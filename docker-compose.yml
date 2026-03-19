@@ -1,0 +1,69 @@
+version: "3.9"
+
+# =============================================================
+# Docker Compose para la plataforma overleaf-admin
+# Solo gestiona la base de datos PostgreSQL propia.
+# La app Flask puede correr en local (python run.py) o
+# descomentar el servicio 'web' si prefieres contenedorizarla.
+# =============================================================
+
+services:
+  # --- PostgreSQL: base de datos propia de la plataforma ---
+  db:
+    image: postgres:16-alpine
+    container_name: overleaf_admin_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-overleaf_admin}
+      POSTGRES_USER: ${POSTGRES_USER:-overleaf_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-overleaf_admin_pass}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-overleaf_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- pgAdmin (opcional, para explorar la BD visualmente) ---
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: overleaf_admin_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@localhost
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    profiles:
+      - tools  # Activar con: docker compose --profile tools up
+
+  # --- Aplicación Flask (opcional) ---
+  # Descomenta si quieres correr la app también en Docker.
+  # Por defecto se recomienda correr la app en local (python run.py)
+  # para facilitar el desarrollo y depuración.
+  #
+  # web:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile
+  #   container_name: overleaf_admin_web
+  #   restart: unless-stopped
+  #   env_file: .env
+  #   environment:
+  #     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  #   ports:
+  #     - "5000:5000"
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   volumes:
+  #     - .:/app
+
+volumes:
+  pgdata:
+    name: overleaf_admin_pgdata

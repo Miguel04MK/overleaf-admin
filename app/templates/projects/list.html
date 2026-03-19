@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Proyectos{% endblock %}
+{% block page_title %}Proyectos sincronizados{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <!-- Barra de búsqueda -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <form method="GET" action="{{ url_for('projects.list_projects') }}" class="row g-2 align-items-end">
+        <div class="col-12 col-md-6 col-lg-4">
+          <label class="form-label small fw-medium text-muted mb-1">Buscar proyecto</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+            <input
+              type="text"
+              name="q"
+              class="form-control"
+              placeholder="Nombre del proyecto..."
+              value="{{ search }}"
+            />
+          </div>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary">Buscar</button>
+          {% if search %}
+            <a href="{{ url_for('projects.list_projects') }}" class="btn btn-outline-secondary">Limpiar</a>
+          {% endif %}
+        </div>
+        <div class="col-auto ms-auto text-muted small align-self-center">
+          {% if search %}Resultados para <strong>{{ search }}</strong>:{% endif %}
+          <strong>{{ pagination.total }}</strong> proyecto{{ 's' if pagination.total != 1 else '' }}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      {% if pagination.items %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">ID</th>
+              <th>ID Overleaf</th>
+              <th>Nombre</th>
+              <th>Propietario</th>
+              <th>Creado</th>
+              <th>Última actualización</th>
+              <th>Sincronizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for proj in pagination.items %}
+            <tr>
+              <td class="ps-3 text-muted small">{{ proj.id }}</td>
+              <td>
+                <code class="small text-muted" title="{{ proj.overleaf_id }}">
+                  {{ proj.overleaf_id[:10] }}…
+                </code>
+              </td>
+              <td>
+                <span class="fw-medium">{{ proj.name or '—' }}</span>
+              </td>
+              <td class="small">
+                {% if proj.owner %}
+                  <a href="{{ url_for('users.user_detail', user_id=proj.owner.id) }}"
+                     class="text-decoration-none">
+                    {{ proj.owner.display_name }}
+                  </a>
+                {% elif proj.owner_overleaf_id %}
+                  <code class="text-muted small" title="{{ proj.owner_overleaf_id }}">
+                    {{ proj.owner_overleaf_id[:10] }}…
+                  </code>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted">
+                {{ proj.created_at.strftime('%d/%m/%Y') if proj.created_at else '—' }}
+              </td>
+              <td class="small text-muted">
+                {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else '—' }}
+              </td>
+              <td class="small text-muted">
+                {{ proj.synced_at.strftime('%d/%m/%Y %H:%M') if proj.synced_at else '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginación -->
+      {% if pagination.pages > 1 %}
+      <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
+        <div class="text-muted small">Página {{ pagination.page }} de {{ pagination.pages }}</div>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('projects.list_projects', page=pagination.prev_num, q=search) }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+              {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                  <a class="page-link" href="{{ url_for('projects.list_projects', page=p, q=search) }}">{{ p }}</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+              {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('projects.list_projects', page=pagination.next_num, q=search) }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-folder-x fs-1 d-block mb-3 opacity-50"></i>
+        {% if search %}
+          No se encontraron proyectos con <strong>{{ search }}</strong>.
+        {% else %}
+          No hay proyectos sincronizados todavía.<br>
+          <a href="{{ url_for('sync.status') }}" class="btn btn-success btn-sm mt-3">
+            <i class="bi bi-arrow-repeat me-2"></i>Ejecutar sincronización
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

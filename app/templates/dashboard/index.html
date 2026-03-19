@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <!-- ── Tarjetas de resumen ── -->
+  <div class="row g-3 mb-4">
+
+    <!-- Total usuarios -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="rounded-3 p-3 bg-primary-subtle">
+            <i class="bi bi-people-fill fs-3 text-primary"></i>
+          </div>
+          <div>
+            <div class="fs-2 fw-bold lh-1">{{ stats.total_users }}</div>
+            <div class="text-muted small">Usuarios sincronizados</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total proyectos -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="rounded-3 p-3 bg-success-subtle">
+            <i class="bi bi-folder2-open fs-3 text-success"></i>
+          </div>
+          <div>
+            <div class="fs-2 fw-bold lh-1">{{ stats.total_projects }}</div>
+            <div class="text-muted small">Proyectos sincronizados</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Última sincronización -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="rounded-3 p-3 bg-warning-subtle">
+            <i class="bi bi-clock-history fs-3 text-warning"></i>
+          </div>
+          <div>
+            {% if stats.last_sync %}
+              <div class="fw-semibold lh-1 small">
+                {{ stats.last_sync.strftime('%d/%m/%Y') }}
+              </div>
+              <div class="text-muted small">
+                {{ stats.last_sync.strftime('%H:%M:%S') }}
+              </div>
+            {% else %}
+              <div class="fw-semibold text-muted small">Nunca</div>
+            {% endif %}
+            <div class="text-muted small">Última sincronización</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado de la última sync -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="rounded-3 p-3
+            {% if stats.last_sync_status == 'success' %}bg-success-subtle
+            {% elif stats.last_sync_status == 'error' %}bg-danger-subtle
+            {% elif stats.last_sync_status == 'running' %}bg-info-subtle
+            {% else %}bg-secondary-subtle{% endif %}">
+            <i class="bi fs-3
+              {% if stats.last_sync_status == 'success' %}bi-check-circle-fill text-success
+              {% elif stats.last_sync_status == 'error' %}bi-x-circle-fill text-danger
+              {% elif stats.last_sync_status == 'running' %}bi-arrow-repeat text-info
+              {% else %}bi-dash-circle text-secondary{% endif %}"></i>
+          </div>
+          <div>
+            <div class="fw-semibold lh-1">
+              {% if stats.last_sync_status == 'success' %}Exitosa
+              {% elif stats.last_sync_status == 'error' %}Con errores
+              {% elif stats.last_sync_status == 'running' %}En curso
+              {% elif stats.last_sync_status == 'partial' %}Parcial
+              {% else %}Sin datos{% endif %}
+            </div>
+            <div class="text-muted small">Estado de sincronización</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row tarjetas -->
+
+  <div class="row g-3">
+
+    <!-- ── Estado de servicios ── -->
+    <div class="col-12 col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">
+            <i class="bi bi-hdd-network me-2 text-muted"></i>Estado de servicios
+          </span>
+          {% if service_statuses and service_statuses[0].source == 'docker' %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle small">Docker</span>
+          {% elif service_statuses and service_statuses[0].source == 'tcp' %}
+            <span class="badge bg-info-subtle text-info border border-info-subtle small">TCP</span>
+          {% else %}
+            <span class="badge bg-secondary-subtle text-secondary border small">Sin verificar</span>
+          {% endif %}
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush">
+            {% for svc in service_statuses %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+              <div>
+                <div class="fw-medium small">{{ svc.name }}</div>
+                <div class="text-muted" style="font-size:.75rem;">{{ svc.detail }}</div>
+              </div>
+              {% if svc.status == 'online' %}
+                <span class="badge rounded-pill bg-success">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Activo
+                </span>
+              {% elif svc.status == 'offline' %}
+                <span class="badge rounded-pill bg-danger">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Inactivo
+                </span>
+              {% else %}
+                <span class="badge rounded-pill bg-secondary">
+                  <i class="bi bi-circle me-1" style="font-size:.5rem;"></i>Desconocido
+                </span>
+              {% endif %}
+            </li>
+            {% else %}
+            <li class="list-group-item text-muted small py-3">No se pudo obtener el estado de los servicios.</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="card-footer bg-white border-top">
+          <form method="POST" action="{{ url_for('sync.trigger') }}">
+            <button type="submit" class="btn btn-success btn-sm w-100">
+              <i class="bi bi-arrow-repeat me-2"></i>Sincronizar ahora
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Historial de sincronizaciones ── -->
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">
+            <i class="bi bi-clock-history me-2 text-muted"></i>Sincronizaciones recientes
+          </span>
+          <a href="{{ url_for('sync.status') }}" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+        </div>
+        <div class="card-body p-0">
+          {% if stats.recent_syncs %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>Inicio</th>
+                  <th>Estado</th>
+                  <th>Usuarios</th>
+                  <th>Proyectos</th>
+                  <th>Duración</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for run in stats.recent_syncs %}
+                <tr>
+                  <td class="text-muted small">{{ run.id }}</td>
+                  <td class="small">{{ run.started_at.strftime('%d/%m %H:%M') if run.started_at else '—' }}</td>
+                  <td>
+                    {% if run.status == 'success' %}
+                      <span class="badge bg-success">Éxito</span>
+                    {% elif run.status == 'error' %}
+                      <span class="badge bg-danger">Error</span>
+                    {% elif run.status == 'running' %}
+                      <span class="badge bg-info">En curso</span>
+                    {% elif run.status == 'partial' %}
+                      <span class="badge bg-warning text-dark">Parcial</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ run.status }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="small">{{ run.users_synced }}/{{ run.users_found }}</td>
+                  <td class="small">{{ run.projects_synced }}/{{ run.projects_found }}</td>
+                  <td class="small text-muted">
+                    {% if run.duration_seconds is not none %}
+                      {{ "%.1f"|format(run.duration_seconds) }}s
+                    {% else %}—{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center text-muted py-5 small">
+            <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+            No hay sincronizaciones registradas todavía.<br>
+            Haz clic en <strong>Sincronizar ahora</strong> para comenzar.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row -->
+</div>
+{% endblock %}

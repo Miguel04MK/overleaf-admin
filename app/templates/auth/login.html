@@ -1,0 +1,82 @@
+{% extends "base_login.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+
+    <div class="text-center mb-4">
+      <i class="bi bi-journal-code text-success" style="font-size: 3rem;"></i>
+      <h2 class="fw-bold mt-2">Overleaf Admin</h2>
+      <p class="text-muted small">Panel de administración &mdash; acceso restringido</p>
+    </div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4">
+        <h5 class="card-title mb-4 text-center text-muted">Iniciar sesión</h5>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
+          <div class="mb-3">
+            <label for="username" class="form-label fw-medium">Usuario</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white">
+                <i class="bi bi-person text-muted"></i>
+              </span>
+              <input
+                type="text"
+                class="form-control"
+                id="username"
+                name="username"
+                placeholder="admin"
+                autocomplete="username"
+                autofocus
+                required
+              />
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label for="password" class="form-label fw-medium">Contraseña</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white">
+                <i class="bi bi-lock text-muted"></i>
+              </span>
+              <input
+                type="password"
+                class="form-control"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="d-grid">
+            <button type="submit" class="btn btn-success btn-lg">
+              <i class="bi bi-box-arrow-in-right me-2"></i>Entrar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-center text-muted small mt-3">
+      Credenciales por defecto: <code>admin</code> / <code>admin</code>
+    </p>
+
+  </div>
+</div>
+{% endblock %}

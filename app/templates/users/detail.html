@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Usuario — {{ user.display_name }}{% endblock %}
+{% block page_title %}Detalle de usuario{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <div class="mb-3">
+    <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Volver al listado
+    </a>
+  </div>
+
+  <div class="row g-3">
+    <!-- Info principal -->
+    <div class="col-12 col-lg-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-4">
+          <div class="rounded-circle bg-primary-subtle d-inline-flex align-items-center justify-content-center mb-3"
+               style="width:72px;height:72px;">
+            <i class="bi bi-person-fill fs-2 text-primary"></i>
+          </div>
+          <h5 class="fw-bold mb-1">{{ user.display_name }}</h5>
+          <p class="text-muted mb-2">{{ user.email or '—' }}</p>
+          {% if user.is_admin %}
+            <span class="badge bg-warning text-dark">
+              <i class="bi bi-shield-fill-check me-1"></i>Administrador Overleaf
+            </span>
+          {% else %}
+            <span class="badge bg-secondary">Usuario estándar</span>
+          {% endif %}
+        </div>
+        <div class="card-footer bg-white border-top">
+          <dl class="row mb-0 small">
+            <dt class="col-6 text-muted">ID plataforma</dt>
+            <dd class="col-6 text-end fw-medium">{{ user.id }}</dd>
+
+            <dt class="col-6 text-muted">ID Overleaf</dt>
+            <dd class="col-6 text-end">
+              <code class="small" title="{{ user.overleaf_id }}">{{ user.overleaf_id }}</code>
+            </dd>
+
+            <dt class="col-6 text-muted">Nombre</dt>
+            <dd class="col-6 text-end">{{ user.first_name or '—' }}</dd>
+
+            <dt class="col-6 text-muted">Apellidos</dt>
+            <dd class="col-6 text-end">{{ user.last_name or '—' }}</dd>
+
+            <dt class="col-6 text-muted">Registro</dt>
+            <dd class="col-6 text-end">
+              {{ user.signup_date.strftime('%d/%m/%Y') if user.signup_date else '—' }}
+            </dd>
+
+            <dt class="col-6 text-muted">Último acceso</dt>
+            <dd class="col-6 text-end">
+              {{ user.last_login_at.strftime('%d/%m/%Y %H:%M') if user.last_login_at else '—' }}
+            </dd>
+
+            <dt class="col-6 text-muted">Sincronizado</dt>
+            <dd class="col-6 text-end">
+              {{ user.synced_at.strftime('%d/%m/%Y %H:%M') if user.synced_at else '—' }}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proyectos del usuario -->
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom fw-semibold">
+          <i class="bi bi-folder2-open me-2 text-muted"></i>
+          Proyectos como propietario
+          <span class="badge bg-secondary ms-2">{{ projects_owned|length }}</span>
+        </div>
+        <div class="card-body p-0">
+          {% if projects_owned %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Nombre</th>
+                  <th>Creado</th>
+                  <th>Última actualización</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for proj in projects_owned %}
+                <tr>
+                  <td class="ps-3 fw-medium small">{{ proj.name or '—' }}</td>
+                  <td class="small text-muted">
+                    {{ proj.created_at.strftime('%d/%m/%Y') if proj.created_at else '—' }}
+                  </td>
+                  <td class="small text-muted">
+                    {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else '—' }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center text-muted py-4 small">
+            <i class="bi bi-folder-x d-block fs-3 mb-2 opacity-50"></i>
+            Este usuario no tiene proyectos registrados como propietario.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
