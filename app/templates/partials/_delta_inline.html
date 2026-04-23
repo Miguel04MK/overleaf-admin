@@ -1,0 +1,16 @@
+{# Inline delta shown next to a number.
+     delta > 0  -> green +X
+     delta < 0  -> red -X
+     delta == 0 -> muted 0
+     delta None -> nothing
+   Usage: {% with delta = run.users_delta %}{% include 'partials/_delta_inline.html' %}{% endwith %}
+#}
+{% if delta is not none %}
+  {% if delta > 0 %}
+    <small class="text-success fw-semibold ms-1">+{{ delta }}</small>
+  {% elif delta < 0 %}
+    <small class="text-danger fw-semibold ms-1">{{ delta }}</small>
+  {% else %}
+    <small class="text-muted ms-1">0</small>
+  {% endif %}
+{% endif %}

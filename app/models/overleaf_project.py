@@ -39,6 +39,11 @@ class OverleafProject(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
+    # File stats extracted from rootFolder (counts docs + fileRefs recursively)
+    file_count = db.Column(db.Integer, nullable=True)
+    # Sum of binary file sizes from rootFolder.fileRefs[].size (bytes)
+    size_bytes = db.Column(db.BigInteger, nullable=True)
+
     # Sync metadata
     synced_at = db.Column(
         db.DateTime(timezone=True),

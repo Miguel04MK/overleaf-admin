@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Sincronización{% endblock %}
+{% block page_title %}Estado de sincronización{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <!-- Acción manual -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div>
+        <h6 class="fw-semibold mb-1">Sincronización manual</h6>
+        <p class="text-muted small mb-0">
+          Extrae usuarios y proyectos de Overleaf Community Edition y los carga en PostgreSQL.
+          El proceso se ejecuta en segundo plano; refresca la página para ver el resultado.
+        </p>
+      </div>
+      <form method="POST" action="{{ url_for('sync.trigger') }}">
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-arrow-repeat me-2"></i>Sincronizar ahora
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Historial -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom fw-semibold">
+      <i class="bi bi-clock-history me-2 text-muted"></i>Historial de sincronizaciones
+      <span class="badge bg-secondary ms-2">{{ runs|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if runs %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">#</th>
+              <th>Inicio</th>
+              <th>Fin</th>
+              <th>Estado</th>
+              <th>Modo</th>
+              <th>Usuarios</th>
+              <th>Proyectos</th>
+              <th>Duración</th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run in runs %}
+            <tr>
+              <td class="ps-3 text-muted small">{{ run.id }}</td>
+              <td class="small text-nowrap">
+                {{ run.started_at.strftime('%d/%m/%Y %H:%M:%S') if run.started_at else '—' }}
+              </td>
+              <td class="small text-nowrap text-muted">
+                {{ run.finished_at.strftime('%H:%M:%S') if run.finished_at else
+                   ('<span class="text-info small">en curso…</span>'|safe) }}
+              </td>
+              <td>
+                {% if run.status == 'success' %}
+                  <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Éxito</span>
+                {% elif run.status == 'error' %}
+                  <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Error</span>
+                {% elif run.status == 'running' %}
+                  <span class="badge bg-info"><i class="bi bi-arrow-repeat me-1"></i>En curso</span>
+                {% elif run.status == 'partial' %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle me-1"></i>Parcial</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ run.status }}</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted">
+                {% if run.triggered_by == 'manual' %}
+                  <i class="bi bi-hand-index me-1"></i>Manual
+                {% else %}
+                  <i class="bi bi-clock me-1"></i>Programada
+                {% endif %}
+              </td>
+              <td class="small">
+                <span class="fw-medium">{{ run.users_found }}</span>
+                {% with delta = run.users_delta %}{% include 'partials/_delta_inline.html' %}{% endwith %}
+              </td>
+              <td class="small">
+                <span class="fw-medium">{{ run.projects_found }}</span>
+                {% with delta = run.projects_delta %}{% include 'partials/_delta_inline.html' %}{% endwith %}
+              </td>
+              <td class="small text-muted">
+                {% if run.duration_seconds is not none %}
+                  {{ "%.1f"|format(run.duration_seconds) }}s
+                {% else %}—{% endif %}
+              </td>
+              <td class="small text-muted" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                  title="{{ run.message or '' }}">
+                {{ run.message or '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-arrow-repeat fs-1 d-block mb-3 opacity-50"></i>
+        No hay sincronizaciones registradas todavía.<br>
+        Haz clic en <strong>Sincronizar ahora</strong> para comenzar.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Info técnica -->
+  <div class="card border-0 shadow-sm mt-4 border-start border-4 border-info">
+    <div class="card-body">
+      <h6 class="fw-semibold text-info mb-2">
+        <i class="bi bi-info-circle me-2"></i>Información técnica
+      </h6>
+      <ul class="small text-muted mb-0">
+        <li>La sincronización se conecta al MongoDB de Overleaf CE (configurable en <code>.env</code> → <code>MONGO_URI</code>).</li>
+        <li>Si MongoDB no está disponible, el proceso fallará con estado <strong>Error</strong> y lo registrará en el log de auditoría.</li>
+        <li>Las sincronizaciones son <strong>idempotentes</strong>: se pueden ejecutar varias veces sin duplicar datos.</li>
+        <li>Para diagnosticar la conexión con Overleaf: <code>python scripts/diagnose_overleaf.py</code></li>
+        <li>Para poblar Overleaf con datos de prueba: <code>python scripts/seed_overleaf.py</code></li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

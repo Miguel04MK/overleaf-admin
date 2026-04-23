@@ -28,6 +28,11 @@ class SyncRun(db.Model):
     projects_found = db.Column(db.Integer, default=0)
     projects_synced = db.Column(db.Integer, default=0)
 
+    # Net change vs previous state (post-sync count - pre-sync count).
+    # Positive => new rows, negative => rows disappeared, 0 => no change.
+    users_delta = db.Column(db.Integer, nullable=True)
+    projects_delta = db.Column(db.Integer, nullable=True)
+
     # "manual" | "scheduled"
     triggered_by = db.Column(db.String(32), nullable=False, default="manual")
 

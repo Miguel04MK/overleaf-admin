@@ -41,19 +41,22 @@ def create_app(config_name: str | None = None) -> Flask:
         return db.session.get(AdminUser, int(user_id))
 
     # Register blueprints
-    from app.auth.routes import auth_bp
-    from app.dashboard.routes import dashboard_bp
-    from app.users.routes import users_bp
-    from app.projects.routes import projects_bp
-    from app.audit.routes import audit_bp
-    from app.sync_bp.routes import sync_bp
+    from app.modules.auth.routes import auth_bp
+    from app.modules.dashboard.routes import dashboard_bp
+    from app.modules.users.routes import users_bp
+    from app.modules.projects.routes import projects_bp
+    from app.modules.sync.routes import sync_bp
+    from app.modules.admin.routes import audit_bp, dev_bp
+    from app.modules.reports.routes import reports_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(projects_bp)
-    app.register_blueprint(audit_bp)
     app.register_blueprint(sync_bp)
+    app.register_blueprint(audit_bp)
+    app.register_blueprint(dev_bp)
+    app.register_blueprint(reports_bp)
 
     # Register error handlers
     _register_error_handlers(app)
