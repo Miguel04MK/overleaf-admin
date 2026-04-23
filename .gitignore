@@ -1,0 +1,74 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+MANIFEST
+.eggs/
+
+# ─── Entornos virtuales ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ─── Variables de entorno y secretos ──────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ─── Flask / SQLAlchemy ───────────────────────────────────────────────────────
+instance/
+*.db
+*.sqlite
+*.sqlite3
+flask_session/
+
+# ─── Migraciones (mantener el código, ignorar caché de Alembic) ───────────────
+migrations/__pycache__/
+migrations/versions/__pycache__/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+
+# ─── IDEs y editores ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+# (docker-compose.yml sí se versiona)
+docker/secrets/
+
+# ─── Assets de terceros (vendor) ──────────────────────────────────────────────
+app/static/vendor/
+
+# ─── Documentación generada ───────────────────────────────────────────────────
+docs/_build/
+site/
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.bak
+*.tmp
+.cache/
