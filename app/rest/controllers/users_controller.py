@@ -1,11 +1,12 @@
-"""Users blueprint — list and detail views for synchronized Overleaf users."""
+"""Users controller — list and detail views for synchronized Overleaf users."""
 from flask import Blueprint, render_template, request, abort, redirect, url_for, flash, jsonify
 from flask_login import login_required
 from flask import current_app
 
-from app.modules.users import service as user_service
+from app.model.services import users_service
+from app.model.services import roles_service
 
-users_bp = Blueprint("users", __name__, url_prefix="/usuarios", template_folder="templates")
+users_bp = Blueprint("users", __name__, url_prefix="/usuarios")
 
 
 def _serialize_user(u) -> dict:
@@ -33,7 +34,7 @@ def search():
     q = request.args.get("q", "").strip() or None
     sort = request.args.get("sort", "email")
     order = request.args.get("order", "asc")
-    users = user_service.search_users(q=q, sort=sort, order=order)
+    users = users_service.search_users(q=q, sort=sort, order=order)
     return jsonify({"total": len(users), "users": [_serialize_user(u) for u in users]})
 
 
@@ -46,26 +47,21 @@ def list_users():
 @users_bp.route("/<int:user_id>")
 @login_required
 def user_detail(user_id: int):
-    user = user_service.get_user_by_id(user_id)
-    if not user:
+    page = request.args.get("page", 1, type=int)
+    data = users_service.get_user_detail_data(user_id, projects_page=page)
+    if data is None:
         abort(404)
-    projects_owned = user.projects_owned.all()
-    return render_template(
-        "users/detail.html",
-        user=user,
-        projects_owned=projects_owned,
-        active_page="users",
-    )
+    all_roles = roles_service.get_all_roles()
+    return render_template("users/detail.html", active_page="users",
+                           all_roles=all_roles, **data)
 
 
 @users_bp.route("/<int:user_id>/cuota", methods=["POST"])
 @login_required
 def set_quota(user_id: int):
-    """Update the storage quota for a user."""
     raw_value = request.form.get("quota_value", "").strip()
     raw_unit  = request.form.get("quota_unit", "MB")
 
-    # Empty or zero => remove quota (unlimited)
     if not raw_value or raw_value == "0":
         max_bytes = None
     else:
@@ -81,6 +77,6 @@ def set_quota(user_id: int):
         mult = multipliers.get(raw_unit, 1024 ** 2)
         max_bytes = int(value * mult)
 
-    ok, msg = user_service.set_user_quota(user_id, max_bytes)
+    ok, msg = users_service.set_user_quota(user_id, max_bytes)
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

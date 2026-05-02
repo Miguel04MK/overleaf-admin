@@ -1,0 +1,644 @@
+{% extends "base.html" %}
+{% block title %}Usuario — {{ user.display_name }}{% endblock %}
+{% block page_title %}Detalle de usuario{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  /* ── Tooltip colaboradores — position:fixed para escapar overflow ── */
+  .collab-cell { display: inline-block; cursor: default; }
+  .collab-tip {
+    display: none;
+    position: fixed;
+    transform: translateY(-50%);
+    background: #1e2a38;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    line-height: 1.7;
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  }
+  .collab-tip::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: #1e2a38;
+  }
+
+  /* ── Cuota: separador vertical en lg ── */
+  .quota-divider {
+    width: 1px;
+    background: #dee2e6;
+    align-self: stretch;
+    margin: 0 1.25rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <div class="mb-3">
+    <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Volver al listado
+    </a>
+  </div>
+
+  {# ── 1. INFO + CUOTA (un solo card) ──────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-4">
+      <div class="d-flex flex-column flex-lg-row align-items-start gap-0">
+
+        {# Avatar + datos del usuario #}
+        <div class="d-flex align-items-start gap-3 flex-grow-1">
+          <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:64px;height:64px;">
+            <i class="bi bi-person-fill fs-3 text-primary"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <h5 class="fw-bold mb-0">{{ user.display_name }}</h5>
+              {% if user.is_admin %}
+                <span class="badge bg-warning text-dark">
+                  <i class="bi bi-shield-fill-check me-1"></i>Admin Overleaf
+                </span>
+              {% endif %}
+              <span class="badge bg-{{ 'success' if is_active else 'secondary' }}">
+                <i class="bi bi-circle-fill me-1" style="font-size:.45rem;vertical-align:middle;"></i>
+                {{ 'Activo' if is_active else 'Inactivo' }}
+              </span>
+              {# ── Rol actual ── #}
+              {% set cur_role = user.role %}
+              {% if cur_role %}
+                <span class="badge bg-{{ cur_role.color }} {% if cur_role.color in ['info','warning'] %}text-dark{% endif %}">
+                  <i class="bi bi-person-badge me-1"></i>{{ cur_role.name | capitalize }}
+                </span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                  <i class="bi bi-person-badge me-1"></i>Sin rol
+                </span>
+              {% endif %}
+              <button type="button"
+                      class="btn btn-sm btn-outline-secondary py-0 px-2"
+                      data-bs-toggle="modal" data-bs-target="#modalCambiarRol"
+                      style="font-size:.75rem;">
+                <i class="bi bi-pencil me-1"></i>Cambiar rol
+              </button>
+            </div>
+            <p class="text-muted mb-3 small">{{ user.email or "—" }}</p>
+            <div class="d-flex flex-wrap gap-4 small text-muted">
+              <span>
+                <i class="bi bi-calendar-plus me-1"></i>Registro:
+                <strong class="text-body">
+                  {{ user.signup_date.strftime('%d/%m/%Y') if user.signup_date else "—" }}
+                </strong>
+              </span>
+              <span>
+                <i class="bi bi-clock-history me-1"></i>Último acceso:
+                <strong class="text-body">
+                  {{ user.last_login_at.strftime('%d/%m/%Y %H:%M') if user.last_login_at else "—" }}
+                </strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {# Divisor vertical (solo lg+) #}
+        <div class="quota-divider d-none d-lg-block"></div>
+        <div class="w-100 d-lg-none border-top mt-3 mb-3"></div>
+
+        {# Cuota #}
+        <div style="min-width:200px;">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="small fw-semibold text-muted">
+              <i class="bi bi-hdd me-1"></i>Almacenamiento
+            </span>
+            <button
+              id="quotaToggleBtn"
+              type="button"
+              onclick="toggleQuotaForm()"
+              class="btn btn-link btn-sm p-0 ms-3 text-muted"
+              style="font-size:.75rem;text-decoration:none;">
+              <i class="bi bi-pencil-fill"></i> editar
+            </button>
+          </div>
+
+          <div class="d-flex align-items-baseline gap-1 mb-1">
+            <span class="fw-bold">{{ user.quota_used_fmt }}</span>
+            <span class="text-muted small">/ {{ user.quota_max_fmt }}</span>
+          </div>
+
+          {% if user.quota_percent is not none %}
+            <div class="progress mb-1" style="height:5px;min-width:160px;">
+              <div class="progress-bar bg-{{ user.quota_status }}"
+                   style="width:{{ [user.quota_percent, 100]|min }}%"></div>
+            </div>
+            <div class="small text-muted">{{ user.quota_percent }}% usado</div>
+          {% else %}
+            <div class="small text-muted fst-italic">Sin límite asignado</div>
+          {% endif %}
+
+          <div id="quotaForm" style="display:none;" class="mt-3 pt-3 border-top">
+            <form method="POST" action="{{ url_for('users.set_quota', user_id=user.id) }}">
+              <div class="input-group input-group-sm">
+                <input type="number" name="quota_value" class="form-control"
+                       placeholder="Ej: 500" min="0" step="any"
+                       value="{{ '%.0f'|format(user.max_quota_bytes / (1024**2)) if user.max_quota_bytes else '' }}">
+                <select name="quota_unit" class="form-select" style="max-width:68px;">
+                  <option value="MB" {% if not user.max_quota_bytes or user.max_quota_bytes < 1024**3 %}selected{% endif %}>MB</option>
+                  <option value="GB" {% if user.max_quota_bytes and user.max_quota_bytes >= 1024**3 %}selected{% endif %}>GB</option>
+                  <option value="KB">KB</option>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  <i class="bi bi-check2"></i>
+                </button>
+              </div>
+              <div class="form-text">Vacío o 0 = sin límite.</div>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  {# ── 2. PROYECTOS CON TABS ────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-bottom">
+      <ul class="nav nav-tabs card-header-tabs">
+        <li class="nav-item">
+          <button class="nav-link active" id="tab-btn-owned" type="button" onclick="switchTab('owned')">
+            <i class="bi bi-folder2-open me-1"></i>Propios
+            <span class="badge bg-secondary ms-1">{{ projects_pagination.total }}</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="tab-btn-collabs" type="button" onclick="switchTab('collabs')">
+            <i class="bi bi-people me-1"></i>Colaboraciones
+            <span class="badge bg-secondary ms-1">{{ collab_count }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    {# ── Tab: Proyectos propios ── #}
+    <div id="table-owned">
+      {% if projects_pagination.items %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Nombre</th>
+                <th class="text-end">Tamaño</th>
+                <th class="text-center">Colaboradores</th>
+                <th>Actualizado</th>
+                <th>Creado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for proj in projects_pagination.items %}
+              {% set collab_names = members_map.get(proj.id, []) %}
+              <tr>
+                <td class="ps-3 fw-medium small">
+                  <a href="{{ url_for('projects.list_projects', q=proj.name) }}"
+                     class="text-decoration-none text-body">{{ proj.name or "—" }}</a>
+                </td>
+                <td class="text-end small text-muted">
+                  {% if proj.size_bytes and proj.size_bytes > 0 %}
+                    {% set s = proj.size_bytes %}
+                    {% if s >= 1073741824 %}{{ "%.1f"|format(s/1073741824) }} GB
+                    {% elif s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                    {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                    {% else %}{{ s }} B{% endif %}
+                  {% else %}<span class="opacity-50">—</span>{% endif %}
+                </td>
+                <td class="text-center">
+                  {% if collab_names %}
+                    <span class="collab-cell">
+                      <span class="badge bg-info-subtle text-info-emphasis" style="cursor:default;">
+                        <i class="bi bi-people-fill me-1"></i>{{ collab_names | length }}
+                      </span>
+                      <span class="collab-tip">
+                        {% for name in collab_names %}{{ name }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+                      </span>
+                    </span>
+                  {% else %}
+                    <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">
+                  {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else "—" }}
+                </td>
+                <td class="small text-muted">
+                  {{ proj.created_at.strftime('%d/%m/%Y') if proj.created_at else "—" }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if projects_pagination.pages > 1 %}
+        <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
+          <span class="small text-muted">
+            {{ projects_pagination.per_page * (projects_pagination.page - 1) + 1 }}–{{ [projects_pagination.per_page * projects_pagination.page, projects_pagination.total]|min }}
+            de {{ projects_pagination.total }}
+          </span>
+          <nav>
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item {% if not projects_pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('users.user_detail', user_id=user.id, page=projects_pagination.prev_num) }}">‹</a>
+              </li>
+              {% for p in projects_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                  <li class="page-item {% if p == projects_pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('users.user_detail', user_id=user.id, page=p) }}">{{ p }}</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+              {% endfor %}
+              <li class="page-item {% if not projects_pagination.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('users.user_detail', user_id=user.id, page=projects_pagination.next_num) }}">›</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
+
+      {% else %}
+        <div class="text-center text-muted py-5 small">
+          <i class="bi bi-folder-x d-block fs-3 mb-2 opacity-50"></i>
+          Este usuario no tiene proyectos como propietario.
+        </div>
+      {% endif %}
+    </div>{# /table-owned #}
+
+    {# ── Tab: Colaboraciones ── #}
+    <div id="table-collabs" style="display:none;">
+      {% if collab_memberships %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Nombre</th>
+                <th>Rol</th>
+                <th>Propietario</th>
+                <th class="text-end">Tamaño</th>
+                <th>Actualizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in collab_memberships %}
+              {% set proj = m.project %}
+              <tr>
+                <td class="ps-3 fw-medium small">
+                  <a href="{{ url_for('projects.list_projects', q=proj.name) }}"
+                     class="text-decoration-none text-body">{{ proj.name or "—" }}</a>
+                </td>
+                <td>
+                  {% if m.role == 'read_only' %}
+                    <span class="badge bg-secondary">Solo lectura</span>
+                  {% else %}
+                    <span class="badge bg-info-subtle text-info-emphasis">Colaborador</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">
+                  {{ proj.owner.display_name if proj.owner else "—" }}
+                </td>
+                <td class="text-end small text-muted">
+                  {% if proj.size_bytes and proj.size_bytes > 0 %}
+                    {% set s = proj.size_bytes %}
+                    {% if s >= 1073741824 %}{{ "%.1f"|format(s/1073741824) }} GB
+                    {% elif s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                    {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                    {% else %}{{ s }} B{% endif %}
+                  {% else %}<span class="opacity-50">—</span>{% endif %}
+                </td>
+                <td class="small text-muted">
+                  {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else "—" }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center text-muted py-5 small">
+          <i class="bi bi-people d-block fs-3 mb-2 opacity-50"></i>
+          Este usuario no colabora en ningún proyecto.
+        </div>
+      {% endif %}
+    </div>{# /table-collabs #}
+
+  </div>
+
+  {# ── 3. KPIs + GRÁFICA ────────────────────────────────────────────────── #}
+  <div class="row g-3">
+
+    <div class="col-12 col-lg-4 d-flex flex-column gap-3">
+
+      {# KPI: Cuota % #}
+      {% set qs = user.quota_status %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="text-muted small mb-1">Cuota usada</div>
+              {% if user.quota_percent is not none %}
+                <div class="fs-2 fw-bold lh-1 text-{{ qs }}">{{ user.quota_percent }}%</div>
+                <div class="small text-muted mt-1">{{ user.quota_used_fmt }} / {{ user.quota_max_fmt }}</div>
+              {% else %}
+                <div class="fs-2 fw-bold lh-1 text-secondary">—</div>
+                <div class="small text-muted mt-1">Sin cuota asignada</div>
+              {% endif %}
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-{{ qs }}-subtle flex-shrink-0"
+                 style="width:48px;height:48px;">
+              <i class="bi bi-hdd-fill text-{{ qs }} fs-5"></i>
+            </div>
+          </div>
+          {% if user.quota_percent is not none %}
+            <div class="progress mt-3" style="height:5px;">
+              <div class="progress-bar bg-{{ qs }}" style="width:{{ [user.quota_percent, 100]|min }}%"></div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# KPI: Estado #}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="text-muted small mb-1">Estado de actividad</div>
+              <div class="fs-2 fw-bold lh-1 text-{{ 'success' if is_active else 'secondary' }}">
+                {{ 'Activo' if is_active else 'Inactivo' }}
+              </div>
+              <div class="small text-muted mt-1">
+                {{ 'Acceso en los últimos 90 días' if is_active else 'Sin acceso reciente' }}
+              </div>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-{{ 'success' if is_active else 'secondary' }}-subtle flex-shrink-0"
+                 style="width:48px;height:48px;">
+              <i class="bi bi-{{ 'person-check-fill' if is_active else 'person-dash-fill' }} text-{{ 'success' if is_active else 'secondary' }} fs-5"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# KPI: Tendencia #}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="text-muted small mb-1">Actividad reciente</div>
+              <div class="fs-2 fw-bold lh-1 text-{{ 'success' if recent_activity > 0 else 'secondary' }}">
+                {{ recent_activity }}
+                <span class="fs-4 ms-1">{{ '↑' if recent_activity > 0 else '↓' }}</span>
+              </div>
+              <div class="small text-muted mt-1">Proyectos editados (30 días)</div>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-{{ 'success' if recent_activity > 0 else 'secondary' }}-subtle flex-shrink-0"
+                 style="width:48px;height:48px;">
+              <i class="bi bi-graph-up text-{{ 'success' if recent_activity > 0 else 'secondary' }} fs-5"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {# Gráfica #}
+    <div class="col-12 col-lg-8">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold small">
+            <i class="bi bi-bar-chart-line me-2 text-muted"></i>Métricas analíticas
+          </span>
+          <ul class="nav nav-tabs card-header-tabs border-0 small">
+            <li class="nav-item">
+              <button class="nav-link active px-3 py-1" data-metric="storage" type="button">
+                <i class="bi bi-hdd me-1"></i>Almacenamiento
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link px-3 py-1" data-metric="projects" type="button">
+                <i class="bi bi-folder me-1"></i>Proyectos
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link px-3 py-1" data-metric="collabs" type="button">
+                <i class="bi bi-people me-1"></i>Colaboraciones
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="card-body d-flex flex-column justify-content-center" style="min-height:280px;">
+          <div id="chart-empty" class="text-center text-muted py-4 d-none">
+            <i class="bi bi-bar-chart d-block fs-2 mb-2 opacity-50"></i>
+            <span class="small">No hay datos disponibles.</span>
+          </div>
+          <canvas id="metricsChart"></canvas>
+        </div>
+        <div class="card-footer bg-white border-top small text-muted" id="chart-subtitle">
+          Almacenamiento por proyecto (MB) — top 10
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{# ── Modal: Cambiar rol ──────────────────────────────────────────────────── #}
+<div class="modal fade" id="modalCambiarRol" tabindex="-1" aria-labelledby="modalCambiarRolLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('roles.assign_role', user_id=user.id) }}">
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title fw-bold" id="modalCambiarRolLabel">
+            <i class="bi bi-person-badge me-2 text-muted"></i>Cambiar rol de usuario
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <p class="text-muted small mb-3">
+            Usuario: <strong>{{ user.display_name }}</strong>
+            ({{ user.email or '—' }})
+          </p>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Nuevo rol</label>
+            <select name="role_id" class="form-select form-select-sm" id="roleSelect">
+              <option value="">— Retirar rol (asignar rol por defecto) —</option>
+              {% for r in all_roles %}
+                <option value="{{ r.id }}"
+                  {% if user.role and user.role.id == r.id %}selected{% endif %}>
+                  {{ r.name | capitalize }}
+                  {% if r.is_default %}(por defecto){% endif %}
+                  — {{ r.storage_quota_fmt }} / {{ r.max_projects_fmt }} proyectos
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label fw-semibold small">Motivo <span class="text-muted fw-normal">(opcional)</span></label>
+            <textarea name="reason" class="form-control form-control-sm" rows="2"
+                      placeholder="Ej: Cambio de plan, solicitud del usuario..."></textarea>
+          </div>
+
+          {# Advertencia cuota #}
+          <div class="alert alert-warning py-2 px-3 small mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Asignar un nuevo rol actualizará automáticamente la cuota de almacenamiento del usuario.
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-ol">
+            <i class="bi bi-check2 me-1"></i>Confirmar cambio
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleQuotaForm() {
+  var form = document.getElementById('quotaForm');
+  var btn  = document.getElementById('quotaToggleBtn');
+  if (form.style.display === 'none' || form.style.display === '') {
+    form.style.display = 'block';
+    btn.innerHTML = '<i class="bi bi-x"></i> cancelar';
+  } else {
+    form.style.display = 'none';
+    btn.innerHTML = '<i class="bi bi-pencil-fill"></i> editar';
+  }
+}
+
+function switchTab(tab) {
+  var ownedEl   = document.getElementById('table-owned');
+  var collabEl  = document.getElementById('table-collabs');
+  var btnOwned  = document.getElementById('tab-btn-owned');
+  var btnCollab = document.getElementById('tab-btn-collabs');
+  if (tab === 'owned') {
+    ownedEl.style.display  = '';
+    collabEl.style.display = 'none';
+    btnOwned.classList.add('active');
+    btnCollab.classList.remove('active');
+  } else {
+    ownedEl.style.display  = 'none';
+    collabEl.style.display = '';
+    btnOwned.classList.remove('active');
+    btnCollab.classList.add('active');
+  }
+}
+
+(function () {
+  var storageData  = {{ chart_storage  | tojson }};
+  var projectsData = {{ chart_projects | tojson }};
+  var collabsData  = {{ chart_collabs  | tojson }};
+
+  var METRICS = {
+    storage: {
+      data: storageData, type: 'bar', label: 'MB',
+      color: 'rgba(25,135,84,0.75)', border: 'rgba(25,135,84,1)',
+      subtitle: 'Almacenamiento por proyecto (MB) — top 10', yLabel: 'MB',
+    },
+    projects: {
+      data: projectsData, type: 'bar', label: 'Proyectos',
+      color: 'rgba(13,110,253,0.7)', border: 'rgba(13,110,253,1)',
+      subtitle: 'Proyectos creados por mes (últimos 12 meses)', yLabel: 'Proyectos',
+    },
+    collabs: {
+      data: collabsData, type: 'bar', label: 'MB',
+      color: 'rgba(255,193,7,0.75)', border: 'rgba(255,193,7,1)',
+      subtitle: 'Almacenamiento en colaboraciones (MB) — top 10', yLabel: 'MB',
+    },
+  };
+
+  var canvas   = document.getElementById('metricsChart');
+  var emptyMsg = document.getElementById('chart-empty');
+  var subtitle = document.getElementById('chart-subtitle');
+  var ctx      = canvas.getContext('2d');
+  var chart    = null;
+
+  function buildChart(metricKey) {
+    var m = METRICS[metricKey];
+    var isEmpty = !m.data.values || m.data.values.length === 0
+                  || m.data.values.every(function(v) { return v === 0; });
+    if (isEmpty) {
+      canvas.style.display = 'none';
+      emptyMsg.classList.remove('d-none');
+      subtitle.textContent = '';
+      if (chart) { chart.destroy(); chart = null; }
+      return;
+    }
+    canvas.style.display = '';
+    emptyMsg.classList.add('d-none');
+    subtitle.textContent = m.subtitle;
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: m.type,
+      data: {
+        labels: m.data.labels,
+        datasets: [{
+          label: m.label, data: m.data.values,
+          backgroundColor: m.color, borderColor: m.border,
+          borderWidth: 1, borderRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        animation: { duration: 200 },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return ' ' + c.parsed.y + ' ' + m.label; } } },
+        },
+        scales: {
+          x: { ticks: { maxRotation: 35, font: { size: 11 } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { font: { size: 11 } }, title: { display: true, text: m.yLabel, font: { size: 11 } } },
+        },
+      },
+    });
+  }
+
+  document.querySelectorAll('[data-metric]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-metric]').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      buildChart(btn.dataset.metric);
+    });
+  });
+
+  buildChart('storage');
+})();
+
+// Tooltips de colaboradores con position:fixed (escapa overflow del table-responsive)
+document.querySelectorAll('.collab-cell').forEach(function(cell) {
+  var tip = cell.querySelector('.collab-tip');
+  cell.addEventListener('mouseenter', function() {
+    var r = cell.getBoundingClientRect();
+    tip.style.top  = (r.top + r.height / 2) + 'px';
+    tip.style.left = (r.right + 10) + 'px';
+    tip.style.display = 'block';
+  });
+  cell.addEventListener('mouseleave', function() {
+    tip.style.display = 'none';
+  });
+});
+</script>
+{% endblock %}
