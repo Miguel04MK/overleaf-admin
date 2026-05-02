@@ -8,9 +8,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from app.models.overleaf_user import OverleafUser
-from app.models.overleaf_project import OverleafProject
-from app.models.project_member import ProjectMember
+from app.model.entities.overleaf_user import OverleafUser
+from app.model.entities.overleaf_project import OverleafProject
+from app.model.entities.project_member import ProjectMember
 
 logger = logging.getLogger(__name__)
 
