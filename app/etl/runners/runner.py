@@ -18,9 +18,9 @@ from datetime import datetime, timezone
 
 from flask import Flask
 
-from app.extensions import db
-from app.models.sync_run import SyncRun
-from app.modules.admin import service as audit_service
+from app.config.extensions import db
+from app.model.entities.sync_run import SyncRun
+from app.model.services.admin import admin_service as audit_service
 from app.etl.extractors.adapter import OverleafMongoAdapter, make_adapter
 from app.etl.extractors.extractor import OverleafExtractor
 from app.etl.loaders.loader import OverleafLoader
@@ -103,9 +103,10 @@ def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
                             members.append({"overleaf_user_id": oid, "role": "read_only"})
                     memberships_data.append((raw_proj["overleaf_id"], members))
 
-                # Step 6: Upsert projects + memberships
+                # Step 6: Upsert projects + memberships (sync_run_id → per-project logs)
                 projects_found, projects_synced = loader.upsert_projects(
-                    raw_projects, memberships_data, user_map
+                    raw_projects, memberships_data, user_map,
+                    sync_run_id=sync_run.id,
                 )
                 sync_run.projects_found = projects_found
                 sync_run.projects_synced = projects_synced
