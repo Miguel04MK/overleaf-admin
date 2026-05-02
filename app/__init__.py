@@ -6,8 +6,8 @@ import logging
 from flask import Flask
 from dotenv import load_dotenv
 
-from app.config import config_map
-from app.extensions import db, migrate, login_manager
+from app.config.config import config_map
+from app.config.extensions import db, migrate, login_manager
 
 load_dotenv()
 
@@ -33,21 +33,29 @@ def create_app(config_name: str | None = None) -> Flask:
     migrate.init_app(app, db)
     login_manager.init_app(app)
 
+    # Import all models so Alembic can detect them
+    from app.model.entities import (  # noqa: F401
+        overleaf_user, overleaf_project, project_member,
+        sync_run, audit_log, project_sync_log,
+        role, role_change_log,
+    )
+
     # Register user loader
-    from app.models.admin_user import AdminUser
+    from app.model.entities.admin_user import AdminUser
 
     @login_manager.user_loader
     def load_user(user_id: str):
         return db.session.get(AdminUser, int(user_id))
 
     # Register blueprints
-    from app.modules.auth.routes import auth_bp
-    from app.modules.dashboard.routes import dashboard_bp
-    from app.modules.users.routes import users_bp
-    from app.modules.projects.routes import projects_bp
-    from app.modules.sync.routes import sync_bp
-    from app.modules.admin.routes import audit_bp, dev_bp
-    from app.modules.reports.routes import reports_bp
+    from app.rest.controllers.auth_controller import auth_bp
+    from app.rest.controllers.dashboard_controller import dashboard_bp
+    from app.rest.controllers.users_controller import users_bp
+    from app.rest.controllers.projects_controller import projects_bp
+    from app.rest.controllers.sync_controller import sync_bp
+    from app.rest.controllers.admin_controller import audit_bp, dev_bp
+    from app.rest.controllers.reports_controller import reports_bp
+    from app.rest.controllers.roles_controller import roles_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -57,6 +65,15 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(audit_bp)
     app.register_blueprint(dev_bp)
     app.register_blueprint(reports_bp)
+    app.register_blueprint(roles_bp)
+
+    # Seed default roles if DB is ready (idempotent)
+    with app.app_context():
+        try:
+            from app.model.services.roles_service import seed_default_roles
+            seed_default_roles()
+        except Exception:
+            pass  # DB might not be migrated yet
 
     # Register error handlers
     _register_error_handlers(app)

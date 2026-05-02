@@ -55,6 +55,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a href="{{ url_for('roles.list_roles') }}"
+           class="nav-link text-white {% if active_page == 'roles' %}active bg-success{% endif %}">
+          <i class="bi bi-person-badge me-2"></i>Roles
+        </a>
+      </li>
+      <li class="nav-item">
         <a href="{{ url_for('sync.status') }}"
            class="nav-link text-white {% if active_page == 'sync' %}active bg-success{% endif %}">
           <i class="bi bi-arrow-repeat me-2"></i>Sincronización
@@ -135,7 +141,7 @@
 <!-- Bootstrap 5 JS -->
 <script
   src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-  integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmDM8vPKxMZMpnW0sT+GDRRfYGmj"
+  integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
   crossorigin="anonymous"
 ></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
