@@ -2,22 +2,89 @@
    Overleaf Admin Platform — custom styles
    ============================================================ */
 
-/* Sidebar */
-#sidebar {
-  width: 240px;
-  min-height: 100vh;
-  transition: width 0.2s ease;
-  flex-shrink: 0;
+/* ── Brand color ─────────────────────────────────────────────────────────── */
+:root {
+  --ol-green:      #3d8b3d;
+  --ol-green-dark: #2d6a2d;
 }
 
+/* ── Overleaf green buttons ──────────────────────────────────────────────── */
+.btn-ol {
+  background-color: var(--ol-green);
+  border-color:     var(--ol-green);
+  color: #fff;
+  font-size: .78rem;
+  padding: .28rem .65rem;
+  line-height: 1.4;
+}
+.btn-ol:hover, .btn-ol:focus {
+  background-color: var(--ol-green-dark);
+  border-color:     var(--ol-green-dark);
+  color: #fff;
+}
+.btn-ol-icon {
+  background-color: var(--ol-green);
+  border-color:     var(--ol-green);
+  color: #fff;
+  padding: .28rem .42rem;
+  font-size: .78rem;
+  line-height: 1.4;
+}
+.btn-ol-icon:hover {
+  background-color: var(--ol-green-dark);
+  border-color:     var(--ol-green-dark);
+  color: #fff;
+}
+
+/* ── Filter buttons (shared by users + projects lists) ───────────────────── */
+.filter-btn { font-size: .8rem; white-space: nowrap; }
+.filter-btn.has-filter {
+  background-color: var(--ol-green);
+  border-color:     var(--ol-green);
+  color: #fff;
+}
+.filter-btn.has-filter:hover {
+  background-color: var(--ol-green-dark);
+  border-color:     var(--ol-green-dark);
+  color: #fff;
+}
+
+/* ── Filter chips ────────────────────────────────────────────────────────── */
+.filter-chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .22rem .65rem;
+  border-radius: 999px;
+  font-size: .78rem; font-weight: 500;
+  background: rgba(61,139,61,.08);
+  border: 1px solid rgba(61,139,61,.30);
+  color: var(--ol-green);
+  user-select: none;
+}
+.filter-chip .chip-remove {
+  cursor: pointer; font-size: .72rem; opacity: .65;
+  background: none; border: none; padding: 0; color: inherit; line-height: 1;
+}
+.filter-chip .chip-remove:hover { opacity: 1; }
+
+/* ── Sortable column headers (shared) ────────────────────────────────────── */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover .sort-icon { opacity: .6; }
+th.sortable .sort-icon { font-size: .7em; opacity: .25; transition: opacity .15s, color .15s; }
+th.sortable.sort-asc  .sort-icon,
+th.sortable.sort-desc .sort-icon { opacity: 1; color: var(--ol-green); }
+th.sortable.sort-asc  .col-label,
+th.sortable.sort-desc .col-label { color: var(--ol-green); font-weight: 600; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  transition: width 0.2s ease;
+}
 #sidebar.collapsed {
   width: 0;
   overflow: hidden;
   padding: 0 !important;
-}
-
-#page-content-wrapper {
-  min-width: 0;
 }
 
 /* Nav links hover */
@@ -26,32 +93,15 @@
   border-radius: 0.375rem;
 }
 
-/* Cards */
-.card {
-  border-radius: 0.75rem;
+/* ── Sticky sidebar layout (desktop only) ───────────────────────────────── */
+@media (min-width: 769px) {
+  html, body                { height: 100%; overflow: hidden; }
+  #wrapper                  { height: 100vh; overflow: hidden; display: flex; }
+  #sidebar                  { height: 100vh; overflow-y: auto; }
+  #page-content-wrapper     { height: 100vh; overflow-y: auto; flex-grow: 1; min-width: 0; }
 }
 
-.card-header {
-  border-radius: 0.75rem 0.75rem 0 0 !important;
-}
-
-/* Tables */
-.table th {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #6c757d;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* Badge tweaks */
-.badge {
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-/* Responsive sidebar */
+/* ── Mobile sidebar (overlay) ────────────────────────────────────────────── */
 @media (max-width: 768px) {
   #sidebar {
     width: 0;
@@ -61,19 +111,31 @@
     z-index: 1040;
     height: 100vh;
   }
-
   #sidebar.show {
     width: 240px;
     padding: 1rem !important;
   }
 }
 
-/* Scrollable table container */
-.table-responsive {
-  border-radius: 0 0 0.75rem 0.75rem;
-}
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.card            { border-radius: 0.75rem; }
+.card-header     { border-radius: 0.75rem 0.75rem 0 0 !important; }
 
-/* Code blocks */
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6c757d;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.table-responsive { border-radius: 0 0 0.75rem 0.75rem; }
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge { font-weight: 500; letter-spacing: 0.02em; }
+
+/* ── Code blocks ─────────────────────────────────────────────────────────── */
 code {
   font-size: 0.8em;
   background: #f8f9fa;
@@ -82,7 +144,15 @@ code {
   color: #495057;
 }
 
-/* Footer */
-footer {
-  font-size: 0.78rem;
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+footer { font-size: 0.78rem; }
+
+/* ── Tabla: transición suave al actualizar datos ─────────────────────────── */
+#projects-tbody,
+#users-tbody {
+  transition: opacity 0.18s ease;
+}
+.tbody-loading {
+  opacity: 0.25;
+  pointer-events: none;
 }
