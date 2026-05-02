@@ -6,58 +6,19 @@
 <style>
   /* ── Buscador ─────────────────────────────────────────────────── */
   #search-wrapper .input-group {
-    border: 1px solid #dee2e6;
-    border-radius: .5rem;
-    overflow: hidden;
-    transition: box-shadow .15s;
-    width: 400px;
+    border: 1px solid #dee2e6; border-radius: .5rem;
+    overflow: hidden; transition: box-shadow .15s; width: 400px;
   }
   #search-wrapper .input-group:focus-within {
-    box-shadow: 0 0 0 .2rem rgba(13,110,253,.15);
-    border-color: #86b7fe;
+    box-shadow: 0 0 0 .2rem rgba(61,139,61,.18); border-color: #7fba7f;
   }
   #search-wrapper .input-group-text,
   #search-wrapper .form-control { border: none; background: #fff; }
   #search-wrapper .form-control:focus { box-shadow: none; }
 
-  /* ── Botones de filtro ────────────────────────────────────────── */
-  .filter-btn { font-size: .8rem; white-space: nowrap; }
-  .filter-btn.has-filter {
-    background-color: var(--bs-primary);
-    border-color: var(--bs-primary);
-    color: #fff;
-  }
-  .filter-btn.has-filter:hover { filter: brightness(.92); }
-
-  /* ── Chips ────────────────────────────────────────────────────── */
-  .filter-chip {
-    display: inline-flex; align-items: center; gap: .35rem;
-    padding: .22rem .65rem;
-    border-radius: 999px;
-    font-size: .78rem; font-weight: 500;
-    background: rgba(13,110,253,.08);
-    border: 1px solid rgba(13,110,253,.25);
-    color: #0d6efd;
-    user-select: none;
-  }
-  .filter-chip .chip-remove {
-    cursor: pointer; font-size: .72rem; opacity: .65;
-    background: none; border: none; padding: 0; color: inherit; line-height: 1;
-  }
-  .filter-chip .chip-remove:hover { opacity: 1; }
-
-  /* ── Cabeceras ordenables ─────────────────────────────────────── */
-  th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
-  th.sortable:hover .sort-icon { opacity: .6; }
-  th.sortable .sort-icon { font-size: .7em; opacity: .25; transition: opacity .15s, color .15s; }
-  th.sortable.sort-asc  .sort-icon,
-  th.sortable.sort-desc .sort-icon { opacity: 1; color: var(--bs-primary); }
-  th.sortable.sort-asc  .col-label,
-  th.sortable.sort-desc .col-label { color: var(--bs-primary); font-weight: 600; }
-
   /* ── Filas clicables ──────────────────────────────────────────── */
   #users-tbody tr { cursor: pointer; }
-  #users-tbody tr:hover { background-color: rgba(13,110,253,.04); }
+  #users-tbody tr:hover { background-color: rgba(61,139,61,.04); }
 </style>
 {% endblock %}
 
@@ -99,8 +60,7 @@
               </select>
               <input type="number" class="form-control form-control-sm" id="f-projects-val"
                      min="0" max="9999" placeholder="nº" style="width:72px">
-              <button type="button" class="btn btn-sm btn-primary px-2" id="f-projects-add"
-                      title="Añadir filtro">
+              <button type="button" class="btn btn-ol-icon" id="f-projects-add" title="Añadir filtro">
                 <i class="bi bi-plus-lg"></i>
               </button>
             </div>
@@ -123,8 +83,7 @@
               <input type="number" class="form-control form-control-sm" id="f-quota-val"
                      min="0" max="200" placeholder="%" style="width:72px">
               <span class="text-muted small">%</span>
-              <button type="button" class="btn btn-sm btn-primary px-2" id="f-quota-add"
-                      title="Añadir filtro">
+              <button type="button" class="btn btn-ol-icon" id="f-quota-add" title="Añadir filtro">
                 <i class="bi bi-plus-lg"></i>
               </button>
             </div>
@@ -141,7 +100,7 @@
           </div>
         </div>
 
-        <!-- Filtro: Rol (placeholder) -->
+        <!-- Filtro: Rol -->
         <div class="dropdown">
           <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
                   id="btn-f-role" type="button">
@@ -163,9 +122,9 @@
           </button>
           <ul class="dropdown-menu shadow-sm">
             <li><h6 class="dropdown-header">Último inicio de sesión</h6></li>
-            <li><a class="dropdown-item" href="#" data-val="1d"   data-label="Acceso: hoy">Hoy</a></li>
-            <li><a class="dropdown-item" href="#" data-val="7d"   data-label="Acceso: semana">Última semana</a></li>
-            <li><a class="dropdown-item" href="#" data-val="30d"  data-label="Acceso: mes">Último mes</a></li>
+            <li><a class="dropdown-item" href="#" data-val="1d"       data-label="Acceso: hoy">Hoy</a></li>
+            <li><a class="dropdown-item" href="#" data-val="7d"       data-label="Acceso: semana">Última semana</a></li>
+            <li><a class="dropdown-item" href="#" data-val="30d"      data-label="Acceso: mes">Último mes</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-warning" href="#" data-val="inactive" data-label="Inactivo >90d">Sin acceso en 90 días</a></li>
             <li><a class="dropdown-item text-danger"  href="#" data-val="never"    data-label="Nunca accedió">Nunca ha accedido</a></li>
@@ -176,7 +135,7 @@
         <div class="text-muted small ms-auto text-nowrap" id="result-count"></div>
       </div>
 
-      <!-- Fila 2: chips de filtros activos (oculta si no hay ninguno) -->
+      <!-- Fila 2: chips de filtros activos -->
       <div id="chips-row" class="d-none mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2">
       </div>
 
@@ -238,6 +197,10 @@
           </tbody>
         </table>
       </div>
+      <!-- Paginación client-side -->
+      <div id="users-pagination"
+           class="d-none d-flex align-items-center justify-content-between px-3 py-2 border-top">
+      </div>
     </div>
   </div>
 
@@ -247,13 +210,18 @@
 {% block extra_js %}
 <script>
 const SEARCH_URL = "{{ url_for('users.search') }}";
+const PER_PAGE   = 20;
 
 // ── Estado ────────────────────────────────────────────────────────────────────
-let sortState   = { col: 'email', order: 'asc' };
-let cachedUsers = [];
+let sortState    = { col: 'email', order: 'asc' };
+let cachedUsers  = [];
 let debounceTimer = null;
-let activeFilters = [];   // [{ id, type, op, val, label }]
+let activeFilters = [];
 let _nextId = 0;
+
+// Paginación
+let _allVisible = [];
+let _curPage    = 1;
 
 // ── Búsqueda con debounce ─────────────────────────────────────────────────────
 document.getElementById('user-search').addEventListener('input', () => {
@@ -266,7 +234,7 @@ document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
     const col = th.dataset.col;
     sortState.order = (sortState.col === col && sortState.order === 'asc') ? 'desc' : 'asc';
-    sortState.col = col;
+    sortState.col   = col;
     updateSortUI();
     doFetch();
   });
@@ -285,7 +253,7 @@ function updateSortUI() {
   });
 }
 
-// ── Dropdown vanilla (sin Bootstrap JS) ──────────────────────────────────────
+// ── Dropdown vanilla ──────────────────────────────────────────────────────────
 (function () {
   function closeAll(except) {
     document.querySelectorAll('.dropdown').forEach(d => {
@@ -307,7 +275,6 @@ function updateSortUI() {
       closeAll();
       if (!isOpen) { dropdown.classList.add('show'); menu.classList.add('show'); }
     });
-    // Clicks dentro del menú no cierran el dropdown
     menu.addEventListener('click', e => e.stopPropagation());
   });
   document.addEventListener('click', () => closeAll());
@@ -322,23 +289,15 @@ function closeDropdown(btnId) {
 // ── Gestión de filtros ────────────────────────────────────────────────────────
 function addFilter(type, op, val, label) {
   activeFilters.push({ id: _nextId++, type, op, val, label });
-  syncChips();
-  syncFilterBtns();
-  applyAndRender();
+  syncChips(); syncFilterBtns(); applyAndRender();
 }
-
 function removeFilter(id) {
   activeFilters = activeFilters.filter(f => f.id !== id);
-  syncChips();
-  syncFilterBtns();
-  applyAndRender();
+  syncChips(); syncFilterBtns(); applyAndRender();
 }
-
 function clearAllFilters() {
   activeFilters = [];
-  syncChips();
-  syncFilterBtns();
-  applyAndRender();
+  syncChips(); syncFilterBtns(); applyAndRender();
 }
 
 function syncChips() {
@@ -349,13 +308,12 @@ function syncChips() {
     <span class="filter-chip">
       ${esc(f.label)}
       <button class="chip-remove" data-remove="${f.id}" title="Quitar">✕</button>
-    </span>
-  `).join('') + `
+    </span>`
+  ).join('') + `
     <button type="button" id="btn-clear-all"
             class="btn btn-sm btn-link text-danger text-decoration-none p-0 ms-1">
       <i class="bi bi-x-circle me-1"></i>Limpiar todo
-    </button>
-  `;
+    </button>`;
   row.querySelectorAll('[data-remove]').forEach(b =>
     b.addEventListener('click', () => removeFilter(parseInt(b.dataset.remove)))
   );
@@ -364,7 +322,7 @@ function syncChips() {
 
 function syncFilterBtns() {
   const active = new Set(activeFilters.map(f => f.type));
-  [['projects','btn-f-projects'], ['quota','btn-f-quota'], ['access','btn-f-access']].forEach(([type, id]) => {
+  [['projects','btn-f-projects'],['quota','btn-f-quota'],['access','btn-f-access']].forEach(([type, id]) => {
     const btn = document.getElementById(id);
     const on  = active.has(type);
     btn.classList.toggle('has-filter', on);
@@ -410,11 +368,10 @@ document.querySelectorAll('.f-quota-quick').forEach(btn => {
   });
 });
 
-// ── Filtro ÚLTIMO ACCESO (reemplaza si ya hay uno) ────────────────────────────
+// ── Filtro ÚLTIMO ACCESO ──────────────────────────────────────────────────────
 document.getElementById('btn-f-access').closest('.dropdown').querySelectorAll('[data-val]').forEach(item => {
   item.addEventListener('click', e => {
     e.preventDefault();
-    // Quitar filtros de acceso previos (solo uno tiene sentido)
     activeFilters = activeFilters.filter(f => f.type !== 'access');
     addFilter('access', null, item.dataset.val, item.dataset.label);
     closeDropdown('btn-f-access');
@@ -435,7 +392,7 @@ function applyFilters(users) {
       }
       if (f.type === 'quota') {
         const pct = u.quota_percent;
-        if (f.op === 'exceeded')  { if (!u.quota_exceeded) return false; }
+        if (f.op === 'exceeded')   { if (!u.quota_exceeded) return false; }
         else if (f.op === 'unlimited') { if (pct !== null) return false; }
         else {
           if (pct === null) return false;
@@ -459,8 +416,11 @@ function applyFilters(users) {
 
 // ── Fetch + render ────────────────────────────────────────────────────────────
 function doFetch() {
-  const q = document.getElementById('user-search').value.trim();
+  const q      = document.getElementById('user-search').value.trim();
   const params = new URLSearchParams({ q, sort: sortState.col, order: sortState.order });
+  const tbody  = document.getElementById('users-tbody');
+  // Dimm solo si ya hay contenido (no en la carga inicial)
+  if (cachedUsers.length > 0) tbody.classList.add('tbody-loading');
   document.getElementById('search-spinner').classList.remove('d-none');
   fetch(`${SEARCH_URL}?${params}`)
     .then(r => r.json())
@@ -470,23 +430,36 @@ function doFetch() {
 
 function applyAndRender() {
   const visible = applyFilters(cachedUsers);
-  renderTable(visible);
+  renderTable(visible);  // sets _allVisible, resets page to 1
   const total = cachedUsers.length;
-  const n = visible.length;
+  const n     = _allVisible.length;
   document.getElementById('result-count').innerHTML = activeFilters.length
     ? `<strong>${n}</strong> de ${total} usuario${total !== 1 ? 's' : ''}`
     : `<strong>${n}</strong> usuario${n !== 1 ? 's' : ''}`;
 }
 
+// renderTable: guarda todos los visibles y renderiza la página 1
 function renderTable(users) {
-  const tbody = document.getElementById('users-tbody');
-  if (!users.length) {
+  _allVisible = users;
+  _curPage    = 1;
+  _renderPage();
+}
+
+// Renderiza la página actual de _allVisible
+function _renderPage() {
+  const start     = (_curPage - 1) * PER_PAGE;
+  const pageUsers = _allVisible.slice(start, start + PER_PAGE);
+  const tbody     = document.getElementById('users-tbody');
+
+  if (!_allVisible.length) {
     tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">
       <i class="bi bi-people fs-1 d-block mb-3 opacity-50"></i>No se encontraron usuarios.
     </td></tr>`;
+    renderPagination(0);
     return;
   }
-  tbody.innerHTML = users.map(u => `
+
+  tbody.innerHTML = pageUsers.map(u => `
     <tr data-href="${esc(u.detail_url)}">
       <td class="ps-3"><span class="fw-medium">${esc(u.email) || '—'}</span></td>
       <td class="text-muted small">${esc(u.display_name) || '—'}</td>
@@ -495,11 +468,64 @@ function renderTable(users) {
       <td>${quotaCell(u)}</td>
       <td class="small text-muted">${u.signup_date || '—'}</td>
     </tr>`).join('');
+
   tbody.querySelectorAll('tr[data-href]').forEach(row =>
     row.addEventListener('click', () => { window.location.href = row.dataset.href; })
   );
+
+  renderPagination(_allVisible.length);
+  // Fade-in en el siguiente frame de render
+  requestAnimationFrame(() => tbody.classList.remove('tbody-loading'));
 }
 
+function goToPage(page) {
+  _curPage = page;
+  document.getElementById('users-tbody').classList.add('tbody-loading');
+  // Pequeño delay para que se vea el dim antes de actualizar
+  requestAnimationFrame(() => {
+    _renderPage();
+    document.getElementById('users-tbody').closest('.table-responsive')
+      .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+// ── Paginación client-side ────────────────────────────────────────────────────
+function renderPagination(total) {
+  const container = document.getElementById('users-pagination');
+  const pages     = Math.ceil(total / PER_PAGE);
+
+  if (pages <= 1) { container.classList.add('d-none'); container.innerHTML = ''; return; }
+  container.classList.remove('d-none');
+
+  const start = PER_PAGE * (_curPage - 1) + 1;
+  const end   = Math.min(PER_PAGE * _curPage, total);
+
+  // Build page array with ellipsis (null = gap)
+  const pArr = [];
+  for (let i = 1; i <= pages; i++) {
+    if (i <= 2 || i >= pages - 1 || Math.abs(i - _curPage) <= 2) pArr.push(i);
+    else if (pArr[pArr.length - 1] !== null) pArr.push(null);
+  }
+
+  container.innerHTML = `
+    <span class="small text-muted">${start}–${end} de ${total}</span>
+    <nav><ul class="pagination pagination-sm mb-0">
+      <li class="page-item ${_curPage <= 1 ? 'disabled' : ''}">
+        <button class="page-link" ${_curPage > 1 ? `onclick="goToPage(${_curPage - 1})"` : ''}>‹</button>
+      </li>
+      ${pArr.map(p => p === null
+        ? `<li class="page-item disabled"><span class="page-link">…</span></li>`
+        : `<li class="page-item ${p === _curPage ? 'active' : ''}">
+             <button class="page-link" onclick="goToPage(${p})">${p}</button>
+           </li>`
+      ).join('')}
+      <li class="page-item ${_curPage >= pages ? 'disabled' : ''}">
+        <button class="page-link" ${_curPage < pages ? `onclick="goToPage(${_curPage + 1})"` : ''}>›</button>
+      </li>
+    </ul></nav>`;
+}
+
+// ── Helpers de render ─────────────────────────────────────────────────────────
 function roleBadge(u) {
   return u.is_admin
     ? `<span class="badge bg-warning text-dark"><i class="bi bi-shield-fill-check me-1"></i>Admin</span>`
@@ -510,7 +536,7 @@ function quotaCell(u) {
   if (u.quota_percent === null) {
     return `<span class="small text-muted">${esc(u.quota_used_fmt)} <span class="opacity-50">/ sin límite</span></span>`;
   }
-  const pct = Math.min(u.quota_percent, 100);
+  const pct      = Math.min(u.quota_percent, 100);
   const exceeded = u.quota_exceeded
     ? `<span class="badge bg-danger mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Excedida</span><br>`
     : '';
