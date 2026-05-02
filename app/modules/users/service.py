@@ -1,8 +1,40 @@
 """
 UserService — business logic for OverleafUser queries.
 """
+from datetime import datetime, timezone
+
 from app.extensions import db
 from app.models.overleaf_user import OverleafUser
+
+_SORT_KEYS = {
+    "email":     lambda u: (u.email or "").lower(),
+    "nombre":    lambda u: (u.display_name or "").lower(),
+    "roles":     lambda u: not u.is_admin,   # admins first on asc
+    "proyectos": lambda u: u.projects_owned.count(),
+    "cuota":     lambda u: u.quota_used_bytes,
+    "registro":  lambda u: u.signup_date or datetime.min.replace(tzinfo=timezone.utc),
+}
+
+
+def search_users(
+    q: str | None = None,
+    sort: str = "email",
+    order: str = "asc",
+    limit: int = 500,
+) -> list[OverleafUser]:
+    """Return a filtered and sorted list of users for the live-search endpoint."""
+    query = OverleafUser.query
+    if q:
+        term = f"%{q}%"
+        query = query.filter(
+            OverleafUser.email.ilike(term)
+            | OverleafUser.first_name.ilike(term)
+            | OverleafUser.last_name.ilike(term)
+        )
+    users = query.all()
+    key_fn = _SORT_KEYS.get(sort, _SORT_KEYS["email"])
+    users.sort(key=key_fn, reverse=(order == "desc"))
+    return users[:limit]
 
 
 def get_users_page(page: int, per_page: int, search: str | None = None):
