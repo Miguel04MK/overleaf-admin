@@ -1,0 +1,790 @@
+{% extends "base.html" %}
+{% block title %}Proyectos{% endblock %}
+{% block page_title %}Proyectos sincronizados{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Buscador ─────────────────────────────────────────────────────── */
+  #search-wrapper .input-group {
+    border: 1px solid #dee2e6; border-radius: .5rem;
+    overflow: hidden; transition: box-shadow .15s; width: 400px;
+  }
+  #search-wrapper .input-group:focus-within {
+    box-shadow: 0 0 0 .2rem rgba(61,139,61,.18); border-color: #7fba7f;
+  }
+  #search-wrapper .input-group-text,
+  #search-wrapper .form-control { border: none; background: #fff; }
+  #search-wrapper .form-control:focus { box-shadow: none; }
+
+  /* ── Dropdown owner lista scrollable ─────────────────────────────── */
+  #owner-list { max-height: 220px; overflow-y: auto; }
+  #owner-list .dropdown-item { font-size: .82rem; }
+  #owner-list .dropdown-item.active { background: rgba(61,139,61,.1); color: var(--ol-green); }
+
+  /* ── Indicadores toggles ──────────────────────────────────────────── */
+  .ind-toggle {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .35rem .65rem; border-radius: .375rem;
+    font-size: .82rem; cursor: pointer; user-select: none; transition: background .12s;
+  }
+  .ind-toggle:hover { background: rgba(0,0,0,.04); }
+  .ind-toggle.active { background: rgba(61,139,61,.1); color: var(--ol-green); font-weight: 500; }
+  .ind-toggle .ind-check { margin-left: auto; opacity: 0; transition: opacity .12s; }
+  .ind-toggle.active .ind-check { opacity: 1; }
+
+  /* ── Tooltip colaboradores ────────────────────────────────────────── */
+  .collab-cell { display: inline-block; cursor: default; }
+  .collab-tip {
+    display: none; position: fixed; transform: translateY(-50%);
+    background: #1e2a38; color: #fff;
+    padding: 6px 12px; border-radius: 6px;
+    font-size: .74rem; line-height: 1.7; white-space: nowrap;
+    z-index: 9999; pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  }
+  .collab-tip::before {
+    content: ''; position: absolute;
+    right: 100%; top: 50%; transform: translateY(-50%);
+    border: 6px solid transparent; border-right-color: #1e2a38;
+  }
+
+  /* ── Filas ────────────────────────────────────────────────────────── */
+  #projects-tbody tr { cursor: pointer; }
+  #projects-tbody tr:hover { background-color: rgba(61,139,61,.04); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  {# ── Barra de filtros ─────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+
+      {# Fila 1: controles #}
+      <div class="d-flex flex-wrap align-items-center gap-2">
+
+        {# Buscador #}
+        <div id="search-wrapper">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="proj-search" class="form-control"
+                   placeholder="Buscar por nombre o ID Overleaf…"
+                   value="{{ search }}" autocomplete="off">
+            <span id="proj-spinner" class="input-group-text d-none">
+              <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
+            </span>
+          </div>
+        </div>
+
+        {# Filtro: Propietario #}
+        <div class="dropdown" id="dd-owner">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if owner_id }}"
+                  id="btn-f-owner">
+            <i class="bi bi-person{{ '-fill' if owner_id }} me-1"></i>
+            <span id="owner-btn-label">{{ selected_owner.display_name if selected_owner else 'Propietario' }}</span>
+          </button>
+          <div class="dropdown-menu shadow-sm p-2" style="min-width:250px;">
+            <div class="px-1 pb-2">
+              <input type="text" class="form-control form-control-sm"
+                     id="owner-search-input" placeholder="Buscar propietario…" autocomplete="off">
+            </div>
+            <div id="owner-list">
+              <button type="button" class="dropdown-item owner-option rounded"
+                      data-id="" data-name="Todos">
+                <span class="text-muted">Todos los propietarios</span>
+              </button>
+              {% for owner in owners %}
+                <button type="button"
+                        class="dropdown-item owner-option rounded {{ 'active' if owner_id == owner.id }}"
+                        data-id="{{ owner.id }}" data-name="{{ owner.display_name }}">
+                  {{ owner.display_name }}
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        {# Filtro: Fecha actualización #}
+        <div class="dropdown" id="dd-date">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if date_from or date_to }}"
+                  id="btn-f-date">
+            <i class="bi bi-calendar{{ '-check' if date_from or date_to else '3' }} me-1"></i>Fecha actualización
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:230px;">
+            <p class="small fw-semibold text-muted mb-2">Última actualización</p>
+            <div class="mb-2">
+              <label class="form-label small text-muted mb-1">Desde</label>
+              <input type="date" class="form-control form-control-sm" id="f-date-from" value="{{ date_from }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-muted mb-1">Hasta</label>
+              <input type="date" class="form-control form-control-sm" id="f-date-to" value="{{ date_to }}">
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-ol flex-grow-1"
+                      onclick="applyDateFilter()">Aplicar</button>
+              {% if date_from or date_to %}
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="clearDateFilter()" title="Limpiar fechas">
+                  <i class="bi bi-x"></i>
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# Filtro: Indicadores #}
+        {% set IND = [
+          ('large',         'Grande',       'bi-hdd-fill',    'warning'),
+          ('inactive',      'Inactivo',     'bi-moon-fill',   'secondary'),
+          ('collaborative', 'Colaborativo', 'bi-people-fill', 'primary'),
+        ] %}
+        <div class="dropdown" id="dd-indicators">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if indicators_filter }}"
+                  id="btn-f-indicators">
+            <i class="bi bi-flag{{ '-fill' if indicators_filter }} me-1"></i>Indicadores
+            {% if indicators_filter %}
+              <span class="badge bg-white text-success ms-1" style="font-size:.7rem;">
+                {{ indicators_filter|length }}
+              </span>
+            {% endif %}
+          </button>
+          <div class="dropdown-menu shadow-sm p-2" style="min-width:210px;">
+            <p class="small fw-semibold text-muted mb-2 px-1">Tipo de proyecto</p>
+            {% for key, label, icon, color in IND %}
+              <div class="ind-toggle {{ 'active' if key in indicators_filter }}"
+                   data-key="{{ key }}" data-label="{{ label }}">
+                <i class="bi {{ icon }} text-{{ color }}"></i>
+                <span>{{ label }}</span>
+                <i class="bi bi-check2 ind-check"></i>
+              </div>
+            {% endfor %}
+            <div class="border-top mt-2 pt-2 px-1">
+              <button type="button" class="btn btn-ol w-100"
+                      onclick="applyIndicators()">Aplicar</button>
+            </div>
+          </div>
+        </div>
+
+        {# Contador #}
+        <div class="text-muted small ms-auto text-nowrap" id="proj-counter">
+          <strong>{{ pagination.total }}</strong>
+          proyecto{{ 's' if pagination.total != 1 else '' }}
+        </div>
+
+      </div>{# /fila 1 #}
+
+      {# Fila 2: chips de filtros activos #}
+      {% set has_filters = search or owner_id or date_from or date_to or indicators_filter %}
+      <div id="chips-row"
+           class="{% if not has_filters %}d-none {% endif %}mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2">
+      </div>
+
+    </div>
+  </div>
+
+  {# ── Tabla ────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="sortable ps-3" data-col="name">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Nombre</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="ps-2">Propietario</th>
+              <th class="sortable text-center" data-col="members">
+                <div class="d-flex align-items-center justify-content-center gap-1">
+                  <span class="col-label">Colaboradores</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable text-end" data-col="size">
+                <div class="d-flex align-items-center justify-content-end gap-1">
+                  <span class="col-label">Tamaño</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" data-col="updated">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Actualizado</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" data-col="created">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Creado</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th>Indicadores</th>
+            </tr>
+          </thead>
+          <tbody id="projects-tbody">
+            {% for proj in pagination.items %}
+            {% set cnt   = member_counts.get(proj.id, 0) %}
+            {% set names = member_names.get(proj.id, []) %}
+            {% set flags = indicators.get(proj.id, []) %}
+            {% set detail_url = url_for('projects.project_detail', project_id=proj.id) %}
+            <tr onclick="window.location='{{ detail_url }}'">
+              <td class="ps-3 fw-medium small">
+                <a href="{{ detail_url }}" class="text-decoration-none text-body"
+                   onclick="event.stopPropagation()">{{ proj.name or "—" }}</a>
+              </td>
+              <td class="small">
+                {% if proj.owner %}
+                  <a href="{{ url_for('users.user_detail', user_id=proj.owner.id) }}"
+                     class="text-decoration-none text-muted d-flex align-items-center gap-1"
+                     onclick="event.stopPropagation()">
+                    <i class="bi bi-person-fill"></i>{{ proj.owner.display_name }}
+                  </a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if cnt > 0 %}
+                  <span class="collab-cell" onclick="event.stopPropagation()">
+                    <span class="badge bg-info-subtle text-info-emphasis">
+                      <i class="bi bi-people-fill me-1"></i>{{ cnt }}
+                    </span>
+                    <span class="collab-tip">
+                      {% for n in names %}{{ n }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+                    </span>
+                  </span>
+                {% else %}<span class="text-muted small">—</span>{% endif %}
+              </td>
+              <td class="text-end small text-muted">
+                {% if proj.size_bytes and proj.size_bytes > 0 %}
+                  {% set s = proj.size_bytes %}
+                  {% if s >= 1073741824 %}{{ "%.1f"|format(s/1073741824) }} GB
+                  {% elif s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                  {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                  {% else %}{{ s }} B{% endif %}
+                {% else %}<span class="opacity-50">—</span>{% endif %}
+              </td>
+              <td class="small text-muted">
+                {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else "—" }}
+              </td>
+              <td class="small text-muted">
+                {{ proj.created_at.strftime('%d/%m/%Y') if proj.created_at else "—" }}
+              </td>
+              <td>
+                <div class="d-flex flex-wrap gap-1">
+                  {% if 'large' in flags %}
+                    <span class="badge bg-warning text-dark" title="Ocupa más de 10 MB">
+                      <i class="bi bi-hdd-fill me-1"></i>Grande
+                    </span>
+                  {% endif %}
+                  {% if 'inactive' in flags %}
+                    <span class="badge bg-secondary" title="Sin actividad en más de 90 días">
+                      <i class="bi bi-moon-fill me-1"></i>Inactivo
+                    </span>
+                  {% endif %}
+                  {% if 'collaborative' in flags %}
+                    <span class="badge bg-primary bg-opacity-75" title="{{ cnt }} colaboradores">
+                      <i class="bi bi-people-fill me-1"></i>Colaborativo
+                    </span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+            {% if not pagination.items %}
+            <tr><td colspan="7" class="text-center py-5 text-muted">
+              <i class="bi bi-folder-x fs-1 d-block mb-3 opacity-50"></i>
+              No hay proyectos que coincidan con los filtros aplicados.
+            </td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Paginación — se actualiza por JS tras cada fetch #}
+      <div id="proj-pagination"
+           class="{% if pagination.pages <= 1 %}d-none {% endif %}d-flex align-items-center justify-content-between px-3 py-2 border-top">
+        {% if pagination.pages > 1 %}
+        <span class="small text-muted">
+          {{ pagination.per_page * (pagination.page - 1) + 1 }}–{{ [pagination.per_page * pagination.page, pagination.total]|min }}
+          de {{ pagination.total }}
+        </span>
+        <nav><ul class="pagination pagination-sm mb-0" id="proj-pages"></ul></nav>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+//  Estado central
+// ══════════════════════════════════════════════════════════════════════════════
+const state = {
+  q:          {{ search     | tojson }},
+  owner_id:   {{ owner_id   | tojson }},
+  owner_name: {{ (selected_owner.display_name if selected_owner else '') | tojson }},
+  date_from:  {{ date_from  | tojson }},
+  date_to:    {{ date_to    | tojson }},
+  indicators: new Set({{ indicators_filter | tojson }}),
+  sort:       {{ sort_col   | tojson }},
+  order:      {{ sort_order | tojson }},
+  page:       1,
+};
+
+const IND_META = {
+  large:         { label: 'Grande',       icon: 'bi-hdd-fill',    color: 'warning'   },
+  inactive:      { label: 'Inactivo',     icon: 'bi-moon-fill',   color: 'secondary' },
+  collaborative: { label: 'Colaborativo', icon: 'bi-people-fill', color: 'primary'   },
+};
+
+// ── Utilidades ─────────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildParams() {
+  const p = new URLSearchParams();
+  if (state.q)         p.set('q',        state.q);
+  if (state.owner_id)  p.set('owner_id', state.owner_id);
+  if (state.date_from) p.set('date_from',state.date_from);
+  if (state.date_to)   p.set('date_to',  state.date_to);
+  state.indicators.forEach(ind => p.append('indicators', ind));
+  p.set('sort',  state.sort);
+  p.set('order', state.order);
+  p.set('page',  state.page);
+  return p;
+}
+
+// ── Fetch + render ──────────────────────────────────────────────────────────
+let _fetchTimer = null;
+
+async function doFetch(page) {
+  state.page = page || 1;
+  state.q    = document.getElementById('proj-search').value.trim();
+
+  const params = buildParams();
+  history.pushState(null, '', window.location.pathname + '?' + params.toString());
+
+  const tbody = document.getElementById('projects-tbody');
+  tbody.classList.add('tbody-loading');
+  document.getElementById('proj-spinner').classList.remove('d-none');
+
+  try {
+    const resp = await fetch('/proyectos/buscar?' + params.toString());
+    if (!resp.ok) throw new Error('server error');
+    const data = await resp.json();
+    // Actualizar contenido mientras sigue dimmed
+    renderTable(data.projects);
+    renderPagination(data);
+    updateCounter(data.total);
+    renderChips();
+    // Fade-in en el siguiente frame de render
+    requestAnimationFrame(() => tbody.classList.remove('tbody-loading'));
+  } catch (e) {
+    tbody.innerHTML = `
+      <tr><td colspan="7" class="text-center py-4 text-danger">
+        <i class="bi bi-exclamation-triangle me-2"></i>Error al cargar proyectos.
+      </td></tr>`;
+    requestAnimationFrame(() => tbody.classList.remove('tbody-loading'));
+  } finally {
+    document.getElementById('proj-spinner').classList.add('d-none');
+  }
+}
+
+// Alias para compatibilidad con handlers que llaman submitForm()
+function submitForm() { doFetch(1); }
+
+// ── Render: tabla ───────────────────────────────────────────────────────────
+function renderTable(projects) {
+  const tbody = document.getElementById('projects-tbody');
+  if (!projects.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">
+      <i class="bi bi-folder-x fs-1 d-block mb-3 opacity-50"></i>
+      No hay proyectos que coincidan con los filtros aplicados.
+    </td></tr>`;
+    return;
+  }
+  tbody.innerHTML = projects.map(buildRow).join('');
+  attachTooltips();
+}
+
+function buildRow(p) {
+  const url  = esc(p.detail_url);
+
+  // Owner cell
+  const ownerHtml = p.owner_name
+    ? `<a href="${esc(p.owner_url)}"
+          class="text-decoration-none text-muted d-flex align-items-center gap-1"
+          onclick="event.stopPropagation()">
+         <i class="bi bi-person-fill"></i>${esc(p.owner_name)}
+       </a>`
+    : `<span class="text-muted">—</span>`;
+
+  // Members cell
+  let membersHtml = `<span class="text-muted small">—</span>`;
+  if (p.member_count > 0) {
+    const tipContent = p.member_names.map(n => esc(n)).join('<br>');
+    membersHtml = `<span class="collab-cell" onclick="event.stopPropagation()">
+      <span class="badge bg-info-subtle text-info-emphasis">
+        <i class="bi bi-people-fill me-1"></i>${p.member_count}
+      </span>
+      <span class="collab-tip">${tipContent}</span>
+    </span>`;
+  }
+
+  // Size cell
+  const sizeHtml = p.size_fmt
+    ? esc(p.size_fmt)
+    : `<span class="opacity-50">—</span>`;
+
+  // Indicators
+  const inds = p.indicators || [];
+  let indHtml = '<div class="d-flex flex-wrap gap-1">';
+  if (inds.includes('large'))
+    indHtml += `<span class="badge bg-warning text-dark" title="Ocupa más de 10 MB"><i class="bi bi-hdd-fill me-1"></i>Grande</span>`;
+  if (inds.includes('inactive'))
+    indHtml += `<span class="badge bg-secondary" title="Sin actividad en más de 90 días"><i class="bi bi-moon-fill me-1"></i>Inactivo</span>`;
+  if (inds.includes('collaborative'))
+    indHtml += `<span class="badge bg-primary bg-opacity-75" title="${p.member_count} colaboradores"><i class="bi bi-people-fill me-1"></i>Colaborativo</span>`;
+  indHtml += '</div>';
+
+  return `<tr onclick="window.location='${url}'">
+    <td class="ps-3 fw-medium small">
+      <a href="${url}" class="text-decoration-none text-body" onclick="event.stopPropagation()">${esc(p.name) || '—'}</a>
+    </td>
+    <td class="small">${ownerHtml}</td>
+    <td class="text-center">${membersHtml}</td>
+    <td class="text-end small text-muted">${sizeHtml}</td>
+    <td class="small text-muted">${p.last_updated_at || '—'}</td>
+    <td class="small text-muted">${p.created_at || '—'}</td>
+    <td>${indHtml}</td>
+  </tr>`;
+}
+
+// ── Render: paginación ──────────────────────────────────────────────────────
+function renderPagination(data) {
+  const wrap = document.getElementById('proj-pagination');
+  const ul   = document.getElementById('proj-pages');
+  if (data.pages <= 1) { wrap.classList.add('d-none'); return; }
+  wrap.classList.remove('d-none');
+
+  const start = data.per_page * (data.page - 1) + 1;
+  const end   = Math.min(data.per_page * data.page, data.total);
+  wrap.querySelector('span.small').textContent = `${start}–${end} de ${data.total}`;
+
+  // Build page list with ellipsis
+  const pages = [];
+  for (let i = 1; i <= data.pages; i++) {
+    if (i <= 2 || i >= data.pages - 1 || Math.abs(i - data.page) <= 2)
+      pages.push(i);
+    else if (pages[pages.length - 1] !== null)
+      pages.push(null);
+  }
+
+  ul.innerHTML = `
+    <li class="page-item ${!data.has_prev ? 'disabled' : ''}">
+      <button class="page-link" ${data.has_prev ? `onclick="doFetch(${data.prev_num})"` : ''}>‹</button>
+    </li>
+    ${pages.map(p => p === null
+      ? `<li class="page-item disabled"><span class="page-link">…</span></li>`
+      : `<li class="page-item ${p === data.page ? 'active' : ''}">
+           <button class="page-link" onclick="doFetch(${p})">${p}</button>
+         </li>`
+    ).join('')}
+    <li class="page-item ${!data.has_next ? 'disabled' : ''}">
+      <button class="page-link" ${data.has_next ? `onclick="doFetch(${data.next_num})"` : ''}>›</button>
+    </li>`;
+}
+
+// ── Render: contador ────────────────────────────────────────────────────────
+function updateCounter(total) {
+  document.getElementById('proj-counter').innerHTML =
+    `<strong>${total}</strong> proyecto${total !== 1 ? 's' : ''}`;
+}
+
+// ── Tooltips colaboradores ──────────────────────────────────────────────────
+function attachTooltips() {
+  document.querySelectorAll('.collab-cell').forEach(cell => {
+    const tip = cell.querySelector('.collab-tip');
+    if (!tip) return;
+    cell.addEventListener('mouseenter', () => {
+      const r = cell.getBoundingClientRect();
+      tip.style.top  = (r.top + r.height / 2) + 'px';
+      tip.style.left = (r.right + 10) + 'px';
+      tip.style.display = 'block';
+    });
+    cell.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+}
+
+// ── Ordenación (server-side) ────────────────────────────────────────────────
+(function initSort() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      state.order = (state.sort === col && state.order === 'asc') ? 'desc' : 'asc';
+      state.sort  = col;
+      updateSortUI();
+      doFetch(1);
+    });
+  });
+  updateSortUI();
+})();
+
+function updateSortUI() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    const icon = th.querySelector('.sort-icon');
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (state.sort === th.dataset.col) {
+      th.classList.add('sort-' + state.order);
+      icon.className = `sort-icon bi bi-chevron-${state.order === 'asc' ? 'up' : 'down'}`;
+    } else {
+      icon.className = 'sort-icon bi bi-chevron-expand';
+    }
+  });
+}
+
+// ── Buscador (debounce + Enter) ─────────────────────────────────────────────
+(function () {
+  const input = document.getElementById('proj-search');
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => doFetch(1), 400);
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); doFetch(1); }
+  });
+})();
+
+// ── Dropdown vanilla ────────────────────────────────────────────────────────
+(function () {
+  function closeAll(except) {
+    document.querySelectorAll('.dropdown').forEach(d => {
+      if (d === except) return;
+      d.classList.remove('show');
+      const m = d.querySelector('.dropdown-menu');
+      if (m) m.classList.remove('show');
+    });
+  }
+  document.querySelectorAll('.dropdown').forEach(dd => {
+    const btn  = dd.querySelector('.dropdown-toggle');
+    const menu = dd.querySelector('.dropdown-menu');
+    if (!btn || !menu) return;
+    menu.style.position = 'absolute';
+    menu.style.zIndex   = '1055';
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = dd.classList.contains('show');
+      closeAll();
+      if (!open) { dd.classList.add('show'); menu.classList.add('show'); }
+    });
+    menu.addEventListener('click', e => e.stopPropagation());
+  });
+  document.addEventListener('click', () => closeAll());
+})();
+
+function closeDropdown(id) {
+  const dd = document.getElementById(id);
+  if (!dd) return;
+  dd.classList.remove('show');
+  const m = dd.querySelector('.dropdown-menu');
+  if (m) m.classList.remove('show');
+}
+
+// ── Filtro: PROPIETARIO ─────────────────────────────────────────────────────
+document.getElementById('owner-search-input').addEventListener('input', function () {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#owner-list .owner-option').forEach(opt => {
+    opt.style.display = opt.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+document.querySelectorAll('.owner-option').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id   = btn.dataset.id;
+    const name = btn.dataset.name;
+    state.owner_id   = id ? parseInt(id) : null;
+    state.owner_name = id ? name : '';
+
+    const lblEl  = document.getElementById('owner-btn-label');
+    const btnEl  = document.getElementById('btn-f-owner');
+    const iconEl = btnEl.querySelector('i');
+    if (id) {
+      lblEl.textContent = name;
+      btnEl.classList.add('has-filter');
+      iconEl.className = 'bi bi-person-fill me-1';
+    } else {
+      lblEl.textContent = 'Propietario';
+      btnEl.classList.remove('has-filter');
+      iconEl.className = 'bi bi-person me-1';
+    }
+    closeDropdown('dd-owner');
+    doFetch(1);
+  });
+});
+
+// ── Filtro: FECHAS ──────────────────────────────────────────────────────────
+function applyDateFilter() {
+  state.date_from = document.getElementById('f-date-from').value;
+  state.date_to   = document.getElementById('f-date-to').value;
+  // Update button state
+  const btn  = document.getElementById('btn-f-date');
+  const icon = btn.querySelector('i');
+  if (state.date_from || state.date_to) {
+    btn.classList.add('has-filter');
+    icon.className = 'bi bi-calendar-check me-1';
+  } else {
+    btn.classList.remove('has-filter');
+    icon.className = 'bi bi-calendar3 me-1';
+  }
+  closeDropdown('dd-date');
+  doFetch(1);
+}
+function clearDateFilter() {
+  state.date_from = '';
+  state.date_to   = '';
+  document.getElementById('f-date-from').value = '';
+  document.getElementById('f-date-to').value   = '';
+  const btn  = document.getElementById('btn-f-date');
+  btn.classList.remove('has-filter');
+  btn.querySelector('i').className = 'bi bi-calendar3 me-1';
+  closeDropdown('dd-date');
+  doFetch(1);
+}
+
+// ── Filtro: INDICADORES ─────────────────────────────────────────────────────
+document.querySelectorAll('.ind-toggle').forEach(el => {
+  el.addEventListener('click', () => {
+    const key = el.dataset.key;
+    if (state.indicators.has(key)) { state.indicators.delete(key); el.classList.remove('active'); }
+    else                           { state.indicators.add(key);    el.classList.add('active');    }
+    _syncIndBtn();
+  });
+});
+
+function _syncIndBtn() {
+  const btn   = document.getElementById('btn-f-indicators');
+  const icon  = btn.querySelector('i');
+  let   badge = btn.querySelector('.badge');
+  if (state.indicators.size > 0) {
+    btn.classList.add('has-filter');
+    icon.className = 'bi bi-flag-fill me-1';
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge bg-white text-success ms-1';
+      badge.style.fontSize = '.7rem';
+      btn.appendChild(badge);
+    }
+    badge.textContent = state.indicators.size;
+  } else {
+    btn.classList.remove('has-filter');
+    icon.className = 'bi bi-flag me-1';
+    if (badge) badge.remove();
+  }
+}
+
+function applyIndicators() {
+  closeDropdown('dd-indicators');
+  doFetch(1);
+}
+
+// ── Chips ───────────────────────────────────────────────────────────────────
+function renderChips() {
+  const chipsData = [];
+
+  if (state.owner_id && state.owner_name) {
+    chipsData.push({
+      label: state.owner_name, icon: 'bi-person-fill',
+      clear: () => {
+        state.owner_id   = null;
+        state.owner_name = '';
+        const btnEl  = document.getElementById('btn-f-owner');
+        document.getElementById('owner-btn-label').textContent = 'Propietario';
+        btnEl.classList.remove('has-filter');
+        btnEl.querySelector('i').className = 'bi bi-person me-1';
+        doFetch(1);
+      },
+    });
+  }
+
+  if (state.date_from || state.date_to) {
+    let label = '';
+    if (state.date_from && state.date_to) label = state.date_from + ' – ' + state.date_to;
+    else if (state.date_from) label = 'Desde ' + state.date_from;
+    else                      label = 'Hasta ' + state.date_to;
+    chipsData.push({
+      label, icon: 'bi-calendar3',
+      clear: () => clearDateFilter(),
+    });
+  }
+
+  state.indicators.forEach(key => {
+    const meta = IND_META[key] || { label: key, icon: 'bi-flag' };
+    chipsData.push({
+      label: meta.label, icon: meta.icon,
+      clear: () => {
+        state.indicators.delete(key);
+        document.querySelector(`.ind-toggle[data-key="${key}"]`)?.classList.remove('active');
+        _syncIndBtn();
+        doFetch(1);
+      },
+    });
+  });
+
+  const row = document.getElementById('chips-row');
+  if (!chipsData.length) { row.classList.add('d-none'); row.innerHTML = ''; return; }
+  row.classList.remove('d-none');
+
+  row.innerHTML = chipsData.map((c, i) => `
+    <span class="filter-chip" data-chip="${i}">
+      <i class="bi ${esc(c.icon)} me-1"></i>${esc(c.label)}
+      <button class="chip-remove" data-chip="${i}" title="Quitar">✕</button>
+    </span>`
+  ).join('') + (chipsData.length > 1 ? `
+    <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0 ms-1"
+            id="btn-clear-all">
+      <i class="bi bi-x-circle me-1"></i>Limpiar todo
+    </button>` : '');
+
+  chipsData.forEach((c, i) => {
+    row.querySelector(`[data-chip="${i}"].chip-remove`)
+       .addEventListener('click', () => c.clear());
+  });
+
+  const clearAllBtn = document.getElementById('btn-clear-all');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
+    state.owner_id   = null; state.owner_name = '';
+    state.date_from  = '';   state.date_to    = '';
+    state.indicators.clear();
+    state.q = '';
+    document.getElementById('proj-search').value = '';
+    document.getElementById('btn-f-owner').classList.remove('has-filter');
+    document.getElementById('owner-btn-label').textContent = 'Propietario';
+    document.getElementById('btn-f-owner').querySelector('i').className = 'bi bi-person me-1';
+    document.getElementById('btn-f-date').classList.remove('has-filter');
+    document.getElementById('btn-f-date').querySelector('i').className = 'bi bi-calendar3 me-1';
+    document.querySelectorAll('.ind-toggle').forEach(el => el.classList.remove('active'));
+    _syncIndBtn();
+    doFetch(1);
+  });
+}
+
+// ── Init: chips + tooltips ──────────────────────────────────────────────────
+renderChips();
+attachTooltips();
+</script>
+{% endblock %}
