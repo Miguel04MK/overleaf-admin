@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Auditoría{% endblock %}
+{% block page_title %}Registro de auditoría{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">
+        <i class="bi bi-journal-text me-2 text-muted"></i>Eventos del sistema
+      </span>
+      <span class="text-muted small">{{ pagination.total }} registros</span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagination.items %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Fecha/Hora</th>
+              <th>Actor</th>
+              <th>Acción</th>
+              <th>Nivel</th>
+              <th>IP</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in pagination.items %}
+            <tr>
+              <td class="ps-3 text-muted small text-nowrap">
+                {{ entry.created_at.strftime('%d/%m/%Y %H:%M:%S') if entry.created_at else '—' }}
+              </td>
+              <td class="small fw-medium">{{ entry.actor }}</td>
+              <td>
+                <code class="small">{{ entry.action }}</code>
+              </td>
+              <td>
+                {% if entry.level == 'error' %}
+                  <span class="badge bg-danger">Error</span>
+                {% elif entry.level == 'warning' %}
+                  <span class="badge bg-warning text-dark">Aviso</span>
+                {% else %}
+                  <span class="badge bg-secondary">Info</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted">{{ entry.ip_address or '—' }}</td>
+              <td class="small text-muted" style="max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                  title="{{ entry.detail or '' }}">
+                {{ entry.detail or '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if pagination.pages > 1 %}
+      <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
+        <div class="text-muted small">Página {{ pagination.page }} de {{ pagination.pages }}</div>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('audit.logs', page=pagination.prev_num) }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+              {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                  <a class="page-link" href="{{ url_for('audit.logs', page=p) }}">{{ p }}</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+              {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('audit.logs', page=pagination.next_num) }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-journal fs-1 d-block mb-3 opacity-50"></i>
+        No hay entradas en el registro de auditoría todavía.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Dev{% endblock %}
+{% block page_title %}Dev · Diagnóstico{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <div class="alert alert-warning small d-flex align-items-center" role="alert">
+    <i class="bi bi-tools me-2 fs-5"></i>
+    <div>
+      <strong>Zona de desarrollador.</strong>
+      Aquí se muestran indicadores técnicos pensados para depuración y mantenimiento.
+      No forma parte del panel de administración habitual.
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- ── Estado de servicios ── -->
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">
+            <i class="bi bi-hdd-network me-2 text-muted"></i>Estado de servicios
+          </span>
+          {% if service_statuses and service_statuses[0].source == 'docker' %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle small">Docker</span>
+          {% elif service_statuses and service_statuses[0].source == 'tcp' %}
+            <span class="badge bg-info-subtle text-info border border-info-subtle small">TCP</span>
+          {% else %}
+            <span class="badge bg-secondary-subtle text-secondary border small">Sin verificar</span>
+          {% endif %}
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush">
+            {% for svc in service_statuses %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+              <div>
+                <div class="fw-medium small">{{ svc.name }}</div>
+                <div class="text-muted" style="font-size:.75rem;">{{ svc.detail }}</div>
+              </div>
+              {% if svc.status == 'online' %}
+                <span class="badge rounded-pill bg-success">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Activo
+                </span>
+              {% elif svc.status == 'offline' %}
+                <span class="badge rounded-pill bg-danger">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Inactivo
+                </span>
+              {% else %}
+                <span class="badge rounded-pill bg-secondary">
+                  <i class="bi bi-circle me-1" style="font-size:.5rem;"></i>Desconocido
+                </span>
+              {% endif %}
+            </li>
+            {% else %}
+            <li class="list-group-item text-muted small py-3">No se pudo obtener el estado de los servicios.</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="card-footer bg-white border-top">
+          <form method="POST" action="{{ url_for('sync.trigger') }}">
+            <button type="submit" class="btn btn-success btn-sm w-100">
+              <i class="bi bi-arrow-repeat me-2"></i>Forzar sincronización
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Información del entorno ── -->
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom">
+          <span class="fw-semibold">
+            <i class="bi bi-info-circle me-2 text-muted"></i>Información del entorno
+          </span>
+        </div>
+        <div class="card-body small">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted">Fuente de detección</dt>
+            <dd class="col-7">
+              {% if service_statuses and service_statuses[0].source %}
+                <code>{{ service_statuses[0].source }}</code>
+              {% else %}—{% endif %}
+            </dd>
+            <dt class="col-5 text-muted">Servicios detectados</dt>
+            <dd class="col-7">{{ service_statuses|length }}</dd>
+            <dt class="col-5 text-muted">Activos</dt>
+            <dd class="col-7">
+              {{ service_statuses|selectattr('status','equalto','online')|list|length }}
+            </dd>
+            <dt class="col-5 text-muted">Inactivos</dt>
+            <dd class="col-7">
+              {{ service_statuses|selectattr('status','equalto','offline')|list|length }}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
