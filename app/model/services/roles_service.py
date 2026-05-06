@@ -151,6 +151,119 @@ def get_role_change_logs(
     )
 
 
+def get_quota_alerts_per_role() -> dict[int, dict]:
+    """
+    Returns {role_id: {near_limit, exceeded, avg_used_bytes}} for all roles.
+    near_limit:     users using 80–99 % of their individual quota.
+    exceeded:       users using ≥ 100 % of their individual quota.
+    avg_used_bytes: average storage used across ALL users in the role.
+    NULL role_id rows (default-role users) are merged into the default role.
+    """
+    from sqlalchemy import func
+    from app.model.entities.overleaf_project import OverleafProject
+
+    proj_sq = (
+        db.session.query(
+            OverleafProject.owner_id.label("uid"),
+            func.coalesce(func.sum(OverleafProject.size_bytes), 0).label("used_bytes"),
+        )
+        .group_by(OverleafProject.owner_id)
+        .subquery()
+    )
+
+    # Fetch ALL users (with or without quota) to compute avg_used_bytes
+    rows = (
+        db.session.query(
+            OverleafUser.role_id,
+            func.coalesce(proj_sq.c.used_bytes, 0).label("used_bytes"),
+            OverleafUser.max_quota_bytes,
+        )
+        .outerjoin(proj_sq, proj_sq.c.uid == OverleafUser.id)
+        .all()
+    )
+
+    buckets: dict = {}
+    for role_id, used_bytes, max_quota in rows:
+        b = buckets.setdefault(role_id, {
+            "total_used": 0, "count": 0, "near_limit": 0, "exceeded": 0
+        })
+        b["count"]      += 1
+        b["total_used"] += (used_bytes or 0)
+        if max_quota and max_quota > 0:
+            pct = (used_bytes or 0) / max_quota * 100
+            if pct >= 100:
+                b["exceeded"] += 1
+            elif pct >= 80:
+                b["near_limit"] += 1
+
+    raw = {
+        rid: {
+            "near_limit":     b["near_limit"],
+            "exceeded":       b["exceeded"],
+            "avg_used_bytes": b["total_used"] // b["count"] if b["count"] else 0,
+        }
+        for rid, b in buckets.items()
+    }
+
+    # Merge NULL role_id (default-role users) into the default role bucket
+    default = get_default_role()
+    if default and None in raw:
+        null_d = raw.pop(None)
+        def_d  = raw.setdefault(default.id, {
+            "near_limit": 0, "exceeded": 0, "avg_used_bytes": 0
+        })
+        def_d["near_limit"] += null_d["near_limit"]
+        def_d["exceeded"]   += null_d["exceeded"]
+        if def_d["avg_used_bytes"] == 0:
+            def_d["avg_used_bytes"] = null_d["avg_used_bytes"]
+
+    return raw
+
+
+def search_users_for_role(role_id: int, q: str, limit: int = 15) -> list[dict]:
+    """Search all users matching name/email, marking whether they have role_id.
+
+    Returns a list of dicts with keys:
+        id, name, email, current_role, has_role (bool)
+    """
+    from sqlalchemy import or_
+
+    default_role = get_default_role()
+    is_default   = default_role is not None and default_role.id == role_id
+
+    term   = f"%{q}%"
+    users  = (
+        OverleafUser.query
+        .filter(
+            or_(
+                OverleafUser.email.ilike(term),
+                OverleafUser.first_name.ilike(term),
+                OverleafUser.last_name.ilike(term),
+            )
+        )
+        .order_by(OverleafUser.email)
+        .limit(limit)
+        .all()
+    )
+
+    results = []
+    for u in users:
+        effective_role = u.role or default_role
+        # "has this role" means the user's effective role IS role_id
+        if is_default:
+            has_role = u.role_id is None or u.role_id == role_id
+        else:
+            has_role = u.role_id == role_id
+        results.append({
+            "id":           u.id,
+            "name":         u.display_name,
+            "email":        u.email or "",
+            "current_role": effective_role.name if effective_role else "sin rol",
+            "has_role":     has_role,
+        })
+    return results
+
+
 # ── Mutations ─────────────────────────────────────────────────────────────────
 
 def assign_role(
