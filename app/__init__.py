@@ -37,7 +37,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.model.entities import (  # noqa: F401
         overleaf_user, overleaf_project, project_member,
         sync_run, audit_log, project_sync_log,
-        role, role_change_log,
+        role, role_change_log, report_export_log,
     )
 
     # Register user loader
@@ -54,7 +54,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.rest.controllers.projects_controller import projects_bp
     from app.rest.controllers.sync_controller import sync_bp
     from app.rest.controllers.admin_controller import audit_bp, dev_bp
-    from app.rest.controllers.reports_controller import reports_bp
+    from app.modules.reports.routes import reports_bp
     from app.rest.controllers.roles_controller import roles_bp
 
     app.register_blueprint(auth_bp)
