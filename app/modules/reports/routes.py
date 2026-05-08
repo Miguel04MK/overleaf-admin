@@ -246,6 +246,54 @@ def export_general_csv():
     return _csv_response(csv_data, filename, ct)
 
 
+# ─── Bundle (all-reports ZIP) ────────────────────────────────────────────────
+
+@reports_bp.route("/exportar-todo/csv")
+@login_required
+def export_all_csv():
+    """ZIP archive containing one CSV per report type."""
+    all_data = service.get_all_reports_data()
+    zip_data, filename, ct = exporters.export_all_csv_zip(all_data)
+    _log_export("todos", "zip", filename)
+    resp = make_response(zip_data)
+    resp.headers["Content-Type"] = ct
+    resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    return resp
+
+
+@reports_bp.route("/exportar-todo/pdf")
+@login_required
+def export_all_pdf():
+    """ZIP archive containing one PDF per report type."""
+    all_data = service.get_all_reports_data()
+    zip_data, filename, ct = exporters.export_all_pdf_zip(all_data, generated_by=_actor())
+    _log_export("todos", "zip", filename)
+    resp = make_response(zip_data)
+    resp.headers["Content-Type"] = ct
+    resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    return resp
+
+
+@reports_bp.route("/exportar-todo/csv-unico")
+@login_required
+def export_all_csv_single():
+    """Single CSV file with every report as a labelled section."""
+    all_data = service.get_all_reports_data()
+    csv_data, filename, ct = exporters.export_all_csv_single(all_data)
+    _log_export("todos", "csv", filename)
+    return _csv_response(csv_data, filename, ct)
+
+
+@reports_bp.route("/exportar-todo/pdf-unico")
+@login_required
+def export_all_pdf_single():
+    """Single PDF with every report as a separate section."""
+    all_data = service.get_all_reports_data()
+    pdf_data, filename, ct = exporters.export_all_pdf_single(all_data, generated_by=_actor())
+    _log_export("todos", "pdf", filename)
+    return _pdf_response(pdf_data, filename)
+
+
 # ─── Specific report views → redirect to index ──────────────────────────────
 # These used to render preview pages. Now they redirect since specific reports
 # are download-only (CSV/PDF).
