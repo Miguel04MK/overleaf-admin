@@ -61,6 +61,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a href="{{ url_for('reports.index') }}"
+           class="nav-link text-white {% if active_page == 'reports' %}active bg-success{% endif %}">
+          <i class="bi bi-bar-chart-line me-2"></i>Informes
+        </a>
+      </li>
+      <li class="nav-item">
         <a href="{{ url_for('sync.status') }}"
            class="nav-link text-white {% if active_page == 'sync' %}active bg-success{% endif %}">
           <i class="bi bi-arrow-repeat me-2"></i>Sincronización

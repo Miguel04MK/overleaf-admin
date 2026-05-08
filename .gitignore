@@ -88,6 +88,9 @@ uploads/
 CLAUDE.md
 REFACTORING.md
 
+# ─── Archivos generados en tiempo de ejecución ───────────────────────────────
+*.pdf
+
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 *.bak
 *.tmp
