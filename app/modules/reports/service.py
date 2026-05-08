@@ -821,8 +821,38 @@ def get_index_stats() -> dict[str, Any]:
         .order_by(desc(ReportExportLog.generated_at))
         .first()
     )
+    last_bundle_export = (
+        ReportExportLog.query
+        .filter(
+            ReportExportLog.report_type == "todos",
+            ReportExportLog.status == "completed",
+        )
+        .order_by(desc(ReportExportLog.generated_at))
+        .first()
+    )
     return {
         "last_general_export": last_general_export,
+        "last_bundle_export": last_bundle_export,
+    }
+
+
+def get_all_reports_data() -> dict:
+    """Gather data for every individual report in a single call.
+
+    Used by the bundle (ZIP) export routes so each dataset is fetched
+    exactly once rather than once per route.
+    """
+    storage = get_storage_report()
+    return {
+        "users":        get_users_report_all(),
+        "projects":     get_projects_report_all(),
+        "storage_rows": storage["rows"],
+        "storage":      storage,           # full dict for PDF (needs totals)
+        "quotas":       get_quotas_report_all(),
+        "activity":     get_activity_report_all(),
+        "incidents":    get_incidents_report_all(),
+        "syncs":        get_syncs_report_all(),
+        "general":      get_general_report_data(),
     }
 
 
