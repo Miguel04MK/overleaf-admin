@@ -6,9 +6,9 @@
 <style>
 /* ── Buttons ─────────────────────────────────────────────────────────── */
 .rpt-format-btn {
-  font-size: .72rem; font-weight: 500;
-  padding: .2rem .5rem; border-radius: .3rem;
-  text-decoration: none; display: inline-flex; align-items: center; gap: .2rem;
+  font-size: .7rem; font-weight: 500;
+  padding: .18rem .42rem; border-radius: .3rem;
+  text-decoration: none; display: inline-flex; align-items: center; gap: .18rem;
   transition: all .12s; white-space: nowrap;
 }
 .rpt-format-btn.csv { color: #198754; border: 1px solid #198754; }
@@ -16,11 +16,32 @@
 .rpt-format-btn.pdf { color: #dc3545; border: 1px solid #dc3545; }
 .rpt-format-btn.pdf:hover { background: #dc3545; color: #fff; }
 
-/* ── General card ────────────────────────────────────────────────────── */
+/* ── Top cards (general + bundle) ────────────────────────────────────── */
+.rpt-top-cards {
+  display: flex;
+  gap: .75rem;
+  flex-shrink: 0;
+  align-items: stretch;
+}
+.rpt-top-cards > * { flex: 1 1 0; min-width: 0; }
+
+/* Inner content of each top card stretches to fill equal height */
+.rpt-card-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.rpt-card-body .rpt-card-actions {
+  margin-top: auto;
+}
+
 .rpt-general-card {
   border: 2px solid #198754; border-radius: .75rem;
   background: linear-gradient(135deg, rgba(25,135,84,.03) 0%, rgba(25,135,84,.08) 100%);
-  flex-shrink: 0;
+}
+.rpt-bundle-card {
+  border: 2px solid #0d6efd; border-radius: .75rem;
+  background: linear-gradient(135deg, rgba(13,110,253,.03) 0%, rgba(13,110,253,.08) 100%);
 }
 
 /* ── Page grid ───────────────────────────────────────────────────────── */
@@ -151,38 +172,87 @@
   {# ═══════════════ LEFT COLUMN ═══════════════ #}
   <div class="rpt-left">
 
-    {# ── General report card ─────────────────────────────────────────── #}
-    <div class="rpt-general-card p-3">
-      <div class="d-flex align-items-start gap-3">
-        <div style="width:44px;height:44px;border-radius:50%;background:rgba(25,135,84,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i class="bi bi-clipboard2-data-fill" style="font-size:1.2rem;color:#198754;"></i>
-        </div>
-        <div class="flex-grow-1">
-          <h6 class="fw-bold mb-0" style="font-size:.9rem;">Informe general de la plataforma</h6>
-          <p class="text-muted small mb-2" style="line-height:1.35;font-size:.8rem;">
-            Resumen global del estado de usuarios, proyectos, cuotas, sincronizacion y auditoria.
-          </p>
-          {% if stats.last_general_export %}
-            <div class="text-muted mb-2" style="font-size:.7rem;">
-              <i class="bi bi-clock me-1"></i>
-              Ultima generacion: {{ stats.last_general_export.generated_at.strftime('%d/%m/%Y %H:%M') }}
-              &middot; {{ stats.last_general_export.generated_by }}
+    {# ── Top cards: general + bundle ─────────────────────────────────── #}
+    <div class="rpt-top-cards">
+
+      {# General card #}
+      <div class="rpt-general-card p-3">
+        <div class="d-flex align-items-start gap-3 h-100">
+          <div style="width:42px;height:42px;border-radius:50%;background:rgba(25,135,84,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="bi bi-clipboard2-data-fill" style="font-size:1.1rem;color:#198754;"></i>
+          </div>
+          <div class="rpt-card-body flex-grow-1 min-width-0">
+            <div>
+              <h6 class="fw-bold mb-0" style="font-size:.88rem;">Informe general de la plataforma</h6>
+              <p class="text-muted mb-2" style="line-height:1.35;font-size:.78rem;">
+                Resumen global: usuarios, proyectos, cuotas, sincronizacion y auditoria.
+              </p>
+              {% if stats.last_general_export %}
+                <div class="text-muted mb-2" style="font-size:.68rem;">
+                  <i class="bi bi-clock me-1"></i>
+                  {{ stats.last_general_export.generated_at.strftime('%d/%m/%Y %H:%M') }}
+                  &middot; {{ stats.last_general_export.generated_by }}
+                </div>
+              {% else %}
+                <div class="mb-2" style="font-size:.68rem;">&nbsp;</div>
+              {% endif %}
             </div>
-          {% endif %}
-          <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ url_for('reports.general_report') }}" class="btn btn-sm btn-outline-success d-flex align-items-center gap-1" style="font-size:.78rem;padding:.2rem .55rem;">
-              <i class="bi bi-eye"></i> Ver informe general
-            </a>
-            <a href="{{ url_for('reports.export_general_pdf') }}" class="rpt-format-btn pdf">
-              <i class="bi bi-file-pdf"></i> PDF
-            </a>
-            <a href="{{ url_for('reports.export_general_csv') }}" class="rpt-format-btn csv">
-              <i class="bi bi-filetype-csv"></i> CSV
-            </a>
+            <div class="rpt-card-actions d-flex gap-2 flex-wrap">
+              <a href="{{ url_for('reports.general_report') }}" class="rpt-format-btn" style="color:#198754;border:1px solid #198754;" onmouseover="this.style.background='#198754';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#198754'">
+                <i class="bi bi-eye"></i> Ver
+              </a>
+              <a href="{{ url_for('reports.export_general_pdf') }}" class="rpt-format-btn pdf">
+                <i class="bi bi-file-pdf"></i> PDF
+              </a>
+              <a href="{{ url_for('reports.export_general_csv') }}" class="rpt-format-btn csv">
+                <i class="bi bi-filetype-csv"></i> CSV
+              </a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {# Bundle card #}
+      <div class="rpt-bundle-card p-3">
+        <div class="d-flex align-items-start gap-3 h-100">
+          <div style="width:42px;height:42px;border-radius:50%;background:rgba(13,110,253,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="bi bi-archive-fill" style="font-size:1.1rem;color:#0d6efd;"></i>
+          </div>
+          <div class="rpt-card-body flex-grow-1 min-width-0">
+            <div>
+              <h6 class="fw-bold mb-0" style="font-size:.88rem;">Resumen completo</h6>
+              <p class="text-muted mb-2" style="line-height:1.35;font-size:.78rem;">
+                Todos los informes a la vez en ZIP o en un unico archivo.
+              </p>
+              {% if stats.last_bundle_export %}
+                <div class="text-muted mb-2" style="font-size:.68rem;">
+                  <i class="bi bi-clock me-1"></i>
+                  {{ stats.last_bundle_export.generated_at.strftime('%d/%m/%Y %H:%M') }}
+                  &middot; {{ stats.last_bundle_export.generated_by }}
+                </div>
+              {% else %}
+                <div class="mb-2" style="font-size:.68rem;">&nbsp;</div>
+              {% endif %}
+            </div>
+            <div class="rpt-card-actions d-flex align-items-center gap-1 flex-nowrap">
+              <a href="{{ url_for('reports.export_all_pdf') }}" class="rpt-format-btn pdf">
+                <i class="bi bi-file-zip"></i> ZIP&nbsp;PDFs
+              </a>
+              <a href="{{ url_for('reports.export_all_csv') }}" class="rpt-format-btn csv">
+                <i class="bi bi-file-zip"></i> ZIP&nbsp;CSVs
+              </a>
+              <a href="{{ url_for('reports.export_all_pdf_single') }}" class="rpt-format-btn pdf">
+                <i class="bi bi-file-pdf"></i> PDF&nbsp;único
+              </a>
+              <a href="{{ url_for('reports.export_all_csv_single') }}" class="rpt-format-btn csv">
+                <i class="bi bi-filetype-csv"></i> CSV&nbsp;único
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>{# /rpt-top-cards #}
 
     {# ── Heading ─────────────────────────────────────────────────────── #}
     <h6 class="fw-semibold text-muted mb-0" style="font-size:.78rem;letter-spacing:.04em;flex-shrink:0;">
@@ -266,6 +336,8 @@
           <div class="d-flex align-items-start gap-2 {% if not loop.last %}mb-2 pb-2 border-bottom{% endif %}">
             {% if exp.format == 'pdf' %}
               <i class="bi bi-file-earmark-pdf text-danger mt-1" style="font-size:.85rem;flex-shrink:0;"></i>
+            {% elif exp.format == 'zip' %}
+              <i class="bi bi-file-zip text-primary mt-1" style="font-size:.85rem;flex-shrink:0;"></i>
             {% else %}
               <i class="bi bi-file-earmark-spreadsheet text-success mt-1" style="font-size:.85rem;flex-shrink:0;"></i>
             {% endif %}
