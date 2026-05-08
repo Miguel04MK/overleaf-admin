@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import io
+import zipfile
 from datetime import datetime
 from typing import Any
 
@@ -66,156 +67,255 @@ def _fmt_bytes(n) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def export_users_csv(users: list[OverleafUser]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_usuarios_{_today_suffix()}.csv", _build_users_csv_rows(users))
+
+
+def export_projects_csv(projects: list[OverleafProject]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_proyectos_{_today_suffix()}.csv", _build_projects_csv_rows(projects))
+
+
+def export_storage_csv(rows_data: list[dict]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_almacenamiento_{_today_suffix()}.csv", _build_storage_csv_rows(rows_data))
+
+
+def export_activity_csv(entries: list[AuditLog]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_actividad_{_today_suffix()}.csv", _build_activity_csv_rows(entries))
+
+
+def export_syncs_csv(runs: list[SyncRun]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_sincronizaciones_{_today_suffix()}.csv", _build_syncs_csv_rows(runs))
+
+
+def export_quotas_csv(rows_data: list[dict]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_cuotas_{_today_suffix()}.csv", _build_quotas_csv_rows(rows_data))
+
+
+def export_incidents_csv(entries: list[AuditLog]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_incidencias_{_today_suffix()}.csv", _build_incidents_csv_rows(entries))
+
+
+def export_general_csv(data: dict) -> tuple[bytes, str, str]:
+    """Flat CSV summary of the general platform report."""
+    return _make_csv(f"informe_general_{_today_suffix()}.csv", _build_general_csv_rows(data))
+
+
+def export_all_csv_zip(all_data: dict) -> tuple[bytes, str, str]:
+    """Bundle every individual CSV export into a single ZIP file.
+
+    ``all_data`` must contain the keys expected by each individual exporter:
+    ``users``, ``projects``, ``storage_rows``, ``quotas``, ``activity``,
+    ``incidents``, ``syncs``, ``general``.
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        entries: list[tuple[str, bytes]] = []
+
+        data, fname, _ = export_users_csv(all_data["users"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_projects_csv(all_data["projects"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_storage_csv(all_data["storage_rows"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_quotas_csv(all_data["quotas"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_activity_csv(all_data["activity"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_incidents_csv(all_data["incidents"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_syncs_csv(all_data["syncs"])
+        entries.append((fname, data))
+
+        data, fname, _ = export_general_csv(all_data["general"])
+        entries.append((fname, data))
+
+        for fname, content in entries:
+            zf.writestr(fname, content)
+
+    filename = f"informes_completos_{_today_suffix()}.zip"
+    return buf.getvalue(), filename, "application/zip"
+
+
+def export_all_pdf_zip(all_data: dict, generated_by: str = "system") -> tuple[bytes, str, str]:
+    """Bundle every individual PDF export into a single ZIP file."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        entries: list[tuple[str, bytes]] = []
+
+        data, fname, _ = export_users_pdf(all_data["users"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        data, fname, _ = export_projects_pdf(all_data["projects"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        storage = all_data["storage"]
+        data, fname, _ = export_storage_pdf(
+            storage["rows"], totals=storage, generated_by=generated_by
+        )
+        entries.append((fname, data))
+
+        data, fname, _ = export_quotas_pdf(all_data["quotas"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        data, fname, _ = export_activity_pdf(all_data["activity"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        data, fname, _ = export_incidents_pdf(all_data["incidents"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        data, fname, _ = export_syncs_pdf(all_data["syncs"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        data, fname, _ = export_general_pdf(all_data["general"], generated_by=generated_by)
+        entries.append((fname, data))
+
+        for fname, content in entries:
+            zf.writestr(fname, content)
+
+    filename = f"informes_completos_{_today_suffix()}.zip"
+    return buf.getvalue(), filename, "application/zip"
+
+
+def export_all_csv_single(all_data: dict) -> tuple[bytes, str, str]:
+    """One CSV file with every report as a labelled section.
+
+    Sections are separated by a blank row and a ``=== NOMBRE ===`` header row
+    so the file can be opened in Excel and each block is clearly delimited.
+    """
+    buf = io.StringIO()
+    w = csv.writer(buf)
+
+    sections: list[tuple[str, list[list]]] = [
+        ("USUARIOS", _build_users_csv_rows(all_data["users"])),
+        ("PROYECTOS", _build_projects_csv_rows(all_data["projects"])),
+        ("ALMACENAMIENTO", _build_storage_csv_rows(all_data["storage_rows"])),
+        ("CUOTAS", _build_quotas_csv_rows(all_data["quotas"])),
+        ("ACTIVIDAD", _build_activity_csv_rows(all_data["activity"])),
+        ("INCIDENCIAS", _build_incidents_csv_rows(all_data["incidents"])),
+        ("SINCRONIZACIONES", _build_syncs_csv_rows(all_data["syncs"])),
+        ("GENERAL", _build_general_csv_rows(all_data["general"])),
+    ]
+
+    first = True
+    for section_name, rows in sections:
+        if not first:
+            w.writerow([])          # blank separator
+        first = False
+        w.writerow([f"=== {section_name} ==="])
+        for row in rows:
+            w.writerow(row)
+
+    filename = f"informe_completo_{_today_suffix()}.csv"
+    return buf.getvalue().encode("utf-8-sig"), filename, "text/csv; charset=utf-8"
+
+
+# ── CSV row builders (shared with individual exporters and combined) ─────────
+
+def _build_users_csv_rows(users) -> list[list]:
     header = [
-        "ID", "Email", "Nombre", "Apellidos",
-        "Admin", "Rol", "Cuota asignada (bytes)", "Cuota usada (bytes)",
+        "ID", "Email", "Nombre", "Apellidos", "Admin", "Rol",
+        "Cuota asignada (bytes)", "Cuota usada (bytes)",
         "% Uso", "Proyectos propietario", "Proyectos colaborador",
         "Fecha alta", "Último acceso",
     ]
     rows = [header]
     for u in users:
         rows.append([
-            u.overleaf_id,
-            u.email or "",
-            u.first_name or "",
-            u.last_name or "",
+            u.overleaf_id, u.email or "", u.first_name or "", u.last_name or "",
             "Sí" if u.is_admin else "No",
             u.role.name if u.role else "",
             u.max_quota_bytes if u.max_quota_bytes is not None else "Sin límite",
-            u.quota_used_bytes,
-            u.quota_percent if u.quota_percent is not None else "",
-            u.projects_owned.count(),
-            u.memberships.count(),
-            _date(u.signup_date),
-            _ts(u.last_login_at),
+            u.quota_used_bytes, u.quota_percent if u.quota_percent is not None else "",
+            u.projects_owned.count(), u.memberships.count(),
+            _date(u.signup_date), _ts(u.last_login_at),
         ])
-    return _make_csv(f"informe_usuarios_{_today_suffix()}.csv", rows)
+    return rows
 
-
-def export_projects_csv(projects: list[OverleafProject]) -> tuple[bytes, str, str]:
-    header = [
-        "ID", "Nombre", "Propietario (email)", "Tamaño",
-        "Archivos", "Miembros", "Creado", "Última actualización",
-    ]
+def _build_projects_csv_rows(projects) -> list[list]:
+    header = ["ID", "Nombre", "Propietario (email)", "Tamaño", "Archivos", "Miembros", "Creado", "Última actualización"]
     rows = [header]
     for p in projects:
-        member_count = p.members.count() if p.members else 0
         rows.append([
-            p.overleaf_id,
-            p.name or "",
+            p.overleaf_id, p.name or "",
             p.owner.email if p.owner else p.owner_overleaf_id or "",
             _fmt_bytes(p.size_bytes),
             p.file_count if p.file_count is not None else "",
-            member_count,
-            _date(p.created_at),
-            _date(p.last_updated_at),
+            p.members.count() if p.members else 0,
+            _date(p.created_at), _date(p.last_updated_at),
         ])
-    return _make_csv(f"informe_proyectos_{_today_suffix()}.csv", rows)
+    return rows
 
+def _build_storage_csv_rows(rows_data) -> list[list]:
+    header = ["Email", "Nombre", "Cuota asignada", "Espacio usado", "% Uso", "Num proyectos"]
+    rows = [header]
+    for r in rows_data:
+        u = r["user"]
+        rows.append([
+            u.email or "", u.display_name, r["quota_fmt"], r["used_fmt"],
+            r["quota_pct"] if r["quota_pct"] is not None else "Sin límite",
+            r["proj_count"],
+        ])
+    return rows
 
-def export_storage_csv(rows_data: list[dict]) -> tuple[bytes, str, str]:
+def _build_quotas_csv_rows(rows_data) -> list[list]:
     header = [
-        "Email", "Nombre", "Cuota asignada", "Espacio usado",
-        "% Uso", "Num proyectos",
+        "Email", "Nombre", "Rol", "Cuota asignada", "Espacio usado",
+        "% Uso", "Estado", "Proyectos", "Límite proyectos", "Excede límite proyectos",
     ]
     rows = [header]
     for r in rows_data:
         u = r["user"]
         rows.append([
-            u.email or "",
-            u.display_name,
-            r["quota_fmt"],
-            r["used_fmt"],
-            r["quota_pct"] if r["quota_pct"] is not None else "Sin límite",
-            r["proj_count"],
+            u.email or "", u.display_name, r["role_name"],
+            r["quota_fmt"], r["used_fmt"],
+            r["pct"] if r["pct"] is not None else "",
+            r["status"], r["projects_count"],
+            r["max_projects"] if r["max_projects"] is not None else "Sin límite",
+            "Sí" if r["exceeds_project_limit"] else "No",
         ])
-    return _make_csv(f"informe_almacenamiento_{_today_suffix()}.csv", rows)
+    return rows
 
-
-def export_activity_csv(entries: list[AuditLog]) -> tuple[bytes, str, str]:
+def _build_activity_csv_rows(entries) -> list[list]:
     header = ["Fecha/Hora", "Actor", "Acción", "Nivel", "IP", "Detalle"]
     rows = [header]
     for e in entries:
-        rows.append([
-            _ts(e.created_at),
-            e.actor,
-            e.action,
-            e.level,
-            e.ip_address or "",
-            e.detail or "",
-        ])
-    return _make_csv(f"informe_actividad_{_today_suffix()}.csv", rows)
+        rows.append([_ts(e.created_at), e.actor, e.action, e.level, e.ip_address or "", e.detail or ""])
+    return rows
 
+def _build_incidents_csv_rows(entries) -> list[list]:
+    header = ["Fecha/Hora", "Nivel", "Actor", "Acción", "Detalle", "IP"]
+    rows = [header]
+    for e in entries:
+        rows.append([_ts(e.created_at), e.level, e.actor, e.action, e.detail or "", e.ip_address or ""])
+    return rows
 
-def export_syncs_csv(runs: list[SyncRun]) -> tuple[bytes, str, str]:
+def _build_syncs_csv_rows(runs) -> list[list]:
     header = [
-        "ID", "Estado", "Iniciado por", "Inicio", "Fin",
-        "Duración (s)", "Usuarios encontrados", "Usuarios sincronizados",
+        "ID", "Estado", "Iniciado por", "Inicio", "Fin", "Duración (s)",
+        "Usuarios encontrados", "Usuarios sincronizados",
         "Proyectos encontrados", "Proyectos sincronizados",
         "Delta usuarios", "Delta proyectos", "Mensaje",
     ]
     rows = [header]
     for r in runs:
         rows.append([
-            r.id,
-            r.status,
-            r.triggered_by,
-            _ts(r.started_at),
-            _ts(r.finished_at),
+            r.id, r.status, r.triggered_by,
+            _ts(r.started_at), _ts(r.finished_at),
             r.duration_seconds if r.duration_seconds is not None else "",
-            r.users_found,
-            r.users_synced,
-            r.projects_found,
-            r.projects_synced,
+            r.users_found, r.users_synced, r.projects_found, r.projects_synced,
             r.users_delta if r.users_delta is not None else "",
             r.projects_delta if r.projects_delta is not None else "",
             r.message or "",
         ])
-    return _make_csv(f"informe_sincronizaciones_{_today_suffix()}.csv", rows)
+    return rows
 
-
-def export_quotas_csv(rows_data: list[dict]) -> tuple[bytes, str, str]:
-    header = [
-        "Email", "Nombre", "Rol", "Cuota asignada", "Espacio usado",
-        "% Uso", "Estado", "Proyectos", "Límite proyectos",
-        "Excede límite proyectos",
-    ]
-    rows = [header]
-    for r in rows_data:
-        u = r["user"]
-        rows.append([
-            u.email or "",
-            u.display_name,
-            r["role_name"],
-            r["quota_fmt"],
-            r["used_fmt"],
-            r["pct"] if r["pct"] is not None else "",
-            r["status"],
-            r["projects_count"],
-            r["max_projects"] if r["max_projects"] is not None else "Sin límite",
-            "Sí" if r["exceeds_project_limit"] else "No",
-        ])
-    return _make_csv(f"informe_cuotas_{_today_suffix()}.csv", rows)
-
-
-def export_incidents_csv(entries: list[AuditLog]) -> tuple[bytes, str, str]:
-    header = ["Fecha/Hora", "Nivel", "Actor", "Acción", "Detalle", "IP"]
-    rows = [header]
-    for e in entries:
-        rows.append([
-            _ts(e.created_at),
-            e.level,
-            e.actor,
-            e.action,
-            e.detail or "",
-            e.ip_address or "",
-        ])
-    return _make_csv(f"informe_incidencias_{_today_suffix()}.csv", rows)
-
-
-def export_general_csv(data: dict) -> tuple[bytes, str, str]:
-    """Flat CSV summary of the general platform report."""
-    rows = [
+def _build_general_csv_rows(data) -> list[list]:
+    return [
         ["Sección", "Métrica", "Valor"],
         ["Usuarios", "Total usuarios sincronizados", data["total_users"]],
         ["Usuarios", "Administradores internos", data["total_admins_internal"]],
@@ -235,7 +335,6 @@ def export_general_csv(data: dict) -> tuple[bytes, str, str]:
         ["Sincronización", "Duración media (s)", data["avg_sync_duration"] or "N/A"],
         ["Auditoría", "Alertas activas (24 h)", data["active_alerts_count"]],
     ]
-    return _make_csv(f"informe_general_{_today_suffix()}.csv", rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -487,230 +586,194 @@ def _metric_pair(label: str, value) -> Paragraph:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PDF EXPORTERS
+# PDF EXPORTERS — section helpers + public exporters
+#
+# Each report type exposes a private _XXX_section() that returns its flowables.
+# The individual exporter wraps it with _build_pdf.
+# The combined exporter chains all sections into one document.
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def _users_section(users: list[OverleafUser]) -> list:
+    styles = _pdf_styles()
+    fl = [
+        Paragraph(f"Total usuarios: <b>{len(users)}</b>", styles["Normal"]),
+        Spacer(1, 6),
+    ]
+    headers = ["Email", "Nombre", "Rol", "Admin", "Cuota usada", "% Uso", "Alta", "Últ. acceso"]
+    rows = [[
+        u.email or u.overleaf_id, u.display_name,
+        u.role.name if u.role else "",
+        "Sí" if u.is_admin else "No",
+        u.quota_used_fmt,
+        f"{u.quota_percent}%" if u.quota_percent is not None else "",
+        _date(u.signup_date), _date(u.last_login_at),
+    ] for u in users]
+    fl.append(_make_table(headers, rows, col_widths=[90, 70, 50, 30, 60, 35, 55, 60]))
+    return fl
 
 def export_users_pdf(
     users: list[OverleafUser],
     generated_by: str = "system",
     filters_text: str | None = None,
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    flowables.append(Paragraph(f"Total usuarios: <b>{len(users)}</b>", styles["Normal"]))
-    flowables.append(Spacer(1, 6))
-
-    headers = ["Email", "Nombre", "Rol", "Admin", "Cuota usada", "% Uso", "Alta", "Últ. acceso"]
-    rows = []
-    for u in users:
-        rows.append([
-            u.email or u.overleaf_id,
-            u.display_name,
-            u.role.name if u.role else "",
-            "Sí" if u.is_admin else "No",
-            u.quota_used_fmt,
-            f"{u.quota_percent}%" if u.quota_percent is not None else "",
-            _date(u.signup_date),
-            _date(u.last_login_at),
-        ])
-
-    widths = [90, 70, 50, 30, 60, 35, 55, 60]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de usuarios", generated_by, flowables, filters_text)
+    data = _build_pdf("Informe de usuarios", generated_by, _users_section(users), filters_text)
     return data, f"informe_usuarios_{_today_suffix()}.pdf", "application/pdf"
 
+
+def _projects_section(projects: list[OverleafProject]) -> list:
+    styles = _pdf_styles()
+    fl = [
+        Paragraph(f"Total proyectos: <b>{len(projects)}</b>", styles["Normal"]),
+        Spacer(1, 6),
+    ]
+    headers = ["Nombre", "Propietario", "Tamaño", "Archivos", "Miembros", "Creado", "Últ. act."]
+    rows = [[
+        (p.name or "")[:40],
+        (p.owner.email if p.owner else "")[:30],
+        _fmt_bytes(p.size_bytes),
+        p.file_count or "",
+        p.members.count() if p.members else 0,
+        _date(p.created_at),
+        _date(p.last_updated_at),
+    ] for p in projects]
+    fl.append(_make_table(headers, rows, col_widths=[100, 80, 55, 40, 40, 55, 55]))
+    return fl
 
 def export_projects_pdf(
     projects: list[OverleafProject],
     generated_by: str = "system",
     filters_text: str | None = None,
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    flowables.append(Paragraph(f"Total proyectos: <b>{len(projects)}</b>", styles["Normal"]))
-    flowables.append(Spacer(1, 6))
-
-    headers = ["Nombre", "Propietario", "Tamaño", "Archivos", "Miembros", "Creado", "Últ. act."]
-    rows = []
-    for p in projects:
-        mc = p.members.count() if p.members else 0
-        rows.append([
-            (p.name or "")[:40],
-            (p.owner.email if p.owner else "")[:30],
-            _fmt_bytes(p.size_bytes),
-            p.file_count or "",
-            mc,
-            _date(p.created_at),
-            _date(p.last_updated_at),
-        ])
-
-    widths = [100, 80, 55, 40, 40, 55, 55]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de proyectos", generated_by, flowables, filters_text)
+    data = _build_pdf("Informe de proyectos", generated_by, _projects_section(projects), filters_text)
     return data, f"informe_proyectos_{_today_suffix()}.pdf", "application/pdf"
 
+
+def _storage_section(rows_data: list[dict], totals: dict | None = None) -> list:
+    styles = _pdf_styles()
+    fl = []
+    if totals:
+        fl += [
+            _metric_pair("Total consumido", totals.get("total_bytes_fmt", "")),
+            _metric_pair("Media por usuario", totals.get("avg_per_user_fmt", "")),
+            _metric_pair("Media por proyecto", totals.get("avg_per_project_fmt", "")),
+            Spacer(1, 8),
+        ]
+    headers = ["Email", "Nombre", "Cuota", "Usado", "% Uso", "Proyectos"]
+    rows = [[
+        (r["user"].email or "")[:35],
+        r["user"].display_name[:25],
+        r["quota_fmt"], r["used_fmt"],
+        f"{r['quota_pct']}%" if r["quota_pct"] is not None else "Sin límite",
+        r["proj_count"],
+    ] for r in rows_data]
+    fl.append(_make_table(headers, rows, col_widths=[100, 80, 65, 65, 50, 45]))
+    return fl
 
 def export_storage_pdf(
     rows_data: list[dict],
     totals: dict | None = None,
     generated_by: str = "system",
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    if totals:
-        flowables.append(_metric_pair("Total consumido", totals.get("total_bytes_fmt", "")))
-        flowables.append(_metric_pair("Media por usuario", totals.get("avg_per_user_fmt", "")))
-        flowables.append(_metric_pair("Media por proyecto", totals.get("avg_per_project_fmt", "")))
-        flowables.append(Spacer(1, 8))
-
-    headers = ["Email", "Nombre", "Cuota", "Usado", "% Uso", "Proyectos"]
-    rows = []
-    for r in rows_data:
-        u = r["user"]
-        rows.append([
-            (u.email or "")[:35],
-            u.display_name[:25],
-            r["quota_fmt"],
-            r["used_fmt"],
-            f"{r['quota_pct']}%" if r["quota_pct"] is not None else "Sin límite",
-            r["proj_count"],
-        ])
-
-    widths = [100, 80, 65, 65, 50, 45]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de almacenamiento", generated_by, flowables)
+    data = _build_pdf("Informe de almacenamiento", generated_by, _storage_section(rows_data, totals))
     return data, f"informe_almacenamiento_{_today_suffix()}.pdf", "application/pdf"
 
+
+def _quotas_section(rows_data: list[dict]) -> list:
+    styles = _pdf_styles()
+    fl = [
+        Paragraph(f"Total usuarios: <b>{len(rows_data)}</b>", styles["Normal"]),
+        Spacer(1, 6),
+    ]
+    headers = ["Email", "Rol", "Cuota", "Usado", "% Uso", "Estado", "Proy.", "Limite", "Excede proy."]
+    rows = [[
+        (r["user"].email or "")[:30],
+        r["role_name"][:12],
+        r["quota_fmt"], r["used_fmt"],
+        f"{r['pct']}%" if r["pct"] is not None else "",
+        r["status"], r["projects_count"],
+        r["max_projects"] if r["max_projects"] is not None else "Sin lím.",
+        "Sí" if r["exceeds_project_limit"] else "No",
+    ] for r in rows_data]
+    fl.append(_make_table(headers, rows, col_widths=[80, 40, 50, 50, 35, 42, 28, 35, 42]))
+    return fl
 
 def export_quotas_pdf(
     rows_data: list[dict],
     generated_by: str = "system",
     filters_text: str | None = None,
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    flowables.append(Paragraph(f"Total usuarios: <b>{len(rows_data)}</b>", styles["Normal"]))
-    flowables.append(Spacer(1, 6))
-
-    headers = ["Email", "Rol", "Cuota", "Usado", "% Uso", "Estado", "Proy.", "Limite", "Excede proy."]
-    rows = []
-    for r in rows_data:
-        u = r["user"]
-        rows.append([
-            (u.email or "")[:30],
-            r["role_name"][:12],
-            r["quota_fmt"],
-            r["used_fmt"],
-            f"{r['pct']}%" if r["pct"] is not None else "",
-            r["status"],
-            r["projects_count"],
-            r["max_projects"] if r["max_projects"] is not None else "Sin lím.",
-            "Sí" if r["exceeds_project_limit"] else "No",
-        ])
-
-    widths = [80, 40, 50, 50, 35, 42, 28, 35, 42]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de cuotas", generated_by, flowables, filters_text)
+    data = _build_pdf("Informe de cuotas", generated_by, _quotas_section(rows_data), filters_text)
     return data, f"informe_cuotas_{_today_suffix()}.pdf", "application/pdf"
 
+
+def _activity_section(entries: list[AuditLog]) -> list:
+    styles = _pdf_styles()
+    fl = [
+        Paragraph(f"Total entradas: <b>{len(entries)}</b>", styles["Normal"]),
+        Spacer(1, 6),
+    ]
+    headers = ["Fecha", "Actor", "Acción", "Nivel", "IP", "Detalle"]
+    rows = [[
+        _ts(e.created_at), e.actor or "", e.action or "",
+        e.level or "", e.ip_address or "", (e.detail or "")[:60],
+    ] for e in entries]
+    fl.append(_make_table(headers, rows, col_widths=[75, 55, 55, 35, 55, 150]))
+    return fl
 
 def export_activity_pdf(
     entries: list[AuditLog],
     generated_by: str = "system",
     filters_text: str | None = None,
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    flowables.append(Paragraph(f"Total entradas: <b>{len(entries)}</b>", styles["Normal"]))
-    flowables.append(Spacer(1, 6))
-
-    headers = ["Fecha", "Actor", "Acción", "Nivel", "IP", "Detalle"]
-    rows = []
-    for e in entries:
-        rows.append([
-            _ts(e.created_at),
-            e.actor or "",
-            e.action or "",
-            e.level or "",
-            e.ip_address or "",
-            (e.detail or "")[:60],
-        ])
-
-    widths = [75, 55, 55, 35, 55, 150]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de actividad administrativa", generated_by, flowables, filters_text)
+    data = _build_pdf("Informe de actividad administrativa", generated_by, _activity_section(entries), filters_text)
     return data, f"informe_actividad_{_today_suffix()}.pdf", "application/pdf"
 
+
+def _incidents_section(entries: list[AuditLog]) -> list:
+    styles = _pdf_styles()
+    fl = [
+        Paragraph(f"Total incidencias: <b>{len(entries)}</b>", styles["Normal"]),
+        Spacer(1, 6),
+    ]
+    headers = ["Fecha", "Nivel", "Actor", "Acción", "Detalle"]
+    rows = [[
+        _ts(e.created_at), e.level or "", e.actor or "",
+        e.action or "", (e.detail or "")[:80],
+    ] for e in entries]
+    fl.append(_make_table(headers, rows, col_widths=[75, 40, 55, 55, 200]))
+    return fl
 
 def export_incidents_pdf(
     entries: list[AuditLog],
     generated_by: str = "system",
     filters_text: str | None = None,
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    flowables.append(Paragraph(f"Total incidencias: <b>{len(entries)}</b>", styles["Normal"]))
-    flowables.append(Spacer(1, 6))
-
-    headers = ["Fecha", "Nivel", "Actor", "Acción", "Detalle"]
-    rows = []
-    for e in entries:
-        rows.append([
-            _ts(e.created_at),
-            e.level or "",
-            e.actor or "",
-            e.action or "",
-            (e.detail or "")[:80],
-        ])
-
-    widths = [75, 40, 55, 55, 200]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de incidencias", generated_by, flowables, filters_text)
+    data = _build_pdf("Informe de incidencias", generated_by, _incidents_section(entries), filters_text)
     return data, f"informe_incidencias_{_today_suffix()}.pdf", "application/pdf"
 
+
+def _syncs_section(runs: list[SyncRun]) -> list:
+    styles = _pdf_styles()
+    fl = [
+        Paragraph(f"Total ejecuciones: <b>{len(runs)}</b>", styles["Normal"]),
+        Spacer(1, 6),
+    ]
+    headers = ["Inicio", "Fin", "Dur.(s)", "Estado", "Iniciado", "Us.enc.", "Us.sync.", "Pr.enc.", "Pr.sync."]
+    rows = [[
+        _ts(r.started_at), _ts(r.finished_at),
+        f"{r.duration_seconds:.0f}" if r.duration_seconds else "",
+        r.status, r.triggered_by,
+        r.users_found, r.users_synced, r.projects_found, r.projects_synced,
+    ] for r in runs]
+    fl.append(_make_table(headers, rows, col_widths=[68, 68, 32, 38, 40, 32, 32, 32, 32]))
+    return fl
 
 def export_syncs_pdf(
     runs: list[SyncRun],
     generated_by: str = "system",
     filters_text: str | None = None,
 ) -> tuple[bytes, str, str]:
-    styles = _pdf_styles()
-    flowables = []
-
-    flowables.append(Paragraph(f"Total ejecuciones: <b>{len(runs)}</b>", styles["Normal"]))
-    flowables.append(Spacer(1, 6))
-
-    headers = ["Inicio", "Fin", "Dur.(s)", "Estado", "Iniciado", "Us.enc.", "Us.sync.", "Pr.enc.", "Pr.sync."]
-    rows = []
-    for r in runs:
-        rows.append([
-            _ts(r.started_at),
-            _ts(r.finished_at),
-            f"{r.duration_seconds:.0f}" if r.duration_seconds else "",
-            r.status,
-            r.triggered_by,
-            r.users_found,
-            r.users_synced,
-            r.projects_found,
-            r.projects_synced,
-        ])
-
-    widths = [68, 68, 32, 38, 40, 32, 32, 32, 32]
-    flowables.append(_make_table(headers, rows, col_widths=widths))
-
-    data = _build_pdf("Informe de sincronizaciones", generated_by, flowables, filters_text)
+    data = _build_pdf("Informe de sincronizaciones", generated_by, _syncs_section(runs), filters_text)
     return data, f"informe_sincronizaciones_{_today_suffix()}.pdf", "application/pdf"
 
 
@@ -1311,3 +1374,45 @@ def export_general_pdf(data: dict, generated_by: str = "system") -> tuple[bytes,
     doc.build(flowables, onFirstPage=_on_first, onLaterPages=_on_later)
     pdf_data = buf.getvalue()
     return pdf_data, f"informe_general_{_today_suffix()}.pdf", "application/pdf"
+
+
+def export_all_pdf_single(all_data: dict, generated_by: str = "system") -> tuple[bytes, str, str]:
+    """One PDF containing every report as a labelled section.
+
+    The document uses the shared ``_build_pdf`` header/footer and separates
+    each section with a ``PageBreak`` and a bold section title, so the reader
+    can navigate it like a binder.
+    """
+    styles = _pdf_styles()
+
+    # Section-title style (reuse SectionHeading but add a rule below)
+    def _section_title(name: str) -> list:
+        return [
+            Paragraph(name, styles["SectionHeading"]),
+            HRFlowable(width="100%", thickness=0.4, color=_RULE,
+                       spaceAfter=8, spaceBefore=0),
+        ]
+
+    sections = [
+        ("Usuarios",                    _users_section(all_data["users"])),
+        ("Proyectos",                   _projects_section(all_data["projects"])),
+        ("Almacenamiento",              _storage_section(all_data["storage_rows"], all_data["storage"])),
+        ("Cuotas",                      _quotas_section(all_data["quotas"])),
+        ("Actividad administrativa",    _activity_section(all_data["activity"])),
+        ("Incidencias",                 _incidents_section(all_data["incidents"])),
+        ("Sincronizaciones",            _syncs_section(all_data["syncs"])),
+    ]
+
+    combined: list = []
+    for i, (title, section_fl) in enumerate(sections):
+        if i > 0:
+            combined.append(PageBreak())
+        combined += _section_title(title)
+        combined += section_fl
+
+    data = _build_pdf(
+        "Informe completo — todos los informes",
+        generated_by,
+        combined,
+    )
+    return data, f"informe_completo_{_today_suffix()}.pdf", "application/pdf"
