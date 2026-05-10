@@ -87,6 +87,7 @@ uploads/
 .claude/
 CLAUDE.md
 REFACTORING.md
+ARCHITECTURE.md
 
 # ─── Archivos generados en tiempo de ejecución ───────────────────────────────
 *.pdf
