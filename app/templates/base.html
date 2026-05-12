@@ -73,6 +73,18 @@
         </a>
       </li>
       <li class="nav-item">
+        <a href="{{ url_for('alerts.list_alerts') }}"
+           class="nav-link text-white {% if active_page == 'alerts' %}active bg-success{% endif %} d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-exclamation-triangle me-2"></i>Alertas</span>
+          {% if sidebar_unread_alerts and sidebar_unread_alerts > 0 %}
+            <span class="badge rounded-pill {% if active_page == 'alerts' %}bg-white text-success{% else %}bg-danger{% endif %}"
+                  style="font-size:.65rem; min-width:1.4rem; padding:.2em .45em;">
+              {{ sidebar_unread_alerts }}
+            </span>
+          {% endif %}
+        </a>
+      </li>
+      <li class="nav-item">
         <a href="{{ url_for('audit.logs') }}"
            class="nav-link text-white {% if active_page == 'audit' %}active bg-success{% endif %}">
           <i class="bi bi-journal-text me-2"></i>Auditoría
