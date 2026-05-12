@@ -99,6 +99,52 @@
 
   <div class="row g-3">
 
+    <!-- ── Alertas recientes ── -->
+    {% if stats.alert_active_count > 0 %}
+    <div class="col-12">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">
+            <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Alertas del sistema
+          </span>
+          <div class="d-flex align-items-center gap-2">
+            {% if stats.alert_critical_count > 0 %}
+              <span class="badge bg-danger">
+                {{ stats.alert_critical_count }} crítica{{ 's' if stats.alert_critical_count != 1 else '' }}
+              </span>
+            {% endif %}
+            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+              {{ stats.alert_active_count }} activa{{ 's' if stats.alert_active_count != 1 else '' }}
+            </span>
+            <a href="{{ url_for('alerts.list_alerts') }}" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          {% if stats.recent_alerts %}
+          <ul class="list-group list-group-flush">
+            {% for alert in stats.recent_alerts %}
+            <li class="list-group-item d-flex align-items-center gap-3 py-2 px-3 border-0 border-bottom">
+              <span class="badge {{ alert.level_badge_class }} flex-shrink-0">
+                <i class="bi {{ alert.level_icon }}"></i>
+              </span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="small fw-medium text-truncate">{{ alert.title }}</div>
+                <div class="text-muted" style="font-size:.72rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {{ alert.message }}
+                </div>
+              </div>
+              <span class="text-muted text-nowrap flex-shrink-0" style="font-size:.7rem;">
+                {{ alert.created_at.strftime('%d/%m %H:%M') if alert.created_at else '' }}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- ── Historial de sincronizaciones ── -->
     <div class="col-12">
       <div class="card border-0 shadow-sm h-100">
@@ -175,5 +221,157 @@
     </div>
 
   </div><!-- /row -->
+
+  <!-- ── Panel de notificaciones por email ── -->
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">
+            <i class="bi bi-envelope me-2 text-primary"></i>Notificaciones por email
+          </span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small" id="smtp-status">
+              <span class="spinner-border spinner-border-sm me-1" style="width:.6rem;height:.6rem;"></span>
+            </span>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="pending-email-badge">
+              <span class="spinner-border spinner-border-sm" style="width:.5rem;height:.5rem;"></span>
+            </span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <div class="flex-grow-1">
+              <p class="small text-muted mb-1">
+                Envia un resumen de alertas pendientes a los administradores activos, respetando sus preferencias de notificacion.
+              </p>
+              <div id="smtp-diag-detail" class="small text-muted"></div>
+            </div>
+            <div class="d-flex gap-2 flex-shrink-0">
+              <button id="btn-test-email" class="btn btn-outline-primary"
+                      title="Enviar correo de prueba SMTP">
+                <i class="bi bi-envelope-check me-1"></i>Probar email
+              </button>
+              <button id="btn-send-summary" class="btn btn-primary"
+                      title="Enviar resumen de alertas pendientes por email">
+                <i class="bi bi-send me-1"></i>Enviar resumen
+                <span class="badge bg-light text-primary ms-1" id="pending-email-count" style="font-size:.7rem;"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TEST_EMAIL_URL   = "{{ url_for('alerts.send_test_email') }}";
+const SEND_SUMMARY_URL = "{{ url_for('alerts.send_email_summary') }}";
+const EMAIL_DIAG_URL   = "{{ url_for('alerts.email_diagnostics') }}";
+
+// ── SMTP diagnostics + pending count ─────────────────────────────────────────
+function loadEmailDiag() {
+  fetch(EMAIL_DIAG_URL, { headers: { 'Accept': 'application/json' } })
+    .then(r => r.json())
+    .then(data => {
+      // Status badge
+      const statusEl = document.getElementById('smtp-status');
+      if (data.mock) {
+        statusEl.innerHTML = '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Modo mock</span>';
+      } else if (data.ready) {
+        statusEl.innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle">SMTP configurado</span>';
+      } else {
+        statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">SMTP no configurado</span>';
+      }
+
+      // Detail line
+      const detail = document.getElementById('smtp-diag-detail');
+      if (data.mock) {
+        detail.innerHTML = '<i class="bi bi-info-circle me-1"></i>SMTP_MOCK=true &mdash; los emails se imprimen en consola. Configura las variables SMTP en .env para enviar emails reales.';
+      } else if (data.issues && data.issues.length) {
+        detail.innerHTML = '<i class="bi bi-exclamation-triangle me-1 text-warning"></i>' + data.issues.join(' ');
+      } else {
+        detail.innerHTML = '<i class="bi bi-check-circle me-1 text-success"></i>Servidor: ' + data.host + ':' + data.port + ' &mdash; Usuario: ' + data.user;
+      }
+
+      // Pending count
+      const n = data.pending_alerts || 0;
+      const badge = document.getElementById('pending-email-badge');
+      badge.textContent = n + ' pendiente' + (n !== 1 ? 's' : '');
+      badge.className = n > 0
+        ? 'badge bg-primary-subtle text-primary border border-primary-subtle'
+        : 'badge bg-secondary-subtle text-secondary border border-secondary-subtle';
+      const countBadge = document.getElementById('pending-email-count');
+      countBadge.textContent = n > 0 ? n : '';
+    })
+    .catch(() => {
+      document.getElementById('smtp-status').innerHTML =
+        '<span class="badge bg-secondary-subtle text-secondary">Sin datos</span>';
+    });
+}
+
+// ── Test email ───────────────────────────────────────────────────────────────
+document.getElementById('btn-test-email').addEventListener('click', () => {
+  const btn = document.getElementById('btn-test-email');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Enviando...';
+  fetch(TEST_EMAIL_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body:    JSON.stringify({}),
+  })
+    .then(r => r.json())
+    .then(data => {
+      alert(data.ok
+        ? 'Correo de prueba enviado.\n\n' + data.msg
+        : 'Error al enviar correo de prueba:\n\n' + data.msg);
+    })
+    .catch(() => alert('Error de red al enviar correo de prueba.'))
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-envelope-check me-1"></i>Probar email';
+    });
+});
+
+// ── Send summary ─────────────────────────────────────────────────────────────
+document.getElementById('btn-send-summary').addEventListener('click', () => {
+  const btn = document.getElementById('btn-send-summary');
+  const countEl = document.getElementById('pending-email-count');
+  const n = countEl.textContent || '0';
+  if (n === '0' || n === '') {
+    alert('No hay alertas pendientes de notificacion.');
+    return;
+  }
+  if (!confirm('Se enviara un resumen con ' + n + ' alerta(s) pendiente(s) a los administradores configurados.\n\nContinuar?')) {
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Enviando resumen...';
+  fetch(SEND_SUMMARY_URL, {
+    method:  'POST',
+    headers: { 'Accept': 'application/json' },
+  })
+    .then(r => r.json())
+    .then(data => {
+      let msg = 'Emails enviados: ' + data.sent + '\nAlertas notificadas: ' + data.alerts_notified + '\nErrores: ' + data.errors;
+      if (data.details && data.details.length) {
+        msg += '\n\nDetalle:\n' + data.details.map(function(d) { return '  - ' + d; }).join('\n');
+      }
+      alert(msg);
+      loadEmailDiag();
+    })
+    .catch(() => alert('Error de red al enviar resumen.'))
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-send me-1"></i>Enviar resumen <span class="badge bg-light text-primary ms-1" id="pending-email-count" style="font-size:.7rem;"></span>';
+      loadEmailDiag();
+    });
+});
+
+loadEmailDiag();
+</script>
 {% endblock %}
