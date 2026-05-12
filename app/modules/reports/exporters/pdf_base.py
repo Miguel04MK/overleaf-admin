@@ -191,9 +191,17 @@ def _build_pdf(
 
 # ─── Shared table builder ────────────────────────────────────────────────────
 
-def _make_table(headers: list[str], rows: list[list], col_widths=None) -> Table:
-    """Build a styled data table with soft header and generous padding."""
+def _make_table(headers: list[str], rows: list[list], col_pcts: list[float] | None = None) -> Table:
+    """Build a styled data table matching the general-report design.
+
+    Parameters
+    ----------
+    col_pcts : optional list of floats that sum to ~1.0.
+        Each value is the fraction of ``_CONTENT_W`` for that column.
+        When omitted the table auto-sizes columns.
+    """
     styles = _pdf_styles()
+    col_widths = [_CONTENT_W * p for p in col_pcts] if col_pcts else None
 
     table_data = [
         [Paragraph(h, styles["CellHeader"]) for h in headers]
@@ -207,11 +215,9 @@ def _make_table(headers: list[str], rows: list[list], col_widths=None) -> Table:
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), _GREEN_SOFT),
         ("TEXTCOLOR", (0, 0), (-1, 0), _TEXT),
-        ("FONTSIZE", (0, 0), (-1, 0), 8.5),
         ("LINEBELOW", (0, 0), (-1, 0), 0.6, _BORDER),
-        ("FONTSIZE", (0, 1), (-1, -1), 9.5),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _ROW_ALT]),
-        ("GRID", (0, 0), (-1, -1), 0.3, _BORDER),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.3, _RULE),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),

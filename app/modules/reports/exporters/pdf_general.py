@@ -19,12 +19,16 @@ from reportlab.platypus import (
     HRFlowable, KeepTogether,
 )
 
-from ._helpers import _today_suffix, _ts_short
+from ._helpers import _today_suffix, _ts_short, _fmt_bytes
 from .pdf_base import (
     _pdf_styles, _metric_pair,
     _TEXT, _TEXT_SECONDARY, _GREEN, _GREEN_SOFT, _RED, _AMBER,
     _ROW_ALT, _BORDER, _RULE,
     _MARGIN_L, _MARGIN_R, _CONTENT_W,
+)
+from .pdf_sections import (
+    _LEVEL_LABELS, _TYPE_LABELS, _ENTITY_TYPE_LABELS,
+    _format_extra_data, _smart_truncate as _trunc_section,
 )
 
 
@@ -503,19 +507,80 @@ def export_general_pdf(data: dict, generated_by: str = "system") -> tuple[bytes,
         _after_table()
 
     # ══════════════════════════════════════════════════════════════════════
-    # 6. Auditoría e incidencias
+    # 6. Incidencias y alertas
     # ══════════════════════════════════════════════════════════════════════
-    _heading("6. Auditoría e incidencias")
+    _heading("6. Incidencias y alertas")
 
-    _narrative(
-        f"En las últimas 24 horas se han registrado "
-        f"<b>{data['active_alerts_count']}</b> alertas (errores y avisos)."
-    )
-    _metric("Alertas activas (24 h)", data["active_alerts_count"])
+    alerts_total      = data.get("system_alerts_total", 0)
+    alerts_unresolved = data.get("system_alerts_unresolved", 0)
+    alerts_critical   = data.get("system_alerts_critical", 0)
+    alerts_active     = data.get("system_alerts_active", [])
+
+    if alerts_unresolved > 0:
+        narr_6 = (
+            f"Se han registrado <b>{alerts_total}</b> alertas en el sistema. "
+            f"De ellas, <b>{alerts_unresolved}</b> permanecen sin resolver"
+        )
+        if alerts_critical > 0:
+            narr_6 += (
+                f', de las cuales <font color="{_RED.hexval()}">'
+                f"<b>{alerts_critical}</b> son de nivel crítico o peligro</font>"
+            )
+        narr_6 += "."
+    else:
+        narr_6 = (
+            f'<font color="{_GREEN.hexval()}">No hay alertas activas '
+            f"en el sistema.</font> Se han registrado "
+            f"<b>{alerts_total}</b> alertas en total, todas resueltas."
+        )
+    _narrative(narr_6)
+
+    _metric("Alertas totales", alerts_total)
+    _metric("Sin resolver", alerts_unresolved)
+    _metric("Críticas / Peligro", alerts_critical)
     _after_metrics()
 
+    if alerts_active:
+        _subheading("6.1 Alertas activas")
+        alert_rows = []
+        for a in alerts_active[:10]:
+            entity = _ENTITY_TYPE_LABELS.get(a.entity_type, a.entity_type or "")
+            if a.entity_id:
+                entity += f" ({a.entity_id})"
+            alert_rows.append([
+                _ts_short(a.created_at),
+                _LEVEL_LABELS.get(a.level, a.level),
+                _TYPE_LABELS.get(a.type, a.type),
+                _smart_truncate(a.title, 40),
+                entity,
+            ])
+        flowables.append(_gen_table(
+            ["Fecha", "Nivel", "Tipo", "Título", "Entidad"],
+            alert_rows,
+            col_pcts=[0.14, 0.10, 0.18, 0.34, 0.24],
+        ))
+        _after_table()
+
+        # Detail sub-table with messages and extra data
+        alerts_with_detail = [a for a in alerts_active[:10] if a.message or a.extra_data]
+        if alerts_with_detail:
+            _subheading("6.2 Detalle de alertas activas")
+            detail_rows = []
+            for a in alerts_with_detail:
+                detail_rows.append([
+                    _smart_truncate(a.title, 30),
+                    _smart_truncate(a.message or "", 50),
+                    _smart_truncate(_format_extra_data(a), 50),
+                ])
+            flowables.append(_gen_table(
+                ["Título", "Mensaje", "Datos adicionales"],
+                detail_rows,
+                col_pcts=[0.25, 0.40, 0.35],
+            ))
+            _after_table()
+
     if data["recent_errors"]:
-        _subheading("6.1 Errores y avisos recientes")
+        _subheading("6.3 Errores y avisos recientes en auditoría")
         err_rows = [
             [_ts_short(e.created_at), e.level, e.actor,
              _translate_action(e.action),
@@ -529,7 +594,7 @@ def export_general_pdf(data: dict, generated_by: str = "system") -> tuple[bytes,
         _after_table()
 
     if data["recent_role_changes"]:
-        _subheading("6.2 Cambios de rol/cuota recientes")
+        _subheading("6.4 Cambios de rol/cuota recientes")
         rc_rows = []
         for rc in data["recent_role_changes"][:5]:
             rc_rows.append([
