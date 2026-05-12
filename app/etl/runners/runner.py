@@ -144,6 +144,15 @@ def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
             )
             logger.info("SyncRun #%d finished successfully.", sync_run.id)
 
+            try:
+                from app.model.services import alerts_service
+                alerts_service.check_last_sync()
+                alerts_service.check_all_quotas()
+                alerts_service.check_all_project_limits()
+                alerts_service.check_repeated_errors()
+            except Exception as alert_exc:
+                logger.warning("Alert checks after sync failed: %s", alert_exc)
+
         except Exception as exc:
             db.session.rollback()
             error_msg = f"Error de sincronización: {exc}"
@@ -161,6 +170,13 @@ def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
                 detail=error_msg,
                 level="error",
             )
+
+            try:
+                from app.model.services import alerts_service
+                alerts_service.check_last_sync()
+                alerts_service.check_repeated_errors()
+            except Exception as alert_exc:
+                logger.warning("Alert checks after sync error failed: %s", alert_exc)
 
         finally:
             try:
