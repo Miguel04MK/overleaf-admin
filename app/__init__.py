@@ -38,6 +38,7 @@ def create_app(config_name: str | None = None) -> Flask:
         overleaf_user, overleaf_project, project_member,
         sync_run, audit_log, project_sync_log,
         role, role_change_log, report_export_log,
+        system_alert, app_setting, admin_notification_pref,
     )
 
     # Register user loader
@@ -56,6 +57,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.rest.controllers.admin_controller import audit_bp, dev_bp
     from app.modules.reports.routes import reports_bp
     from app.rest.controllers.roles_controller import roles_bp
+    from app.rest.controllers.alerts_controller import alerts_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -66,14 +68,32 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(dev_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(roles_bp)
+    app.register_blueprint(alerts_bp)
 
-    # Seed default roles if DB is ready (idempotent)
+    # Seed default roles and alert thresholds if DB is ready (idempotent)
     with app.app_context():
         try:
             from app.model.services.roles_service import seed_default_roles
             seed_default_roles()
         except Exception:
             pass  # DB might not be migrated yet
+        try:
+            from app.model.entities.app_setting import seed_defaults
+            seed_defaults()
+        except Exception:
+            pass  # DB might not be migrated yet
+
+    # Context processor: inject unread alert count for sidebar badge
+    @app.context_processor
+    def inject_alert_counts():
+        from flask_login import current_user
+        if current_user and current_user.is_authenticated:
+            try:
+                from app.model.services import alerts_service
+                return {"sidebar_unread_alerts": alerts_service.get_unread_count()}
+            except Exception:
+                pass
+        return {"sidebar_unread_alerts": 0}
 
     # Register error handlers
     _register_error_handlers(app)

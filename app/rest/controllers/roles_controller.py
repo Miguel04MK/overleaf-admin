@@ -88,6 +88,12 @@ def update_role(role_id: int):
         storage_quota_bytes=quota_bytes,
         max_projects=max_projects,
     )
+    if ok:
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_role_users(role_id)
+        except Exception:
+            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))
 
@@ -162,6 +168,13 @@ def manage_user_role(role_id: int):
             actor=current_user.username,
         )
 
+    if ok:
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_user_quota(user_id)
+            alerts_service.check_user_project_limit(user_id)
+        except Exception:
+            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))
 
@@ -189,5 +202,12 @@ def assign_role(user_id: int):
             reason=reason,
         )
 
+    if ok:
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_user_quota(user_id)
+            alerts_service.check_user_project_limit(user_id)
+        except Exception:
+            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

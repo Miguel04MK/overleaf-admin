@@ -21,6 +21,9 @@ class DashboardStats:
     last_users_delta: int | None = None
     last_projects_delta: int | None = None
     recent_syncs: list = field(default_factory=list)
+    alert_active_count: int = 0
+    alert_critical_count: int = 0
+    recent_alerts: list = field(default_factory=list)
 
 
 def get_stats() -> DashboardStats:
@@ -44,6 +47,13 @@ def get_stats() -> DashboardStats:
         stats.recent_syncs = (
             SyncRun.query.order_by(SyncRun.started_at.desc()).limit(5).all()
         )
+        try:
+            from app.model.services import alerts_service
+            stats.alert_active_count   = alerts_service.get_active_count()
+            stats.alert_critical_count = alerts_service.get_critical_count()
+            stats.recent_alerts        = alerts_service.get_recent_alerts(limit=3)
+        except Exception:
+            pass
     except Exception as exc:
         logger.error("Error collecting dashboard stats: %s", exc)
     return stats
