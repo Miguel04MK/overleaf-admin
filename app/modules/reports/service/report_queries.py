@@ -18,6 +18,7 @@ from app.model.entities.project_member import ProjectMember
 from app.model.entities.audit_log import AuditLog
 from app.model.entities.sync_run import SyncRun
 from app.model.entities.role import Role
+from app.model.entities.system_alert import SystemAlert
 
 from ._helpers import _INACTIVE_DAYS, _LARGE_BYTES, _fmt_bytes
 
@@ -568,4 +569,27 @@ def get_incidents_report_all(
     if level:     q = q.filter(AuditLog.level == level)
     if date_from: q = q.filter(AuditLog.created_at >= date_from)
     if date_to:   q = q.filter(AuditLog.created_at <= date_to)
+    return q.all()
+
+
+# ─── Alerts (SystemAlert) ───────────────────────────────────────────────────
+
+def get_alerts_report_all(
+    *,
+    level: str | None = None,
+    alert_type: str | None = None,
+    status: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[SystemAlert]:
+    """All system alerts for CSV/PDF export."""
+    q = SystemAlert.query.order_by(desc(SystemAlert.created_at))
+    if level:      q = q.filter(SystemAlert.level == level)
+    if alert_type: q = q.filter(SystemAlert.type == alert_type)
+    if status == "active":
+        q = q.filter(SystemAlert.is_resolved == False)
+    elif status == "resolved":
+        q = q.filter(SystemAlert.is_resolved == True)
+    if date_from:  q = q.filter(SystemAlert.created_at >= date_from)
+    if date_to:    q = q.filter(SystemAlert.created_at <= date_to)
     return q.all()

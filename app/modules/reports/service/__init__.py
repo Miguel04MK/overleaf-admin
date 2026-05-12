@@ -41,6 +41,7 @@ from .report_queries import (
     get_quotas_report_all,
     get_incidents_report,
     get_incidents_report_all,
+    get_alerts_report_all,
 )
 
 # ── General report queries ────────────────────────────────────────────────────
@@ -81,6 +82,7 @@ __all__ = [
     "get_syncs_report", "get_syncs_report_all",
     "get_quotas_report", "get_quotas_report_all",
     "get_incidents_report", "get_incidents_report_all",
+    "get_alerts_report_all",
     # general report
     "get_general_section_resumen", "get_general_section_usuarios",
     "get_general_section_proyectos", "get_general_section_almacenamiento",

@@ -12,6 +12,7 @@ from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.overleaf_project import OverleafProject
 from app.model.entities.audit_log import AuditLog
 from app.model.entities.sync_run import SyncRun
+from app.model.entities.system_alert import SystemAlert
 
 from ._helpers import _make_csv, _today_suffix, _ts, _date, _fmt_bytes
 
@@ -125,6 +126,74 @@ def _build_syncs_csv_rows(runs) -> list[list]:
     return rows
 
 
+_ALERT_TYPE_LABELS = {
+    "quota_warning":          "Cuota cercana",
+    "quota_exceeded":         "Cuota excedida",
+    "project_limit_warning":  "Proyectos cerca del límite",
+    "project_limit_exceeded": "Límite de proyectos superado",
+    "sync_failed":            "Fallo de sincronización",
+    "service_down":           "Servicio caído",
+    "repeated_errors":        "Errores repetidos",
+    "many_projects":          "Muchos proyectos",
+    "administrative_warning": "Aviso administrativo",
+}
+
+_ALERT_LEVEL_LABELS = {
+    "info": "Información", "warning": "Aviso", "danger": "Peligro", "critical": "Crítico",
+}
+
+_ALERT_ENTITY_LABELS = {
+    "user": "Usuario", "project": "Proyecto", "sync_run": "Sincronización", "service": "Servicio",
+}
+
+
+def _build_alerts_csv_rows(alerts) -> list[list]:
+    header = [
+        "ID", "Fecha", "Nivel", "Tipo", "Título", "Mensaje",
+        "Entidad", "ID Entidad", "Estado", "Leída",
+        "Resuelta por", "Fecha resolución", "Comentario resolución",
+        "Datos adicionales",
+    ]
+    rows = [header]
+    for a in alerts:
+        # Format extra_data
+        ed = a.extra_data or {}
+        extra_parts = []
+        for k, v in ed.items():
+            if k in ("max_quota_bytes",) and isinstance(v, (int, float)):
+                v = _fmt_bytes(v)
+            extra_parts.append(f"{k}: {v}")
+        extra_str = "; ".join(extra_parts)
+
+        rows.append([
+            a.id,
+            _ts(a.created_at),
+            _ALERT_LEVEL_LABELS.get(a.level, a.level),
+            _ALERT_TYPE_LABELS.get(a.type, a.type),
+            a.title or "",
+            a.message or "",
+            _ALERT_ENTITY_LABELS.get(a.entity_type, a.entity_type or ""),
+            a.entity_id or "",
+            "Resuelta" if a.is_resolved else "Activa",
+            "Sí" if a.is_read else "No",
+            a.resolved_by or "",
+            _ts(a.resolved_at),
+            a.resolution_comment or "",
+            extra_str,
+        ])
+    return rows
+
+
+def _build_incidents_alerts_csv_rows(incidents, alerts) -> list[list]:
+    """Merged incidents + alerts CSV rows."""
+    rows = [["=== ALERTAS DEL SISTEMA ==="]]
+    rows.extend(_build_alerts_csv_rows(alerts))
+    rows.append([])
+    rows.append(["=== INCIDENCIAS EN AUDITORÍA ==="])
+    rows.extend(_build_incidents_csv_rows(incidents))
+    return rows
+
+
 def _build_general_csv_rows(data) -> list[list]:
     return [
         ["Sección", "Métrica", "Valor"],
@@ -180,6 +249,17 @@ def export_incidents_csv(entries: list[AuditLog]) -> tuple[bytes, str, str]:
     return _make_csv(f"informe_incidencias_{_today_suffix()}.csv", _build_incidents_csv_rows(entries))
 
 
+def export_alerts_csv(alerts: list[SystemAlert]) -> tuple[bytes, str, str]:
+    return _make_csv(f"informe_alertas_{_today_suffix()}.csv", _build_alerts_csv_rows(alerts))
+
+
+def export_incidents_alerts_csv(incidents, alerts) -> tuple[bytes, str, str]:
+    return _make_csv(
+        f"informe_incidencias_alertas_{_today_suffix()}.csv",
+        _build_incidents_alerts_csv_rows(incidents, alerts),
+    )
+
+
 def export_general_csv(data: dict) -> tuple[bytes, str, str]:
     """Flat CSV summary of the general platform report."""
     return _make_csv(f"informe_general_{_today_suffix()}.csv", _build_general_csv_rows(data))
@@ -213,7 +293,7 @@ def export_all_csv_zip(all_data: dict) -> tuple[bytes, str, str]:
         data, fname, _ = export_activity_csv(all_data["activity"])
         entries.append((fname, data))
 
-        data, fname, _ = export_incidents_csv(all_data["incidents"])
+        data, fname, _ = export_incidents_alerts_csv(all_data["incidents"], all_data["alerts"])
         entries.append((fname, data))
 
         data, fname, _ = export_syncs_csv(all_data["syncs"])
@@ -239,10 +319,10 @@ def export_all_csv_single(all_data: dict) -> tuple[bytes, str, str]:
         ("PROYECTOS",        _build_projects_csv_rows(all_data["projects"])),
         ("ALMACENAMIENTO",   _build_storage_csv_rows(all_data["storage_rows"])),
         ("CUOTAS",           _build_quotas_csv_rows(all_data["quotas"])),
-        ("ACTIVIDAD",        _build_activity_csv_rows(all_data["activity"])),
-        ("INCIDENCIAS",      _build_incidents_csv_rows(all_data["incidents"])),
-        ("SINCRONIZACIONES", _build_syncs_csv_rows(all_data["syncs"])),
-        ("GENERAL",          _build_general_csv_rows(all_data["general"])),
+        ("ACTIVIDAD",                _build_activity_csv_rows(all_data["activity"])),
+        ("INCIDENCIAS Y ALERTAS",    _build_incidents_alerts_csv_rows(all_data["incidents"], all_data["alerts"])),
+        ("SINCRONIZACIONES",         _build_syncs_csv_rows(all_data["syncs"])),
+        ("GENERAL",                  _build_general_csv_rows(all_data["general"])),
     ]
 
     first = True

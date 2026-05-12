@@ -136,13 +136,13 @@ def index():
             "url_pdf": url_for("reports.export_activity_pdf"),
         },
         {
-            "key": "incidencias",
-            "name": "Informe de incidencias",
-            "desc": "Errores y avisos del sistema.",
+            "key": "incidencias_alertas",
+            "name": "Incidencias y alertas",
+            "desc": "Alertas del sistema y errores de auditoria unificados.",
             "icon": "bi-exclamation-triangle-fill",
             "color": "#dc3545",
-            "url_csv": url_for("reports.export_incidents_csv"),
-            "url_pdf": url_for("reports.export_incidents_pdf"),
+            "url_csv": url_for("reports.export_incidents_alerts_csv"),
+            "url_pdf": url_for("reports.export_incidents_alerts_pdf"),
         },
         {
             "key": "sincronizaciones",
@@ -334,6 +334,19 @@ def incidents_report():
     return redirect(url_for("reports.index"))
 
 
+# Legacy routes — redirect to merged endpoints
+@reports_bp.route("/incidencias/csv")
+@login_required
+def export_incidents_csv():
+    return export_incidents_alerts_csv()
+
+
+@reports_bp.route("/incidencias/pdf")
+@login_required
+def export_incidents_pdf():
+    return export_incidents_alerts_pdf()
+
+
 @reports_bp.route("/sincronizaciones")
 @login_required
 def syncs_report():
@@ -506,34 +519,54 @@ def export_quotas_pdf():
     return _pdf_response(pdf_data, filename)
 
 
-# ─── Incidents CSV/PDF ──────────────────────────────────────────────────────
+# ─── Incidents + Alerts (merged) CSV/PDF ───────────────────────────────────
 
-@reports_bp.route("/incidencias/csv")
+@reports_bp.route("/incidencias-alertas/csv")
 @login_required
-def export_incidents_csv():
+def export_incidents_alerts_csv():
     args = request.args
-    entries = service.get_incidents_report_all(
+    incidents = service.get_incidents_report_all(
         level=args.get("level") or None,
         date_from=service._parse_date(args.get("date_from")),
         date_to=service._parse_date(args.get("date_to")),
     )
-    data, filename, ct = exporters.export_incidents_csv(entries)
-    _log_export("incidencias", "csv", filename)
+    alerts = service.get_alerts_report_all(
+        level=args.get("level") or None,
+        alert_type=args.get("type") or None,
+        status=args.get("status") or None,
+        date_from=service._parse_date(args.get("date_from")),
+        date_to=service._parse_date(args.get("date_to")),
+    )
+    data, filename, ct = exporters.export_incidents_alerts_csv(incidents, alerts)
+    _log_export("incidencias_alertas", "csv", filename)
     return _csv_response(data, filename, ct)
 
 
-@reports_bp.route("/incidencias/pdf")
+@reports_bp.route("/incidencias-alertas/pdf")
 @login_required
-def export_incidents_pdf():
+def export_incidents_alerts_pdf():
     args = request.args
-    entries = service.get_incidents_report_all(
+    incidents = service.get_incidents_report_all(
         level=args.get("level") or None,
         date_from=service._parse_date(args.get("date_from")),
         date_to=service._parse_date(args.get("date_to")),
     )
-    ft = _filters_text([("Nivel", args.get("level"))])
-    pdf_data, filename, ct = exporters.export_incidents_pdf(entries, generated_by=_actor(), filters_text=ft)
-    _log_export("incidencias", "pdf", filename)
+    alerts = service.get_alerts_report_all(
+        level=args.get("level") or None,
+        alert_type=args.get("type") or None,
+        status=args.get("status") or None,
+        date_from=service._parse_date(args.get("date_from")),
+        date_to=service._parse_date(args.get("date_to")),
+    )
+    ft = _filters_text([
+        ("Nivel", args.get("level")),
+        ("Tipo", args.get("type")),
+        ("Estado", args.get("status")),
+    ])
+    pdf_data, filename, ct = exporters.export_incidents_alerts_pdf(
+        incidents, alerts, generated_by=_actor(), filters_text=ft,
+    )
+    _log_export("incidencias_alertas", "pdf", filename)
     return _pdf_response(pdf_data, filename)
 
 

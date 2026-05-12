@@ -21,6 +21,7 @@ from app.model.entities.sync_run import SyncRun
 from app.model.entities.role import Role
 from app.model.entities.role_change_log import RoleChangeLog
 from app.model.entities.admin_user import AdminUser
+from app.model.entities.system_alert import SystemAlert
 
 from ._helpers import _INACTIVE_DAYS, _LARGE_BYTES, _fmt_bytes
 
@@ -424,6 +425,21 @@ def get_general_report_data() -> dict[str, Any]:
         .count()
     )
 
+    # System alerts
+    system_alerts_active = (
+        SystemAlert.query
+        .filter(SystemAlert.is_resolved == False)
+        .order_by(desc(SystemAlert.created_at))
+        .limit(10)
+        .all()
+    )
+    system_alerts_total = SystemAlert.query.count()
+    system_alerts_unresolved = SystemAlert.query.filter(SystemAlert.is_resolved == False).count()
+    system_alerts_critical = SystemAlert.query.filter(
+        SystemAlert.level.in_(["critical", "danger"]),
+        SystemAlert.is_resolved == False,
+    ).count()
+
     return {
         # Users
         "total_users":           total_users,
@@ -455,6 +471,11 @@ def get_general_report_data() -> dict[str, Any]:
         "recent_role_changes":  recent_role_changes,
         "recent_errors":        recent_errors,
         "active_alerts_count":  active_alerts_count,
+        # System alerts
+        "system_alerts_active":     system_alerts_active,
+        "system_alerts_total":      system_alerts_total,
+        "system_alerts_unresolved": system_alerts_unresolved,
+        "system_alerts_critical":   system_alerts_critical,
         # Meta
         "generated_at": now,
     }

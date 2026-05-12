@@ -15,9 +15,11 @@ from ._helpers import _today_suffix
 from .pdf_base import _pdf_styles, _build_pdf, _RULE
 from .pdf_sections import (
     _users_section, _projects_section, _storage_section,
-    _quotas_section, _activity_section, _incidents_section, _syncs_section,
+    _quotas_section, _activity_section, _syncs_section,
+    _incidents_alerts_section,
     export_users_pdf, export_projects_pdf, export_storage_pdf,
-    export_quotas_pdf, export_activity_pdf, export_incidents_pdf, export_syncs_pdf,
+    export_quotas_pdf, export_activity_pdf, export_syncs_pdf,
+    export_incidents_alerts_pdf,
 )
 from .pdf_general import export_general_pdf
 
@@ -46,7 +48,9 @@ def export_all_pdf_zip(all_data: dict, generated_by: str = "system") -> tuple[by
         data, fname, _ = export_activity_pdf(all_data["activity"], generated_by=generated_by)
         entries.append((fname, data))
 
-        data, fname, _ = export_incidents_pdf(all_data["incidents"], generated_by=generated_by)
+        data, fname, _ = export_incidents_alerts_pdf(
+            all_data["incidents"], all_data["alerts"], generated_by=generated_by,
+        )
         entries.append((fname, data))
 
         data, fname, _ = export_syncs_pdf(all_data["syncs"], generated_by=generated_by)
@@ -79,7 +83,7 @@ def export_all_pdf_single(all_data: dict, generated_by: str = "system") -> tuple
         ("Almacenamiento",           _storage_section(all_data["storage_rows"], all_data["storage"])),
         ("Cuotas",                   _quotas_section(all_data["quotas"])),
         ("Actividad administrativa", _activity_section(all_data["activity"])),
-        ("Incidencias",              _incidents_section(all_data["incidents"])),
+        ("Incidencias y alertas",    _incidents_alerts_section(all_data["incidents"], all_data["alerts"])),
         ("Sincronizaciones",         _syncs_section(all_data["syncs"])),
     ]
 
