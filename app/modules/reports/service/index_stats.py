@@ -23,6 +23,7 @@ from .report_queries import (
     get_users_report_all, get_projects_report_all, get_storage_report,
     get_quotas_report_all, get_activity_report_all,
     get_incidents_report_all, get_syncs_report_all,
+    get_alerts_report_all,
 )
 from .general_queries import get_general_report_data
 
@@ -61,6 +62,7 @@ def get_all_reports_data() -> dict:
         "activity":     get_activity_report_all(),
         "incidents":    get_incidents_report_all(),
         "syncs":        get_syncs_report_all(),
+        "alerts":       get_alerts_report_all(),
         "general":      get_general_report_data(),
     }
 
