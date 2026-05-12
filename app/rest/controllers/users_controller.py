@@ -78,5 +78,11 @@ def set_quota(user_id: int):
         max_bytes = int(value * mult)
 
     ok, msg = users_service.set_user_quota(user_id, max_bytes)
+    if ok:
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_user_quota(user_id)
+        except Exception:
+            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))
