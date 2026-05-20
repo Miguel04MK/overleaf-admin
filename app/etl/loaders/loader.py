@@ -87,6 +87,10 @@ class OverleafLoader:
         synced = 0
         now = datetime.now(timezone.utc)
 
+        # Collect (project_ref, event, size_bytes) tuples so we can do a
+        # single flush after the loop instead of one per project.
+        pending_logs: list[tuple] = []
+
         for raw in raw_projects:
             try:
                 owner_oid = raw.get("owner_overleaf_id")
@@ -124,17 +128,7 @@ class OverleafLoader:
                     db.session.add(project_ref)
                     event = "created"
 
-                # Write per-project sync log (flushed below so id is available)
-                db.session.flush()
-                sync_log = ProjectSyncLog(
-                    project_id=project_ref.id,
-                    sync_run_id=sync_run_id,
-                    synced_at=now,
-                    event=event,
-                    size_bytes=raw.get("size_bytes"),
-                )
-                db.session.add(sync_log)
-
+                pending_logs.append((project_ref, event, raw.get("size_bytes")))
                 synced += 1
             except Exception as exc:
                 logger.error(
@@ -143,10 +137,25 @@ class OverleafLoader:
                     exc,
                 )
 
+        # Single flush so all new projects get their PKs assigned atomically.
         db.session.flush()
 
+        # Create sync logs now that all project IDs are available.
+        for project_ref, event, size_bytes in pending_logs:
+            sync_log = ProjectSyncLog(
+                project_id=project_ref.id,
+                sync_run_id=sync_run_id,
+                synced_at=now,
+                event=event,
+                size_bytes=size_bytes,
+            )
+            db.session.add(sync_log)
+
         # Upsert memberships
-        self._upsert_memberships(memberships_data, user_map)
+        try:
+            self._upsert_memberships(memberships_data, user_map)
+        except Exception as exc:
+            logger.error("Error upserting memberships: %s", exc)
 
         # Back-fill member_count on the sync logs we just wrote
         if sync_run_id:

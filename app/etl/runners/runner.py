@@ -37,14 +37,16 @@ def _fmt_delta(delta: int) -> str:
     return str(delta)
 
 
-def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
+def run_sync(app: Flask, triggered_by: str = "manual",
+             triggered_by_user: str | None = None) -> SyncRun:
     """
     Execute a full sync cycle.
     Must be called within an app context (or wraps itself in one).
     Returns the completed SyncRun record.
     """
     with app.app_context():
-        sync_run = SyncRun(triggered_by=triggered_by)
+        sync_run = SyncRun(triggered_by=triggered_by,
+                           triggered_by_user=triggered_by_user)
         db.session.add(sync_run)
         db.session.commit()
         logger.info("SyncRun #%d started (triggered_by=%s)", sync_run.id, triggered_by)
