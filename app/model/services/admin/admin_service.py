@@ -66,7 +66,7 @@ class ServiceStatus:
     source: str = "mock" # "docker" | "tcp" | "mock"
 
 
-def _check_tcp(host: str, port: int, timeout: float = 2.0) -> bool:
+def _check_tcp(host: str, port: int, timeout: float = 0.5) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -116,7 +116,7 @@ def _tcp_statuses(mongo_uri: str) -> list[ServiceStatus]:
         logger.debug("MongoDB TCP check error: %s", exc)
 
     for port in (80, 443, 8080):
-        ok = _check_tcp("localhost", port, timeout=1.0)
+        ok = _check_tcp("localhost", port, timeout=0.5)
         if ok:
             statuses.append(ServiceStatus(
                 name=f"Overleaf Web (:{port})",
