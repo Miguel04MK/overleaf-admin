@@ -13,7 +13,8 @@ from app.model.entities.overleaf_project import OverleafProject
 from app.model.entities.project_member import ProjectMember
 from app.model.entities import overleaf_project_dao as project_dao
 from app.model.services import projects_service
-from app.rest.controllers.projects_controller import _fmt_size, _parse_date
+from app.rest.controllers.projects_controller import _fmt_size
+from app.rest.common.helpers import parse_date as _parse_date
 from tests.conftest import make_user, make_project
 
 
