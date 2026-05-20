@@ -1,0 +1,56 @@
+    {# ── Tab: Colaboraciones ── #}
+    <div id="table-collabs" style="display:none;">
+      {% if collab_memberships %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Nombre</th>
+                <th>Rol</th>
+                <th>Propietario</th>
+                <th class="text-end">Tamaño</th>
+                <th>Actualizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in collab_memberships %}
+              {% set proj = m.project %}
+              <tr>
+                <td class="ps-3 fw-medium small">
+                  <a href="{{ url_for('projects.list_projects', q=proj.name) }}"
+                     class="text-decoration-none text-body">{{ proj.name or "—" }}</a>
+                </td>
+                <td>
+                  {% if m.role == 'read_only' %}
+                    <span class="badge bg-secondary">Solo lectura</span>
+                  {% else %}
+                    <span class="badge bg-info-subtle text-info-emphasis">Colaborador</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">
+                  {{ proj.owner.display_name if proj.owner else "—" }}
+                </td>
+                <td class="text-end small text-muted">
+                  {% if proj.size_bytes and proj.size_bytes > 0 %}
+                    {% set s = proj.size_bytes %}
+                    {% if s >= 1073741824 %}{{ "%.1f"|format(s/1073741824) }} GB
+                    {% elif s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                    {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                    {% else %}{{ s }} B{% endif %}
+                  {% else %}<span class="opacity-50">—</span>{% endif %}
+                </td>
+                <td class="small text-muted">
+                  {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else "—" }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center text-muted py-5 small">
+          <i class="bi bi-people d-block fs-3 mb-2 opacity-50"></i>
+          Este usuario no colabora en ningún proyecto.
+        </div>
+      {% endif %}
+    </div>{# /table-collabs #}

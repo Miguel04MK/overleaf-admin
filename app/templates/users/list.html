@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block page_title %}Usuarios sincronizados{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/users.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <!-- Barra de búsqueda + filtros -->
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+
+      <!-- Fila 1: controles -->
+      <div class="d-flex flex-wrap align-items-center gap-2">
+
+        <!-- Buscador -->
+        <div id="search-wrapper">
+          <div class="input-group search-group">
+            <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="user-search" class="form-control"
+                   placeholder="Buscar por nombre o email..." autocomplete="off">
+            <span id="search-spinner" class="input-group-text d-none">
+              <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Filtro: Proyectos -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-projects" type="button">
+            <i class="bi bi-folder2-open me-1"></i>Proyectos
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:210px">
+            <p class="small fw-semibold text-muted mb-2">Nº de proyectos</p>
+            <div class="d-flex gap-2 align-items-center">
+              <select class="form-select form-select-sm" id="f-projects-op" style="width:62px">
+                <option value="gte">≥</option>
+                <option value="eq">=</option>
+                <option value="lte">≤</option>
+              </select>
+              <input type="number" class="form-control form-control-sm" id="f-projects-val"
+                     min="0" max="9999" placeholder="nº" style="width:72px">
+              <button type="button" class="btn btn-ol-icon" id="f-projects-add" title="Añadir filtro">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtro: Cuota -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-quota" type="button">
+            <i class="bi bi-hdd me-1"></i>Cuota
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:220px">
+            <p class="small fw-semibold text-muted mb-2">Uso de almacenamiento</p>
+            <div class="d-flex gap-2 align-items-center mb-3">
+              <select class="form-select form-select-sm" id="f-quota-op" style="width:62px">
+                <option value="gte">≥</option>
+                <option value="lte">≤</option>
+              </select>
+              <input type="number" class="form-control form-control-sm" id="f-quota-val"
+                     min="0" max="200" placeholder="%" style="width:72px">
+              <span class="text-muted small">%</span>
+              <button type="button" class="btn btn-ol-icon" id="f-quota-add" title="Añadir filtro">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+            </div>
+            <div class="d-flex gap-1">
+              <button type="button" class="btn btn-sm btn-outline-danger f-quota-quick"
+                      data-op="exceeded" data-label="Cuota excedida">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>Excedida
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary f-quota-quick"
+                      data-op="unlimited" data-label="Sin límite">
+                <i class="bi bi-infinity me-1"></i>Sin límite
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtro: Rol -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-role" type="button">
+            <i class="bi bi-person-badge me-1"></i>Rol
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:170px">
+            <p class="small fw-semibold text-muted mb-1">Filtrar por rol</p>
+            <span class="text-muted small d-flex align-items-center gap-2">
+              <i class="bi bi-clock-history"></i>Próximamente
+            </span>
+          </div>
+        </div>
+
+        <!-- Filtro: Último acceso -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-access" type="button">
+            <i class="bi bi-clock me-1"></i>Último acceso
+          </button>
+          <ul class="dropdown-menu shadow-sm">
+            <li><h6 class="dropdown-header">Último inicio de sesión</h6></li>
+            <li><a class="dropdown-item" href="#" data-val="1d"       data-label="Acceso: hoy">Hoy</a></li>
+            <li><a class="dropdown-item" href="#" data-val="7d"       data-label="Acceso: semana">Última semana</a></li>
+            <li><a class="dropdown-item" href="#" data-val="30d"      data-label="Acceso: mes">Último mes</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-warning" href="#" data-val="inactive" data-label="Inactivo >90d">Sin acceso en 90 días</a></li>
+            <li><a class="dropdown-item text-danger"  href="#" data-val="never"    data-label="Nunca accedió">Nunca ha accedido</a></li>
+          </ul>
+        </div>
+
+        <!-- Contador -->
+        <div class="text-muted small ms-auto text-nowrap" id="result-count"></div>
+      </div>
+
+      <!-- Fila 2: chips de filtros activos -->
+      <div id="chips-row" class="d-none mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="sortable ps-3" data-col="email">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Email</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" data-col="nombre">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Nombre</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable text-center" data-col="roles">
+                <div class="d-flex align-items-center justify-content-center gap-1">
+                  <span class="col-label">Roles</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable text-center" data-col="proyectos">
+                <div class="d-flex align-items-center justify-content-center gap-1">
+                  <span class="col-label">Proyectos</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" style="min-width:180px" data-col="cuota">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Cuota</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" data-col="registro">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Registro</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Cargando usuarios…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Paginación -->
+      <div id="users-pagination"
+           class="d-none d-flex align-items-center justify-content-between px-3 py-2 border-top">
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SEARCH_URL = "{{ url_for('users.search') }}";
+const PER_PAGE   = 20;
+</script>
+<script src="{{ url_for('static', filename='js/users-list.js') }}"></script>
+{% endblock %}

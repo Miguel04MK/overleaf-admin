@@ -1,0 +1,156 @@
+{# ══════════════════════════════════════════════════════════════════════════
+   2. ROLES (doughnut) + QUOTA WARNINGS (paginated) + SYNC HISTORY
+   ══════════════════════════════════════════════════════════════════════ #}
+<div class="row g-2 mb-2">
+
+  {# Roles — doughnut chart #}
+  <div class="col-lg-3">
+    <div class="card section-card shadow-sm h-100" style="--accent:#6610f2;">
+      <div class="card-header">
+        <h6><span class="accent-bar"></span>
+            <i class="bi bi-pie-chart-fill"></i>
+            Distribución por rol</h6>
+      </div>
+      <div class="card-body roles-body">
+        {% if d.role_stats %}
+          <div class="chart-roles"><canvas id="chartRoles"></canvas></div>
+        {% else %}
+          <div class="text-center text-muted small py-3">Sin roles configurados.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Quota warnings — paginated, auto-rotating #}
+  <div class="col-lg-5">
+    <div class="card section-card shadow-sm h-100" style="--accent:#fd7e14;" id="quotaCard">
+      <div class="card-header">
+        <h6><span class="accent-bar"></span>
+            <i class="bi bi-speedometer2"></i>
+            Usuarios cerca de cuota</h6>
+        <div class="d-flex align-items-center gap-2">
+          <span class="small-aside" id="quotaCounter">{{ d.users_near_quota_total }} total</span>
+          <div class="quota-nav">
+            <button id="quotaPrev" title="Anterior"><i class="bi bi-chevron-left"></i></button>
+            <button id="quotaNext" title="Siguiente"><i class="bi bi-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-3">
+        <div class="quota-list" id="quotaList">
+          {# Initial server-rendered page #}
+          {% if d.users_near_quota %}
+            {% for u in d.users_near_quota %}
+              {% set pct = u._cached_quota_percent|default(0) %}
+              {% set t = [[(pct - 80) / 40, 0]|max, 1]|min %}
+              {% set cr = (245 - 25 * t)|round|int %}
+              {% set cg = (166 - 126 * t)|round|int %}
+              {% set cb = (35 - 5 * t)|round|int %}
+              {% set ca = '%.2f'|format(0.55 + 0.40 * t) %}
+              <div class="quota-item">
+                <a href="{{ url_for('users.user_detail', user_id=u.id) }}"
+                   class="text-decoration-none text-dark truncate"
+                   style="max-width:140px;" title="{{ u.email }}">
+                  {{ u.email or u.first_name or '—' }}
+                </a>
+                <div class="quota-bar">
+                  <div class="quota-bar-fill"
+                    style="width:100%; background:rgba({{ cr }},{{ cg }},{{ cb }},{{ ca }});"></div>
+                </div>
+                <span class="quota-pct">{{ pct }}%</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center text-muted small py-3">
+              <i class="bi bi-shield-check fs-4 d-block mb-2 opacity-50"></i>
+              Ningún usuario cerca de su cuota.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Sync history mini-table #}
+  <div class="col-lg-4">
+    <div class="card section-card shadow-sm h-100" style="--accent:#198754;">
+      <div class="card-header">
+        <h6><span class="accent-bar"></span>
+            <i class="bi bi-arrow-repeat"></i>
+            Historial de sincronización</h6>
+        <a href="{{ url_for('sync.status') }}" class="small-aside text-decoration-none">
+          Ver todas <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if d.recent_syncs %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 sync-mini">
+              <thead class="table-light">
+                <tr>
+                  <th></th>
+                  <th>Fecha</th>
+                  <th>Trigger</th>
+                  <th>Usu.</th>
+                  <th>Proy.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in d.recent_syncs %}
+                <tr class="sync-row-{{ r.status|default('running') }}">
+                  <td style="width:1.2rem;">
+                    {% if r.status == 'success' %}
+                      <i class="bi bi-check-circle-fill text-success" title="Exitosa"></i>
+                    {% elif r.status == 'error' %}
+                      <i class="bi bi-x-circle-fill text-danger" title="Fallida"></i>
+                    {% elif r.status == 'partial' %}
+                      <i class="bi bi-exclamation-circle-fill text-warning" title="Parcial"></i>
+                    {% else %}
+                      <i class="bi bi-arrow-repeat text-info" title="En curso"></i>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted" style="white-space:nowrap;">
+                    {{ r.started_at.strftime('%d/%m %H:%M') if r.started_at else '—' }}
+                  </td>
+                  <td>
+                    {% if r.triggered_by == 'manual' %}
+                      <span class="text-muted"><i class="bi bi-hand-index-thumb"></i>
+                        {{ r.triggered_by_user or 'Manual' }}</span>
+                    {% else %}
+                      <span class="text-muted"><i class="bi bi-clock"></i> Auto</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if r.users_delta and r.users_delta > 0 %}
+                      <span class="text-success fw-medium">+{{ r.users_delta }}</span>
+                    {% elif r.users_delta and r.users_delta < 0 %}
+                      <span class="text-danger fw-medium">{{ r.users_delta }}</span>
+                    {% else %}
+                      <span class="text-muted">0</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if r.projects_delta and r.projects_delta > 0 %}
+                      <span class="text-success fw-medium">+{{ r.projects_delta }}</span>
+                    {% elif r.projects_delta and r.projects_delta < 0 %}
+                      <span class="text-danger fw-medium">{{ r.projects_delta }}</span>
+                    {% else %}
+                      <span class="text-muted">0</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-4 small">
+            <i class="bi bi-arrow-repeat fs-3 d-block mb-2 opacity-50"></i>
+            Sin sincronizaciones.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>

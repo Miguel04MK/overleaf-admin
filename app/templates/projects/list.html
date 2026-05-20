@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Proyectos{% endblock %}
+{% block page_title %}Proyectos sincronizados{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/projects.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  {# ── Barra de filtros ─────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+
+      {# Fila 1: controles #}
+      <div class="d-flex flex-wrap align-items-center gap-2">
+
+        {# Buscador #}
+        <div id="search-wrapper">
+          <div class="input-group search-group">
+            <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="proj-search" class="form-control"
+                   placeholder="Buscar por nombre o ID Overleaf…"
+                   value="{{ search }}" autocomplete="off">
+            <span id="proj-spinner" class="input-group-text d-none">
+              <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
+            </span>
+          </div>
+        </div>
+
+        {# Filtro: Propietario #}
+        <div class="dropdown" id="dd-owner">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if owner_id }}"
+                  id="btn-f-owner">
+            <i class="bi bi-person{{ '-fill' if owner_id }} me-1"></i>
+            <span id="owner-btn-label">{{ selected_owner.display_name if selected_owner else 'Propietario' }}</span>
+          </button>
+          <div class="dropdown-menu shadow-sm p-2" style="min-width:250px;">
+            <div class="px-1 pb-2">
+              <input type="text" class="form-control form-control-sm"
+                     id="owner-search-input" placeholder="Buscar propietario…" autocomplete="off">
+            </div>
+            <div id="owner-list">
+              <button type="button" class="dropdown-item owner-option rounded"
+                      data-id="" data-name="Todos">
+                <span class="text-muted">Todos los propietarios</span>
+              </button>
+              {% for owner in owners %}
+                <button type="button"
+                        class="dropdown-item owner-option rounded {{ 'active' if owner_id == owner.id }}"
+                        data-id="{{ owner.id }}" data-name="{{ owner.display_name }}">
+                  {{ owner.display_name }}
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        {# Filtro: Fecha actualización #}
+        <div class="dropdown" id="dd-date">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if date_from or date_to }}"
+                  id="btn-f-date">
+            <i class="bi bi-calendar{{ '-check' if date_from or date_to else '3' }} me-1"></i>Fecha actualización
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:230px;">
+            <p class="small fw-semibold text-muted mb-2">Última actualización</p>
+            <div class="mb-2">
+              <label class="form-label small text-muted mb-1">Desde</label>
+              <input type="date" class="form-control form-control-sm" id="f-date-from" value="{{ date_from }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-muted mb-1">Hasta</label>
+              <input type="date" class="form-control form-control-sm" id="f-date-to" value="{{ date_to }}">
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-ol flex-grow-1"
+                      onclick="applyDateFilter()">Aplicar</button>
+              {% if date_from or date_to %}
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="clearDateFilter()" title="Limpiar fechas">
+                  <i class="bi bi-x"></i>
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# Filtro: Indicadores #}
+        {% set IND = [
+          ('large',         'Grande',       'bi-hdd-fill',    'warning'),
+          ('inactive',      'Inactivo',     'bi-moon-fill',   'secondary'),
+          ('collaborative', 'Colaborativo', 'bi-people-fill', 'primary'),
+        ] %}
+        <div class="dropdown" id="dd-indicators">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if indicators_filter }}"
+                  id="btn-f-indicators">
+            <i class="bi bi-flag{{ '-fill' if indicators_filter }} me-1"></i>Indicadores
+            {% if indicators_filter %}
+              <span class="badge bg-white text-success ms-1" style="font-size:.7rem;">
+                {{ indicators_filter|length }}
+              </span>
+            {% endif %}
+          </button>
+          <div class="dropdown-menu shadow-sm p-2" style="min-width:210px;">
+            <p class="small fw-semibold text-muted mb-2 px-1">Tipo de proyecto</p>
+            {% for key, label, icon, color in IND %}
+              <div class="ind-toggle {{ 'active' if key in indicators_filter }}"
+                   data-key="{{ key }}" data-label="{{ label }}">
+                <i class="bi {{ icon }} text-{{ color }}"></i>
+                <span>{{ label }}</span>
+                <i class="bi bi-check2 ind-check"></i>
+              </div>
+            {% endfor %}
+            <div class="border-top mt-2 pt-2 px-1">
+              <button type="button" class="btn btn-ol w-100"
+                      onclick="applyIndicators()">Aplicar</button>
+            </div>
+          </div>
+        </div>
+
+        {# Contador #}
+        <div class="text-muted small ms-auto text-nowrap" id="proj-counter">
+          <strong>{{ pagination.total }}</strong>
+          proyecto{{ 's' if pagination.total != 1 else '' }}
+        </div>
+
+      </div>{# /fila 1 #}
+
+      {# Fila 2: chips de filtros activos #}
+      {% set has_filters = search or owner_id or date_from or date_to or indicators_filter %}
+      <div id="chips-row"
+           class="{% if not has_filters %}d-none {% endif %}mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2">
+      </div>
+
+    </div>
+  </div>
+
+  {# ── Tabla ────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="sortable ps-3" data-col="name">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Nombre</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="ps-2">Propietario</th>
+              <th class="sortable text-center" data-col="members">
+                <div class="d-flex align-items-center justify-content-center gap-1">
+                  <span class="col-label">Colaboradores</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable text-end" data-col="size">
+                <div class="d-flex align-items-center justify-content-end gap-1">
+                  <span class="col-label">Tamaño</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" data-col="updated">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Actualizado</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th class="sortable" data-col="created">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Creado</span>
+                  <i class="sort-icon bi bi-chevron-expand"></i>
+                </div>
+              </th>
+              <th>Indicadores</th>
+            </tr>
+          </thead>
+          <tbody id="projects-tbody">
+            {% for proj in pagination.items %}
+            {% set cnt   = member_counts.get(proj.id, 0) %}
+            {% set names = member_names.get(proj.id, []) %}
+            {% set flags = indicators.get(proj.id, []) %}
+            {% set detail_url = url_for('projects.project_detail', project_id=proj.id) %}
+            <tr onclick="window.location='{{ detail_url }}'">
+              <td class="ps-3 fw-medium small">
+                <a href="{{ detail_url }}" class="text-decoration-none text-body"
+                   onclick="event.stopPropagation()">{{ proj.name or "—" }}</a>
+              </td>
+              <td class="small">
+                {% if proj.owner %}
+                  <a href="{{ url_for('users.user_detail', user_id=proj.owner.id) }}"
+                     class="text-decoration-none text-muted d-flex align-items-center gap-1"
+                     onclick="event.stopPropagation()">
+                    <i class="bi bi-person-fill"></i>{{ proj.owner.display_name }}
+                  </a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if cnt > 0 %}
+                  <span class="collab-cell" onclick="event.stopPropagation()">
+                    <span class="badge bg-info-subtle text-info-emphasis">
+                      <i class="bi bi-people-fill me-1"></i>{{ cnt }}
+                    </span>
+                    <span class="collab-tip">
+                      {% for n in names %}{{ n }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+                    </span>
+                  </span>
+                {% else %}<span class="text-muted small">—</span>{% endif %}
+              </td>
+              <td class="text-end small text-muted">
+                {% if proj.size_bytes and proj.size_bytes > 0 %}
+                  {% set s = proj.size_bytes %}
+                  {% if s >= 1073741824 %}{{ "%.1f"|format(s/1073741824) }} GB
+                  {% elif s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                  {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                  {% else %}{{ s }} B{% endif %}
+                {% else %}<span class="opacity-50">—</span>{% endif %}
+              </td>
+              <td class="small text-muted">
+                {{ proj.last_updated_at.strftime('%d/%m/%Y') if proj.last_updated_at else "—" }}
+              </td>
+              <td class="small text-muted">
+                {{ proj.created_at.strftime('%d/%m/%Y') if proj.created_at else "—" }}
+              </td>
+              <td>
+                <div class="d-flex flex-wrap gap-1">
+                  {% if 'large' in flags %}
+                    <span class="badge bg-warning text-dark" title="Ocupa más de 10 MB">
+                      <i class="bi bi-hdd-fill me-1"></i>Grande
+                    </span>
+                  {% endif %}
+                  {% if 'inactive' in flags %}
+                    <span class="badge bg-secondary" title="Sin actividad en más de 90 días">
+                      <i class="bi bi-moon-fill me-1"></i>Inactivo
+                    </span>
+                  {% endif %}
+                  {% if 'collaborative' in flags %}
+                    <span class="badge bg-primary bg-opacity-75" title="{{ cnt }} colaboradores">
+                      <i class="bi bi-people-fill me-1"></i>Colaborativo
+                    </span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+            {% if not pagination.items %}
+            <tr><td colspan="7" class="text-center py-5 text-muted">
+              <i class="bi bi-folder-x fs-1 d-block mb-3 opacity-50"></i>
+              No hay proyectos que coincidan con los filtros aplicados.
+            </td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Paginación — se actualiza por JS tras cada fetch #}
+      <div id="proj-pagination"
+           class="{% if pagination.pages <= 1 %}d-none {% endif %}d-flex align-items-center justify-content-between px-3 py-2 border-top">
+        {% if pagination.pages > 1 %}
+        <span class="small text-muted">
+          {{ pagination.per_page * (pagination.page - 1) + 1 }}–{{ [pagination.per_page * pagination.page, pagination.total]|min }}
+          de {{ pagination.total }}
+        </span>
+        <nav><ul class="pagination pagination-sm mb-0" id="proj-pages"></ul></nav>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SEARCH_URL    = "{{ url_for('projects.search_projects') }}";
+const INITIAL_STATE = {
+  q:          {{ search     | tojson }},
+  owner_id:   {{ owner_id   | tojson }},
+  owner_name: {{ (selected_owner.display_name if selected_owner else '') | tojson }},
+  date_from:  {{ date_from  | tojson }},
+  date_to:    {{ date_to    | tojson }},
+  indicators: {{ indicators_filter | tojson }},
+  sort:       {{ sort_col   | tojson }},
+  order:      {{ sort_order | tojson }},
+};
+</script>
+<script src="{{ url_for('static', filename='js/projects-list.js') }}"></script>
+{% endblock %}

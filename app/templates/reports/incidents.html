@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Informe de incidencias{% endblock %}
+{% block page_title %}Informe de incidencias{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Informes</a></li>
+      <li class="breadcrumb-item active">Incidencias</li>
+    </ol>
+  </nav>
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-3">
+    <div class="col-4">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold text-muted">{{ stats.total_incidents }}</div>
+        <div class="small text-muted">Total incidencias</div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold {% if stats.errors > 0 %}text-danger{% else %}text-muted{% endif %}">{{ stats.errors }}</div>
+        <div class="small text-muted">Errores</div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold {% if stats.warnings > 0 %}text-warning{% else %}text-muted{% endif %}">{{ stats.warnings }}</div>
+        <div class="small text-muted">Avisos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+          <select name="level" class="form-select form-select-sm">
+            <option value="">Nivel: todos</option>
+            <option value="error" {% if args.get('level') == 'error' %}selected{% endif %}>Error</option>
+            <option value="warning" {% if args.get('level') == 'warning' %}selected{% endif %}>Aviso</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <input type="date" name="date_from" class="form-control form-control-sm"
+                 value="{{ args.get('date_from', '') }}" placeholder="Desde">
+        </div>
+        <div class="col-6 col-md-2">
+          <input type="date" name="date_to" class="form-control form-control-sm"
+                 value="{{ args.get('date_to', '') }}" placeholder="Hasta">
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2">
+          <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-search me-1"></i>Filtrar
+          </button>
+          <a href="{{ url_for('reports.incidents_report') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x"></i> Limpiar
+          </a>
+          <a href="{{ url_for('reports.export_incidents_csv', **request.args) }}" class="btn btn-sm btn-success">
+            <i class="bi bi-filetype-csv"></i> CSV
+          </a>
+          <a href="{{ url_for('reports.export_incidents_pdf', **request.args) }}" class="btn btn-sm btn-danger">
+            <i class="bi bi-file-pdf"></i> PDF
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2">
+      <span class="fw-semibold small">
+        <i class="bi bi-exclamation-triangle me-2 text-muted"></i>{{ pagination.total }} incidencias
+      </span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagination.items %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Fecha</th>
+              <th>Nivel</th>
+              <th>Actor</th>
+              <th>Accion</th>
+              <th>Detalle</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in pagination.items %}
+            <tr>
+              <td class="ps-3 small text-nowrap">{{ e.created_at.strftime('%d/%m/%Y %H:%M') if e.created_at else '' }}</td>
+              <td>
+                {% if e.level == 'error' %}
+                  <span class="badge bg-danger">error</span>
+                {% elif e.level == 'warning' %}
+                  <span class="badge bg-warning text-dark">aviso</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ e.level }}</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ e.actor }}</td>
+              <td class="small">{{ e.action }}</td>
+              <td class="small text-truncate" style="max-width:250px;" title="{{ e.detail or '' }}">{{ e.detail or '—' }}</td>
+              <td class="small text-muted">{{ e.ip_address or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if pagination.pages > 1 %}
+      {% set base_qs %}{% for k,v in args.items() %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}{% endset %}
+      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+        <div class="text-muted small">Pagina {{ pagination.page }} de {{ pagination.pages }}</div>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+              <a class="page-link" href="?{{ base_qs }}page={{ pagination.page - 1 }}"><i class="bi bi-chevron-left"></i></a>
+            </li>
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+              <a class="page-link" href="?{{ base_qs }}page={{ pagination.page + 1 }}"><i class="bi bi-chevron-right"></i></a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-check-circle fs-1 d-block mb-3 opacity-50"></i>
+        No hay incidencias con los filtros aplicados.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

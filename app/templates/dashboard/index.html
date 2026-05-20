@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
+
+
+{% block content %}
+<div class="pt-1">
+  {% include "dashboard/partials/_kpi_strip.html" %}
+  {% include "dashboard/partials/_row_roles_quota_sync.html" %}
+  {% include "dashboard/partials/_row_alerts_audit.html" %}
+  {% include "dashboard/partials/_system_status.html" %}
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+const ROLE_LABELS       = {{ d.role_stats.keys()|list|tojson }};
+const ROLE_VALUES       = {{ d.role_stats.values()|list|tojson }};
+const QUOTA_URL         = "{{ url_for('dashboard.quota_users_page') }}";
+const USER_DETAIL_BASE  = "{{ url_for('users.user_detail', user_id=0) }}".replace('/0', '/');
+const QUOTA_TOTAL       = {{ d.users_near_quota_total|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

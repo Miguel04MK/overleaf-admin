@@ -1,0 +1,105 @@
+/* ============================================================
+   Roles pages — estilos específicos de /roles
+   (roles/list.html + roles/detail.html + roles/audit.html)
+   ============================================================ */
+
+/* ── Chart wrapper (roles/list) ──────────────────────────────────────────── */
+.chart-wrap { position: relative; height: 300px; }
+
+/* ── Role card (roles/list) ──────────────────────────────────────────────── */
+.role-card {
+  border-radius: .65rem;
+  transition: box-shadow .15s, transform .15s;
+  overflow: hidden;
+}
+.role-card:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,.08);
+  transform: translateY(-1px);
+}
+.role-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; flex-shrink: 0;
+}
+
+/* ── Metric chips inside role cards (roles/list) ─────────────────────────── */
+.mchip {
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .3rem .65rem; border-radius: 999px;
+  background: #f8f9fa; border: 1px solid #e9ecef;
+  font-size: .78rem; color: #495057; white-space: nowrap;
+}
+.mchip i { font-size: .72rem; opacity: .7; }
+
+/* ── Log row hover (roles/list sidebar) ──────────────────────────────────── */
+.log-row { transition: background .12s; }
+.log-row:hover { background: rgba(0,0,0,.025); }
+
+/* ── Action badges — small variant used in roles/list ─────────────────────── */
+.abadge {
+  display: inline-block; padding: .12rem .42rem;
+  border-radius: 999px; font-size: .65rem; font-weight: 500;
+}
+
+/* ── Action badges — standard variant used in roles/audit ─────────────────── */
+.action-badge {
+  display: inline-block; padding: .22rem .65rem;
+  border-radius: 999px; font-size: .75rem; font-weight: 500;
+}
+
+/* ── Shared color modifiers (used by both .abadge and .action-badge) ─────── */
+.abadge-assigned, .action-badge-assigned {
+  background: rgba(25,135,84,.12);  color: #198754;
+  border: 1px solid rgba(25,135,84,.25);
+}
+.abadge-changed, .action-badge-changed {
+  background: rgba(13,110,253,.08); color: #0d6efd;
+  border: 1px solid rgba(13,110,253,.2);
+}
+.abadge-removed, .action-badge-removed {
+  background: rgba(108,117,125,.1); color: #6c757d;
+  border: 1px solid rgba(108,117,125,.25);
+}
+
+/* ── Search wrapper (roles/audit) ────────────────────────────────────────── */
+#search-wrapper .input-group {
+  border: 1px solid #dee2e6; border-radius: .5rem;
+  overflow: hidden; transition: box-shadow .15s; width: 300px;
+}
+#search-wrapper .input-group:focus-within {
+  box-shadow: 0 0 0 .2rem rgba(61,139,61,.18); border-color: #7fba7f;
+}
+#search-wrapper .input-group-text,
+#search-wrapper .form-control { border: none; background: #fff; }
+#search-wrapper .form-control:focus { box-shadow: none; }
+
+/* ── Scroll interno tabla de usuarios del rol ────────────────────────────── */
+.users-scroll { overflow-y: auto; max-height: 420px; min-height: 72px; }
+
+/* ── Config form (Guardar pegado al fondo) ───────────────────────────────── */
+.config-form { display: flex; flex-direction: column; height: 100%; }
+.config-form-footer { margin-top: auto; }
+
+/* ── Tiles de impacto ────────────────────────────────────────────────────── */
+.impact-tile {
+  border-radius: .45rem; padding: .45rem .25rem;
+  text-align: center; transition: background .2s;
+}
+.impact-tile .tile-val { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.impact-tile .tile-lbl {
+  font-size: .66rem; text-transform: uppercase;
+  letter-spacing: .04em; margin-top: .1rem;
+}
+
+/* ── Cabecera sortable activa (override del global con color de acento) ───── */
+th.sortable.sort-active {
+  color: var(--ol-green) !important;
+  background: var(--ol-green-subtle) !important;
+  border-bottom: 2px solid var(--ol-green);
+}
+th.sortable.sort-active .sort-icon { opacity: 1 !important; color: var(--ol-green); }
+th.sortable:hover { background: rgba(0,0,0,.04); }
+
+/* ── Badge pulsante "sin guardar" ────────────────────────────────────────── */
+@keyframes pulse-warn { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.badge-pulse { animation: pulse-warn 2.2s infinite; }

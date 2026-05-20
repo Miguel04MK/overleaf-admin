@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% from 'macros/ui.html' import pagination_nav, empty_state, role_badge %}
+{% block title %}Auditoría de roles{% endblock %}
+{% block page_title %}Auditoría de cambios de rol{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/roles.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <div class="mb-3 d-flex align-items-center gap-2">
+    <a href="{{ url_for('roles.list_roles') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Volver a roles
+    </a>
+    <h5 class="mb-0 ms-1 fw-bold">Auditoría de cambios de rol</h5>
+  </div>
+
+  {# ── Filtros ──────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+      <form method="GET" action="{{ url_for('roles.audit_log') }}"
+            class="d-flex flex-wrap align-items-center gap-2">
+
+        {# Filtro: Rol #}
+        <select name="role_id" class="form-select form-select-sm"
+                style="width:auto;" onchange="this.form.submit()">
+          <option value="">Todos los roles</option>
+          {% for r in all_roles %}
+            <option value="{{ r.id }}" {% if filter_role_id == r.id %}selected{% endif %}>
+              {{ r.name }}
+            </option>
+          {% endfor %}
+        </select>
+
+        {# Filtro: Acción #}
+        <select name="action" class="form-select form-select-sm"
+                style="width:auto;" onchange="this.form.submit()">
+          <option value="">Todas las acciones</option>
+          <option value="assigned" {% if filter_action == 'assigned' %}selected{% endif %}>Asignado</option>
+          <option value="changed"  {% if filter_action == 'changed'  %}selected{% endif %}>Cambiado</option>
+          <option value="removed"  {% if filter_action == 'removed'  %}selected{% endif %}>Retirado</option>
+        </select>
+
+        {# Mantener filtros activos al paginar #}
+        {% if filter_role_id %}<input type="hidden" name="role_id" value="{{ filter_role_id }}">{% endif %}
+
+        <div class="text-muted small ms-auto">
+          <strong>{{ pagination.total }}</strong> registro{{ 's' if pagination.total != 1 else '' }}
+        </div>
+
+        {% if filter_role_id or filter_action %}
+          <a href="{{ url_for('roles.audit_log') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x me-1"></i>Limpiar filtros
+          </a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  {# ── Tabla ────────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      {% if pagination.items %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Usuario</th>
+              <th>Acción</th>
+              <th>Rol anterior</th>
+              <th>Rol nuevo</th>
+              <th>Administrador</th>
+              <th>Fecha</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in pagination.items %}
+            <tr>
+              <td class="ps-3 small">
+                {% if log.user %}
+                  <a href="{{ url_for('users.user_detail', user_id=log.user.id) }}"
+                     class="text-decoration-none fw-medium text-body">
+                    {{ log.user.display_name }}
+                  </a>
+                  <div class="text-muted" style="font-size:.72rem;">{{ log.user.email or '' }}</div>
+                {% else %}
+                  <span class="text-muted fst-italic">Usuario eliminado</span>
+                {% endif %}
+              </td>
+
+              <td>
+                {% if log.action == 'assigned' %}
+                  <span class="action-badge action-badge-assigned">
+                    <i class="bi bi-plus-circle me-1"></i>Asignado
+                  </span>
+                {% elif log.action == 'changed' %}
+                  <span class="action-badge action-badge-changed">
+                    <i class="bi bi-arrow-left-right me-1"></i>Cambiado
+                  </span>
+                {% else %}
+                  <span class="action-badge action-badge-removed">
+                    <i class="bi bi-dash-circle me-1"></i>Retirado
+                  </span>
+                {% endif %}
+              </td>
+
+              <td>{{ role_badge(log.role_from) }}</td>
+              <td>{{ role_badge(log.role_to) }}</td>
+
+              <td class="small text-muted">
+                <i class="bi bi-person-circle me-1"></i>{{ log.changed_by }}
+              </td>
+
+              <td class="small text-muted text-nowrap">
+                {{ log.changed_at.strftime('%d/%m/%Y') }}<br>
+                <span style="font-size:.7rem;">{{ log.changed_at.strftime('%H:%M') }}</span>
+              </td>
+
+              <td class="small text-muted" style="max-width:180px;">
+                {% if log.reason %}
+                  <span class="d-block text-truncate" title="{{ log.reason }}">
+                    {{ log.reason }}
+                  </span>
+                {% else %}
+                  <span class="opacity-50">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Paginación #}
+      {{ pagination_nav(pagination, url_for('roles.audit_log', role_id=filter_role_id, action=filter_action)) }}
+
+      {% else %}
+      {{ empty_state('clock-history', 'No hay cambios de rol registrados' ~ (' con los filtros aplicados' if filter_role_id or filter_action else '') ~ '.') }}
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

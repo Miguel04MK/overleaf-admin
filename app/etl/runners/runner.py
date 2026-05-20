@@ -18,9 +18,9 @@ from datetime import datetime, timezone
 
 from flask import Flask
 
-from app.extensions import db
-from app.models.sync_run import SyncRun
-from app.modules.admin import service as audit_service
+from app.config.extensions import db
+from app.model.entities.sync_run import SyncRun
+from app.model.services.admin import admin_service as audit_service
 from app.etl.extractors.adapter import OverleafMongoAdapter, make_adapter
 from app.etl.extractors.extractor import OverleafExtractor
 from app.etl.loaders.loader import OverleafLoader
@@ -37,14 +37,16 @@ def _fmt_delta(delta: int) -> str:
     return str(delta)
 
 
-def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
+def run_sync(app: Flask, triggered_by: str = "manual",
+             triggered_by_user: str | None = None) -> SyncRun:
     """
     Execute a full sync cycle.
     Must be called within an app context (or wraps itself in one).
     Returns the completed SyncRun record.
     """
     with app.app_context():
-        sync_run = SyncRun(triggered_by=triggered_by)
+        sync_run = SyncRun(triggered_by=triggered_by,
+                           triggered_by_user=triggered_by_user)
         db.session.add(sync_run)
         db.session.commit()
         logger.info("SyncRun #%d started (triggered_by=%s)", sync_run.id, triggered_by)
@@ -103,9 +105,10 @@ def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
                             members.append({"overleaf_user_id": oid, "role": "read_only"})
                     memberships_data.append((raw_proj["overleaf_id"], members))
 
-                # Step 6: Upsert projects + memberships
+                # Step 6: Upsert projects + memberships (sync_run_id → per-project logs)
                 projects_found, projects_synced = loader.upsert_projects(
-                    raw_projects, memberships_data, user_map
+                    raw_projects, memberships_data, user_map,
+                    sync_run_id=sync_run.id,
                 )
                 sync_run.projects_found = projects_found
                 sync_run.projects_synced = projects_synced
@@ -143,6 +146,15 @@ def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
             )
             logger.info("SyncRun #%d finished successfully.", sync_run.id)
 
+            try:
+                from app.model.services import alerts_service
+                alerts_service.check_last_sync()
+                alerts_service.check_all_quotas()
+                alerts_service.check_all_project_limits()
+                alerts_service.check_repeated_errors()
+            except Exception as alert_exc:
+                logger.warning("Alert checks after sync failed: %s", alert_exc)
+
         except Exception as exc:
             db.session.rollback()
             error_msg = f"Error de sincronización: {exc}"
@@ -160,6 +172,13 @@ def run_sync(app: Flask, triggered_by: str = "manual") -> SyncRun:
                 detail=error_msg,
                 level="error",
             )
+
+            try:
+                from app.model.services import alerts_service
+                alerts_service.check_last_sync()
+                alerts_service.check_repeated_errors()
+            except Exception as alert_exc:
+                logger.warning("Alert checks after sync error failed: %s", alert_exc)
 
         finally:
             try:

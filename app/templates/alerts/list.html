@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Alertas{% endblock %}
+{% block page_title %}Alertas del sistema{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/alerts.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-2">
+  {% include "alerts/partials/_summary_cards.html" %}
+  {% include "alerts/partials/_threshold_panel.html" %}
+  {% include "alerts/partials/_filters.html" %}
+  {% include "alerts/partials/_bulk_bar.html" %}
+  {% include "alerts/partials/_table.html" %}
+</div>
+{% include "alerts/partials/_modals.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SEARCH_URL       = "{{ search_url }}";
+const RECALC_URL       = "{{ recalc_url }}";
+const CONFIG_URL       = "{{ url_for('alerts.get_config') }}";
+const NOTIF_URL        = "{{ url_for('alerts.get_notif_prefs') }}";
+const BULK_READ_URL    = "{{ url_for('alerts.bulk_mark_read') }}";
+const BULK_RESOLVE_URL = "{{ url_for('alerts.bulk_resolve') }}";
+const BULK_REOPEN_URL  = "{{ url_for('alerts.bulk_reopen') }}";
+const PER_PAGE         = 10;
+const ALERT_DETAIL_URL_TPL = "{{ url_for('alerts.alert_detail', alert_id=0) }}";
+</script>
+<script src="{{ url_for('static', filename='js/alerts-list.js') }}"></script>
+{% endblock %}

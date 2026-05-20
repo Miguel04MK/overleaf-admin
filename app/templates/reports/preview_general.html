@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Informe general{% endblock %}
+{% block page_title %}Informe general de la plataforma{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/reports.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  {# ── Back link (replaces breadcrumb) ────────────────────────── #}
+  <a href="{{ url_for('reports.index') }}" class="gen-back-link mb-3 d-inline-flex">
+    <i class="bi bi-arrow-left"></i> Volver a informes
+  </a>
+
+  {# ── Header ─────────────────────────────────────────── #}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <p class="text-muted small mb-0">
+        Vista previa del informe general.
+        {% if last_export %}
+          Ultima generacion: {{ last_export.generated_at.strftime('%d/%m/%Y %H:%M') }}
+        {% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('reports.export_general_pdf') }}" class="btn btn-sm btn-danger d-flex align-items-center gap-1">
+        <i class="bi bi-file-pdf"></i> Descargar PDF
+      </a>
+      <a href="{{ url_for('reports.export_general_csv') }}" class="btn btn-sm btn-success d-flex align-items-center gap-1">
+        <i class="bi bi-filetype-csv"></i> Descargar CSV
+      </a>
+    </div>
+  </div>
+
+  {# ── 1. Resumen ────────────────────────────── #}
+  <div class="gen-section" id="section-resumen">
+    <div class="gen-section-title">1. Resumen</div>
+    <div id="resumen-content">
+      <div class="section-loading"><div class="spinner-sm"></div> Cargando resumen...</div>
+    </div>
+  </div>
+
+  {# ── 2. Usuarios ────────────────────────────── #}
+  <div class="gen-section" id="section-usuarios">
+    <div class="gen-section-title">2. Usuarios</div>
+    <div id="usuarios-content">
+      <div class="section-loading"><div class="spinner-sm"></div> Cargando usuarios...</div>
+    </div>
+  </div>
+
+  {# ── 3. Proyectos ────────────────────────────── #}
+  <div class="gen-section" id="section-proyectos">
+    <div class="gen-section-title">3. Proyectos</div>
+    <div id="proyectos-content">
+      <div class="section-loading"><div class="spinner-sm"></div> Cargando proyectos...</div>
+    </div>
+  </div>
+
+  {# ── 4. Almacenamiento y cuotas ────────────────── #}
+  <div class="gen-section" id="section-almacenamiento">
+    <div class="gen-section-title">4. Almacenamiento y cuotas</div>
+    <div id="almacenamiento-content">
+      <div class="section-loading"><div class="spinner-sm"></div> Cargando almacenamiento...</div>
+    </div>
+  </div>
+
+  {# ── 5. Sincronizacion ────────────────────────── #}
+  <div class="gen-section" id="section-sincronizacion">
+    <div class="gen-section-title">5. Sincronizacion</div>
+    <div id="sincronizacion-content">
+      <div class="section-loading"><div class="spinner-sm"></div> Cargando sincronizacion...</div>
+    </div>
+  </div>
+
+  {# ── 6. Auditoria e incidencias ────────────────── #}
+  <div class="gen-section" id="section-auditoria">
+    <div class="gen-section-title">6. Auditoria e incidencias</div>
+    <div id="auditoria-content">
+      <div class="section-loading"><div class="spinner-sm"></div> Cargando auditoria...</div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SECTION_RESUMEN_URL        = "{{ url_for('reports.general_section_resumen') }}";
+const SECTION_USUARIOS_URL       = "{{ url_for('reports.general_section_usuarios') }}";
+const SECTION_PROYECTOS_URL      = "{{ url_for('reports.general_section_proyectos') }}";
+const SECTION_ALMACENAMIENTO_URL = "{{ url_for('reports.general_section_almacenamiento') }}";
+const SECTION_SINCRONIZACION_URL = "{{ url_for('reports.general_section_sincronizacion') }}";
+const SECTION_AUDITORIA_URL      = "{{ url_for('reports.general_section_auditoria') }}";
+</script>
+<script src="{{ url_for('static', filename='js/reports-preview.js') }}"></script>
+{% endblock %}

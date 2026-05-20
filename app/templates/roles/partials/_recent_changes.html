@@ -1,0 +1,71 @@
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-2 px-4
+                d-flex align-items-center justify-content-between">
+      <h6 class="fw-semibold mb-0 small">
+        <i class="bi bi-clock-history me-2 text-muted"></i>Cambios recientes
+      </h6>
+      <a href="{{ url_for('roles.audit_log', role_id=role.id) }}"
+         class="small text-muted text-decoration-none">
+        Ver todos <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+    {% if recent_logs.items %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Usuario</th>
+            <th>Acción</th>
+            <th>Administrador</th>
+            <th class="text-end pe-4">Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in recent_logs.items %}
+          <tr>
+            <td class="ps-4">
+              {% if log.user %}
+                <a href="{{ url_for('users.user_detail', user_id=log.user.id) }}"
+                   class="text-decoration-none fw-medium text-body">
+                  {{ log.user.display_name }}
+                </a>
+              {% else %}
+                <span class="text-muted fst-italic">Usuario eliminado</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if log.action == 'assigned' %}
+                <span class="badge bg-success-subtle text-success">
+                  <i class="bi bi-plus-circle me-1"></i>Asignado
+                </span>
+              {% elif log.action == 'changed' %}
+                <span class="badge bg-info-subtle text-info-emphasis">
+                  <i class="bi bi-arrow-left-right me-1"></i>Cambiado
+                </span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary">
+                  <i class="bi bi-dash-circle me-1"></i>Retirado
+                </span>
+              {% endif %}
+            </td>
+            <td class="text-muted">
+              <i class="bi bi-person-circle me-1"></i>{{ log.changed_by }}
+            </td>
+            <td class="text-muted text-end pe-4 text-nowrap">
+              {{ log.changed_at.strftime('%d/%m/%Y') }}
+              <span class="d-block" style="font-size:.7rem;">
+                {{ log.changed_at.strftime('%H:%M') }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4 small">
+      <i class="bi bi-clock-history d-block fs-3 mb-2 opacity-50"></i>
+      Sin cambios registrados para este rol.
+    </div>
+    {% endif %}
+  </div>

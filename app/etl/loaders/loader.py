@@ -10,10 +10,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from app.extensions import db
-from app.models.overleaf_user import OverleafUser
-from app.models.overleaf_project import OverleafProject
-from app.models.project_member import ProjectMember
+from app.config.extensions import db
+from app.model.entities.overleaf_user import OverleafUser
+from app.model.entities.overleaf_project import OverleafProject
+from app.model.entities.project_member import ProjectMember
+from app.model.entities.project_sync_log import ProjectSyncLog
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ class OverleafLoader:
         raw_projects: list[dict[str, Any]],
         memberships_data: list[tuple[str, list[dict]]],  # (overleaf_project_id, memberships)
         user_map: dict[str, int],
+        sync_run_id: int | None = None,
     ) -> tuple[int, int]:
         """
         Upsert projects and their memberships.
@@ -84,6 +86,10 @@ class OverleafLoader:
         """
         synced = 0
         now = datetime.now(timezone.utc)
+
+        # Collect (project_ref, event, size_bytes) tuples so we can do a
+        # single flush after the loop instead of one per project.
+        pending_logs: list[tuple] = []
 
         for raw in raw_projects:
             try:
@@ -105,8 +111,10 @@ class OverleafLoader:
                     if raw.get("size_bytes") is not None:
                         existing.size_bytes = raw["size_bytes"]
                     existing.synced_at = now
+                    event = "updated"
+                    project_ref = existing
                 else:
-                    project = OverleafProject(
+                    project_ref = OverleafProject(
                         overleaf_id=raw["overleaf_id"],
                         name=raw.get("name"),
                         owner_id=owner_internal_id,
@@ -117,8 +125,10 @@ class OverleafLoader:
                         size_bytes=raw.get("size_bytes"),
                         synced_at=now,
                     )
-                    db.session.add(project)
+                    db.session.add(project_ref)
+                    event = "created"
 
+                pending_logs.append((project_ref, event, raw.get("size_bytes")))
                 synced += 1
             except Exception as exc:
                 logger.error(
@@ -127,10 +137,44 @@ class OverleafLoader:
                     exc,
                 )
 
+        # Single flush so all new projects get their PKs assigned atomically.
         db.session.flush()
 
+        # Create sync logs now that all project IDs are available.
+        for project_ref, event, size_bytes in pending_logs:
+            sync_log = ProjectSyncLog(
+                project_id=project_ref.id,
+                sync_run_id=sync_run_id,
+                synced_at=now,
+                event=event,
+                size_bytes=size_bytes,
+            )
+            db.session.add(sync_log)
+
         # Upsert memberships
-        self._upsert_memberships(memberships_data, user_map)
+        try:
+            self._upsert_memberships(memberships_data, user_map)
+        except Exception as exc:
+            logger.error("Error upserting memberships: %s", exc)
+
+        # Back-fill member_count on the sync logs we just wrote
+        if sync_run_id:
+            from sqlalchemy import func
+            counts = dict(
+                db.session.query(
+                    ProjectMember.project_id,
+                    func.count(ProjectMember.id),
+                )
+                .group_by(ProjectMember.project_id)
+                .all()
+            )
+            logs = (
+                ProjectSyncLog.query
+                .filter_by(sync_run_id=sync_run_id)
+                .all()
+            )
+            for log in logs:
+                log.member_count = counts.get(log.project_id, 0)
 
         return len(raw_projects), synced
 

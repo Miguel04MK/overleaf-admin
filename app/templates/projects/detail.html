@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Proyecto — {{ project.name or project.overleaf_id }}{% endblock %}
+{% block page_title %}Detalle de proyecto{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <div class="mb-3">
+    <a href="{{ url_for('projects.list_projects') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Volver al listado
+    </a>
+  </div>
+
+  {# ── 1. INFO DEL PROYECTO ─────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-4">
+      <div class="d-flex flex-column flex-lg-row align-items-start gap-0">
+
+        {# Icono + datos principales #}
+        <div class="d-flex align-items-start gap-3 flex-grow-1">
+          <div class="rounded-circle bg-success-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:64px;height:64px;">
+            <i class="bi bi-folder2-open fs-3 text-success"></i>
+          </div>
+          <div class="flex-grow-1">
+            <h5 class="fw-bold mb-1">{{ project.name or "Sin nombre" }}</h5>
+            <div class="mb-2">
+              <code class="small text-muted" title="{{ project.overleaf_id }}">
+                {{ project.overleaf_id }}
+              </code>
+            </div>
+            <div class="d-flex flex-wrap gap-4 small text-muted">
+              <span>
+                <i class="bi bi-calendar-plus me-1"></i>Creado:
+                <strong class="text-body">
+                  {{ project.created_at.strftime('%d/%m/%Y') if project.created_at else "—" }}
+                </strong>
+              </span>
+              <span>
+                <i class="bi bi-clock-history me-1"></i>Actualizado:
+                <strong class="text-body">
+                  {{ project.last_updated_at.strftime('%d/%m/%Y %H:%M') if project.last_updated_at else "—" }}
+                </strong>
+              </span>
+              <span>
+                <i class="bi bi-arrow-repeat me-1"></i>Sincronizado:
+                <strong class="text-body">
+                  {{ project.synced_at.strftime('%d/%m/%Y %H:%M') if project.synced_at else "—" }}
+                </strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {# Divisor #}
+        <div class="d-none d-lg-block border-start mx-4 align-self-stretch"></div>
+        <div class="w-100 d-lg-none border-top my-3"></div>
+
+        {# Métricas rápidas #}
+        <div style="min-width:180px;">
+          <div class="small fw-semibold text-muted mb-2">
+            <i class="bi bi-bar-chart me-1"></i>Métricas
+          </div>
+          <dl class="row mb-0 small">
+            <dt class="col-6 text-muted">Propietario</dt>
+            <dd class="col-6 text-end">
+              {% if project.owner %}
+                <a href="{{ url_for('users.user_detail', user_id=project.owner.id) }}"
+                   class="text-decoration-none fw-medium">
+                  {{ project.owner.display_name }}
+                </a>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </dd>
+
+            <dt class="col-6 text-muted">Tamaño</dt>
+            <dd class="col-6 text-end fw-medium">
+              {% if project.size_bytes and project.size_bytes > 0 %}
+                {% set s = project.size_bytes %}
+                {% if s >= 1073741824 %}{{ "%.1f"|format(s/1073741824) }} GB
+                {% elif s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                {% else %}{{ s }} B{% endif %}
+              {% else %}—{% endif %}
+            </dd>
+
+            <dt class="col-6 text-muted">Archivos</dt>
+            <dd class="col-6 text-end fw-medium">
+              {{ project.file_count if project.file_count is not none else "—" }}
+            </dd>
+
+            <dt class="col-6 text-muted">Colaboradores</dt>
+            <dd class="col-6 text-end fw-medium">{{ members | length }}</dd>
+          </dl>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    {# ── 2. COLABORADORES ─────────────────────────────────────────────────── #}
+    <div class="col-12 col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white fw-semibold small border-bottom">
+          <i class="bi bi-people me-2 text-muted"></i>Colaboradores
+          <span class="badge bg-secondary ms-1">{{ members | length }}</span>
+        </div>
+        <div class="card-body p-0">
+          {% if members %}
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Usuario</th>
+                  <th>Rol</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in members %}
+                <tr>
+                  <td class="ps-3 small">
+                    {% if m.user %}
+                      <a href="{{ url_for('users.user_detail', user_id=m.user.id) }}"
+                         class="text-decoration-none text-body d-flex align-items-center gap-2">
+                        <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+                             style="width:26px;height:26px;">
+                          <i class="bi bi-person-fill text-primary" style="font-size:.7rem;"></i>
+                        </div>
+                        <div>
+                          <div class="fw-medium">{{ m.user.display_name }}</div>
+                          <div class="text-muted" style="font-size:.72rem;">{{ m.user.email or "" }}</div>
+                        </div>
+                      </a>
+                    {% else %}
+                      <span class="text-muted">Usuario desconocido</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if m.role == 'read_only' %}
+                      <span class="badge bg-secondary">Solo lectura</span>
+                    {% else %}
+                      <span class="badge bg-info-subtle text-info-emphasis">Editor</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="text-center text-muted py-4 small">
+              <i class="bi bi-person-x d-block fs-3 mb-2 opacity-50"></i>
+              Sin colaboradores registrados.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ── 3. HISTÓRICO DE SINCRONIZACIÓN ───────────────────────────────────── #}
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white fw-semibold small border-bottom d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-arrow-repeat me-2 text-muted"></i>Histórico de sincronización</span>
+          <span class="badge bg-secondary">últimas {{ sync_logs | length }}</span>
+        </div>
+        <div class="card-body p-0">
+          {% if sync_logs %}
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-3">Fecha</th>
+                    <th>Evento</th>
+                    <th class="text-end">Tamaño</th>
+                    <th class="text-center">Colaboradores</th>
+                    <th>Sync global</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for log in sync_logs %}
+                  <tr>
+                    <td class="ps-3 small text-muted">
+                      {{ log.synced_at.strftime('%d/%m/%Y %H:%M') if log.synced_at else "—" }}
+                    </td>
+                    <td>
+                      {% if log.event == 'created' %}
+                        <span class="badge bg-success-subtle text-success-emphasis">
+                          <i class="bi bi-plus-circle me-1"></i>Creado
+                        </span>
+                      {% else %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                          <i class="bi bi-arrow-repeat me-1"></i>Actualizado
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end small text-muted">
+                      {% if log.size_bytes and log.size_bytes > 0 %}
+                        {% set s = log.size_bytes %}
+                        {% if s >= 1048576 %}{{ "%.1f"|format(s/1048576) }} MB
+                        {% elif s >= 1024 %}{{ "%.1f"|format(s/1024) }} KB
+                        {% else %}{{ s }} B{% endif %}
+                      {% else %}—{% endif %}
+                    </td>
+                    <td class="text-center small text-muted">
+                      {{ log.member_count if log.member_count is not none else "—" }}
+                    </td>
+                    <td class="small text-muted">
+                      {% if log.sync_run %}
+                        <span class="badge bg-{{ 'success' if log.sync_run.status == 'success' else 'danger' }}-subtle text-{{ 'success' if log.sync_run.status == 'success' else 'danger' }}-emphasis">
+                          #{{ log.sync_run.id }}
+                        </span>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-4 small">
+              <i class="bi bi-clock-history d-block fs-3 mb-2 opacity-50"></i>
+              Sin registros de sincronización todavía.<br>
+              <span class="text-muted" style="font-size:.8rem;">
+                Los logs se generan a partir de la próxima sincronización.
+              </span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

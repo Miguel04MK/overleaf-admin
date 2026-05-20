@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Rol — {{ role.name }}{% endblock %}
+{% block page_title %}Configuración de rol{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/roles.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-2">
+
+  {# ══ Cabecera ═══════════════════════════════════════════════════════════════ #}
+  {% include "roles/partials/_detail_header.html" %}
+
+  {# ══ Dos columnas (flex-stretch) ════════════════════════════════════════ #}
+  <div class="row g-3 mb-3 align-items-stretch">
+
+    {# ── Configuración (izquierda) ───────────────────────────────────── #}
+    <div class="col-lg-5 d-flex">
+      {% include "roles/partials/_config_form.html" %}
+    </div>
+
+    {# ── Usuarios (derecha, tabla JS) ────────────────────────────────── #}
+    <div class="col-lg-7 d-flex">
+      {% include "roles/partials/_users_table.html" %}
+    </div>
+
+  </div>{# /row #}
+
+  {# ══ Cambios recientes (fila completa) ═══════════════════════════════════ #}
+  {% include "roles/partials/_recent_changes.html" %}
+
+</div>{# /pt-2 #}
+
+{# ══ Modales ═══════════════════════════════════════════════════════════════ #}
+{% include "roles/partials/_modals.html" %}
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+const ROLE_QUOTA_BYTES  = {{ role.storage_quota_bytes | tojson }};
+const ROLE_MAX_PROJECTS = {{ role.max_projects | tojson }};
+const ALL_USERS         = {{ users_stats | tojson }};
+const ROLE_NAME         = {{ role.name | tojson }};
+const SEARCH_URL        = {{ url_for('roles.search_users_for_role', role_id=role.id) | tojson }};
+const ROLES_LIST_URL    = {{ url_for('roles.list_roles') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/roles-detail.js') }}"></script>
+{% endblock %}

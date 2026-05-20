@@ -1,0 +1,92 @@
+{# ══════════════════════════════════════════════════════════════════════════
+   1. KPI STRIP
+   ══════════════════════════════════════════════════════════════════════ #}
+<div class="kpi-strip mb-2">
+
+  <div class="kpi kpi--users">
+    <div class="kpi__icon"><i class="bi bi-people-fill"></i></div>
+    <div class="kpi__body">
+      <div class="kpi__num">{{ d.total_users|default(0) }}</div>
+      <div class="kpi__label">Usuarios</div>
+    </div>
+  </div>
+
+  <div class="kpi kpi--projects">
+    <div class="kpi__icon"><i class="bi bi-folder2-open"></i></div>
+    <div class="kpi__body">
+      <div class="kpi__num">{{ d.total_projects|default(0) }}</div>
+      <div class="kpi__label">Proyectos</div>
+      <div class="kpi__sub">~{{ d.avg_projects_per_user }} por usuario</div>
+    </div>
+  </div>
+
+  <div class="kpi kpi--storage">
+    <div class="kpi__icon"><i class="bi bi-hdd-fill"></i></div>
+    <div class="kpi__body">
+      <div class="kpi__num kpi__num--sm truncate">{{ d.total_storage_fmt|default('—') }}</div>
+      <div class="kpi__label">Almacenamiento</div>
+      {% if d.storage_percent is not none %}
+        <div class="progress mt-1" style="height:4px;">
+          <div class="progress-bar
+            {% if d.storage_percent >= 95 %}bg-danger
+            {% elif d.storage_percent >= 80 %}bg-warning
+            {% else %}bg-success{% endif %}"
+            style="width:{{ [d.storage_percent, 100]|min }}%;"></div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <a href="{{ url_for('alerts.list_alerts') }}" class="kpi-link" title="Ver alertas">
+    <div class="kpi kpi--alerts {% if not d.alerts_active %}is-quiet{% endif %}">
+      <div class="kpi__icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div class="kpi__body">
+        <div class="kpi__num">{{ d.alerts_active|default(0) }}</div>
+        <div class="kpi__label">Alertas activas</div>
+        {% if d.alerts_by_level %}
+          <div class="mt-1 truncate">
+            {% for lvl in ['critical','danger','warning','info'] %}
+              {% if d.alerts_by_level.get(lvl) %}
+                <span class="kpi__pill
+                  {% if lvl in ['critical','danger'] %}is-danger
+                  {% elif lvl == 'warning' %}is-warning
+                  {% else %}is-info{% endif %}">{{ d.alerts_by_level[lvl] }} {{ lvl }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </a>
+
+  {% set _sync_status = (d.last_sync.status if d.last_sync else None) %}
+  <div class="kpi
+    {% if _sync_status == 'success' %}kpi--sync-ok
+    {% elif _sync_status == 'error' %}kpi--sync-bad
+    {% else %}kpi--sync-na{% endif %}">
+    <div class="kpi__icon">
+      <i class="bi
+        {% if _sync_status == 'success' %}bi-check-circle-fill
+        {% elif _sync_status == 'error' %}bi-x-circle-fill
+        {% elif _sync_status == 'running' %}bi-arrow-repeat
+        {% else %}bi-dash-circle{% endif %}"></i>
+    </div>
+    <div class="kpi__body">
+      <div class="kpi__num kpi__num--sm truncate">
+        {% if d.last_sync %}
+          {{ (d.last_sync.finished_at or d.last_sync.started_at).strftime('%d/%m %H:%M') }}
+        {% else %}Nunca{% endif %}
+      </div>
+      <div class="kpi__label">Última sync</div>
+      {% if d.last_sync %}
+      <div class="kpi__sub truncate">
+        {% if _sync_status == 'success' %}<span class="text-success">Exitosa</span>
+        {% elif _sync_status == 'error' %}<span class="text-danger">Con errores</span>
+        {% elif _sync_status == 'running' %}<span class="text-info">En curso</span>
+        {% else %}{{ _sync_status }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>

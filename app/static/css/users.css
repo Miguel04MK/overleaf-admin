@@ -1,0 +1,9 @@
+/* ============================================================
+   Users page — estilos específicos de /usuarios
+   ============================================================ */
+
+/* ── Search bar width (users/list) ──────────────────────────────────────── */
+#search-wrapper .input-group { width: 400px; }
+
+/* ── Quota divider (users/detail) ────────────────────────────────────────── */
+.quota-divider { width: 1px; background: #dee2e6; align-self: stretch; margin: 0 1.25rem; }

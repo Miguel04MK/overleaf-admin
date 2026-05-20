@@ -44,6 +44,7 @@ logs/
 # ─── Testing ──────────────────────────────────────────────────────────────────
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 coverage.xml
 .tox/
@@ -68,7 +69,30 @@ app/static/vendor/
 docs/_build/
 site/
 
+# ─── Type checkers y linters ──────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.pytype/
+
+# ─── Runtime: uploads de usuario ──────────────────────────────────────────────
+# Archivos subidos en tiempo de ejecución (no son código fuente)
+uploads/
+!uploads/.gitkeep
+
+# ─── Herramientas de versión de Python ────────────────────────────────────────
+.python-version
+
+# ─── Notas y documentación de desarrollo ─────────────────────────────────────
+.claude/
+docs/
+
+# ─── Archivos generados en tiempo de ejecución ───────────────────────────────
+*.pdf
+
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 *.bak
 *.tmp
+*.orig
+*.prof
 .cache/

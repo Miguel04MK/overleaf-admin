@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Usuario — {{ user.display_name }}{% endblock %}
+{% block page_title %}Detalle de usuario{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/users.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <div class="mb-3">
+    <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Volver al listado
+    </a>
+  </div>
+
+  {% include "users/partials/_detail_header.html" %}
+
+  {# ── 2. PROYECTOS CON TABS ────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-bottom">
+      <ul class="nav nav-tabs card-header-tabs">
+        <li class="nav-item">
+          <button class="nav-link active" id="tab-btn-owned" type="button" onclick="switchTab('owned')">
+            <i class="bi bi-folder2-open me-1"></i>Propios
+            <span class="badge bg-secondary ms-1">{{ projects_pagination.total }}</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="tab-btn-collabs" type="button" onclick="switchTab('collabs')">
+            <i class="bi bi-people me-1"></i>Colaboraciones
+            <span class="badge bg-secondary ms-1">{{ collab_count }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    {% include "users/partials/_projects_owned.html" %}
+    {% include "users/partials/_projects_collabs.html" %}
+
+  </div>
+
+  {% include "users/partials/_kpis_chart.html" %}
+
+</div>
+
+{% include "users/partials/_modal_change_role.html" %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CHART_STORAGE  = {{ chart_storage  | tojson }};
+const CHART_PROJECTS = {{ chart_projects | tojson }};
+const CHART_COLLABS  = {{ chart_collabs  | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/users-detail.js') }}"></script>
+{% endblock %}
