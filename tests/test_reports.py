@@ -1021,10 +1021,10 @@ class TestReportsController:
         assert "Conclusion" not in html or "Conclusion automatica" not in html
 
     def test_general_report_uses_ajax(self, auth_client):
-        """General report page should contain AJAX fetch calls."""
+        """General report page should load the AJAX preview script and have loading placeholders."""
         resp = auth_client.get("/informes/general")
         html = resp.data.decode()
-        assert "fetch(" in html
+        assert "reports-preview.js" in html
         assert "section-loading" in html or "spinner" in html
 
     def test_export_history_renders_ok(self, auth_client):
