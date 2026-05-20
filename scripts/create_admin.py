@@ -21,8 +21,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app import create_app
-from app.extensions import db
-from app.models.admin_user import AdminUser
+from app.config.extensions import db
+from app.model.entities.admin_user import AdminUser
 
 
 def create_admin():

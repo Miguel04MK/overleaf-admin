@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app import create_app
-from app.sync.runner import run_sync
+from app.etl.runners.runner import run_sync
 
 
 def main():
