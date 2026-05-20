@@ -220,7 +220,7 @@ class TestRolesServiceQueries:
             profesor = roles_service.get_role_by_name("profesor")
             make_user(db, "oid-rs1", role=profesor)
             make_user(db, "oid-rs2", role=profesor)
-            stats = roles_service.get_role_stats()
+            stats = roles_service.get_role_stats_by_id()
             assert stats.get(profesor.id, 0) == 2
 
     def test_get_role_stats_null_role_counted_in_default(self, app, db):
@@ -228,7 +228,7 @@ class TestRolesServiceQueries:
             # Users with no role assigned → count under default role
             make_user(db, "oid-rs3")  # role_id = NULL
             default = roles_service.get_default_role()
-            stats = roles_service.get_role_stats()
+            stats = roles_service.get_role_stats_by_id()
             assert stats.get(default.id, 0) >= 1
 
     def test_get_role_stats_empty_db_returns_dict(self, app, db):
