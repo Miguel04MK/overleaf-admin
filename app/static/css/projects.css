@@ -1,0 +1,25 @@
+/* ============================================================
+   Projects page — estilos específicos de /proyectos
+   ============================================================ */
+
+/* ── Owner dropdown con scroll ───────────────────────────────────────────── */
+#owner-list { max-height: 220px; overflow-y: auto; }
+#owner-list .dropdown-item { font-size: .82rem; }
+#owner-list .dropdown-item.active {
+  background: var(--ol-green-subtle); color: var(--ol-green);
+}
+
+/* ── Indicadores toggles ─────────────────────────────────────────────────── */
+.ind-toggle {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .35rem .65rem; border-radius: .375rem;
+  font-size: .82rem; cursor: pointer; user-select: none; transition: background .12s;
+}
+.ind-toggle:hover { background: rgba(0,0,0,.04); }
+.ind-toggle.active { background: var(--ol-green-subtle); color: var(--ol-green); font-weight: 500; }
+.ind-toggle .ind-check { margin-left: auto; opacity: 0; transition: opacity .12s; }
+.ind-toggle.active .ind-check { opacity: 1; }
+
+
+/* ── Search bar width (projects/list) ───────────────────────────────────── */
+#search-wrapper .input-group { width: 400px; }

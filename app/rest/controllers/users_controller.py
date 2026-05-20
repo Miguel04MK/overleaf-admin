@@ -1,41 +1,42 @@
 """Users controller — list and detail views for synchronized Overleaf users."""
+import json
+
 from flask import Blueprint, render_template, request, abort, redirect, url_for, flash, jsonify
 from flask_login import login_required
-from flask import current_app
 
 from app.model.services import users_service
 from app.model.services import roles_service
+from app.rest.dtos.forms import SetQuotaForm
 
 users_bp = Blueprint("users", __name__, url_prefix="/usuarios")
-
-
-def _serialize_user(u) -> dict:
-    return {
-        "id": u.id,
-        "email": u.email or "",
-        "display_name": u.display_name if u.display_name != u.email else "",
-        "is_admin": u.is_admin,
-        "projects_count": u.projects_owned.count(),
-        "quota_percent": u.quota_percent,
-        "quota_status": u.quota_status,
-        "quota_used_fmt": u.quota_used_fmt,
-        "quota_max_fmt": u.quota_max_fmt,
-        "quota_exceeded": u.quota_exceeded,
-        "signup_date": u.signup_date.strftime("%d/%m/%Y") if u.signup_date else "",
-        "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
-        "detail_url": url_for("users.user_detail", user_id=u.id),
-    }
 
 
 @users_bp.route("/buscar")
 @login_required
 def search():
-    """JSON endpoint for live search + sorting."""
-    q = request.args.get("q", "").strip() or None
-    sort = request.args.get("sort", "email")
-    order = request.args.get("order", "asc")
-    users = users_service.search_users(q=q, sort=sort, order=order)
-    return jsonify({"total": len(users), "users": [_serialize_user(u) for u in users]})
+    """JSON endpoint: server-side search, filter, sort & paginate."""
+    q        = request.args.get("q", "").strip() or None
+    sort     = request.args.get("sort", "email")
+    order    = request.args.get("order", "asc")
+    page     = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    per_page = max(1, min(per_page, 100))  # clamp
+
+    # Parse filters JSON: [{"type":"projects","op":"gte","val":5}, ...]
+    filters_raw = request.args.get("filters", "")
+    filters = None
+    if filters_raw:
+        try:
+            filters = json.loads(filters_raw)
+        except (ValueError, TypeError):
+            filters = None
+
+    result = users_service.search_users_paginated(
+        q=q, sort=sort, order=order,
+        page=page, per_page=per_page,
+        filters=filters,
+    )
+    return jsonify(result)
 
 
 @users_bp.route("/")
@@ -59,30 +60,12 @@ def user_detail(user_id: int):
 @users_bp.route("/<int:user_id>/cuota", methods=["POST"])
 @login_required
 def set_quota(user_id: int):
-    raw_value = request.form.get("quota_value", "").strip()
-    raw_unit  = request.form.get("quota_unit", "MB")
+    form = SetQuotaForm(request.form)
+    if not form.validate():
+        flash("Valor de cuota no válido.", "danger")
+        return redirect(url_for("users.user_detail", user_id=user_id))
 
-    if not raw_value or raw_value == "0":
-        max_bytes = None
-    else:
-        try:
-            value = float(raw_value)
-            if value < 0:
-                raise ValueError("negative")
-        except ValueError:
-            flash("Valor de cuota no valido.", "danger")
-            return redirect(url_for("users.user_detail", user_id=user_id))
-
-        multipliers = {"B": 1, "KB": 1024, "MB": 1024 ** 2, "GB": 1024 ** 3}
-        mult = multipliers.get(raw_unit, 1024 ** 2)
-        max_bytes = int(value * mult)
-
+    max_bytes = form.to_bytes()
     ok, msg = users_service.set_user_quota(user_id, max_bytes)
-    if ok:
-        try:
-            from app.model.services import alerts_service
-            alerts_service.check_user_quota(user_id)
-        except Exception:
-            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

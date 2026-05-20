@@ -64,13 +64,26 @@ class OverleafExtractor:
         raw_users = list(self.db["users"].find({}, projection))
         logger.info("Found %d users in MongoDB.", len(raw_users))
 
-        return [self._normalize_user(u) for u in raw_users]
+        normalized = []
+        for u in raw_users:
+            try:
+                normalized.append(self._normalize_user(u))
+            except ValueError as exc:
+                logger.warning("Skipping user %s: %s", u.get("_id"), exc)
+        return normalized
 
     def _normalize_user(self, doc: dict) -> dict[str, Any]:
-        """Convert ObjectIds to strings and handle missing fields."""
+        """Convert ObjectIds to strings and handle missing fields.
+
+        Raises ValueError if the document lacks a valid email address,
+        since email is required for upsert identity in PostgreSQL.
+        """
+        email = doc.get("email")
+        if not email or not isinstance(email, str) or not email.strip():
+            raise ValueError(f"missing or empty email (overleaf_id={doc.get('_id')})")
         return {
             "overleaf_id": str(doc["_id"]),
-            "email": doc.get("email"),
+            "email": email.strip(),
             "first_name": doc.get("first_name") or doc.get("firstName"),
             "last_name": doc.get("last_name") or doc.get("lastName"),
             "is_admin": bool(doc.get("isAdmin", False)),

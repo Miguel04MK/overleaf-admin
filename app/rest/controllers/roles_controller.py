@@ -3,30 +3,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 from app.model.services import roles_service
+from app.rest.dtos.forms import UpdateRoleForm, ManageUserRoleForm, AssignRoleForm
 
 roles_bp = Blueprint("roles", __name__, url_prefix="/roles")
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _parse_int_or_none(value: str) -> int | None:
-    try:
-        v = int(value)
-        return v if v > 0 else None
-    except (ValueError, TypeError):
-        return None
-
-
-def _parse_bytes(value: str, unit: str) -> int | None:
-    """Parse a (value, unit) pair into bytes. Returns None for empty/zero."""
-    try:
-        v = float(value)
-        if v <= 0:
-            return None
-    except (ValueError, TypeError):
-        return None
-    multipliers = {"B": 1, "KB": 1024, "MB": 1024 ** 2, "GB": 1024 ** 3}
-    return int(v * multipliers.get(unit, 1024 ** 2))
 
 
 # ── Views ─────────────────────────────────────────────────────────────────────
@@ -35,7 +14,7 @@ def _parse_bytes(value: str, unit: str) -> int | None:
 @login_required
 def list_roles():
     roles        = roles_service.get_all_roles()
-    stats        = roles_service.get_role_stats()   # {role_id: count}
+    stats        = roles_service.get_role_stats_by_id()   # {role_id: count}
     default      = roles_service.get_default_role()
     recent_logs  = roles_service.get_role_change_logs(per_page=8).items
     quota_alerts = roles_service.get_quota_alerts_per_role()  # {role_id: {near_limit, exceeded}}
@@ -74,26 +53,17 @@ def update_role(role_id: int):
     if not role:
         abort(404)
 
-    description   = request.form.get("description", "").strip()
-    quota_value   = request.form.get("quota_value", "").strip()
-    quota_unit    = request.form.get("quota_unit", "MB")
-    max_proj_raw  = request.form.get("max_projects", "").strip()
-
-    quota_bytes = _parse_bytes(quota_value, quota_unit)
-    max_projects = _parse_int_or_none(max_proj_raw)
+    form = UpdateRoleForm(request.form)
+    if not form.validate():
+        flash("Datos del rol no válidos.", "danger")
+        return redirect(url_for("roles.role_detail", role_id=role_id))
 
     ok, msg = roles_service.update_role_config(
         role_id=role_id,
-        description=description or None,
-        storage_quota_bytes=quota_bytes,
-        max_projects=max_projects,
+        description=form.description.data.strip() or None,
+        storage_quota_bytes=form.to_quota_bytes(),
+        max_projects=form.to_max_projects(),
     )
-    if ok:
-        try:
-            from app.model.services import alerts_service
-            alerts_service.check_role_users(role_id)
-        except Exception:
-            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))
 
@@ -149,12 +119,13 @@ def manage_user_role(role_id: int):
     if not role:
         abort(404)
 
-    user_id = request.form.get("user_id", type=int)
-    action  = request.form.get("action", "assign")   # "assign" | "remove"
-
-    if not user_id:
+    form = ManageUserRoleForm(request.form)
+    if not form.validate():
         flash("No se ha seleccionado ningún usuario.", "danger")
         return redirect(url_for("roles.role_detail", role_id=role_id))
+
+    user_id = form.user_id.data
+    action  = form.action.data
 
     if action == "remove":
         ok, msg = roles_service.remove_role(
@@ -168,13 +139,6 @@ def manage_user_role(role_id: int):
             actor=current_user.username,
         )
 
-    if ok:
-        try:
-            from app.model.services import alerts_service
-            alerts_service.check_user_quota(user_id)
-            alerts_service.check_user_project_limit(user_id)
-        except Exception:
-            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))
 
@@ -183,9 +147,11 @@ def manage_user_role(role_id: int):
 @login_required
 def assign_role(user_id: int):
     """Assign or change the role of a user. Called from user detail page."""
-    role_id = request.form.get("role_id", type=int)
-    reason  = request.form.get("reason", "").strip() or None
-    action  = request.form.get("action", "assign")  # 'assign' | 'remove'
+    form    = AssignRoleForm(request.form)
+    form.validate()  # campos opcionales; sólo normaliza tipos
+    role_id = form.role_id.data
+    reason  = (form.reason.data or "").strip() or None
+    action  = form.action.data or "assign"
 
     # Empty role_id means "remove / reset to default"
     if action == "remove" or not role_id:
@@ -202,12 +168,5 @@ def assign_role(user_id: int):
             reason=reason,
         )
 
-    if ok:
-        try:
-            from app.model.services import alerts_service
-            alerts_service.check_user_quota(user_id)
-            alerts_service.check_user_project_limit(user_id)
-        except Exception:
-            pass
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

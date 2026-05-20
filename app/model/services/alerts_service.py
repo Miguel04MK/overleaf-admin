@@ -649,3 +649,33 @@ def recalculate_alerts(actor: str = "system") -> None:
         action="alerts_recalculate", actor=actor,
         detail="Recálculo de alertas ejecutado.", level="info",
     )
+
+
+# ── Notification preferences (service-layer wrappers) ─────────────────────────
+
+def get_alert_by_id(alert_id: int) -> SystemAlert | None:
+    """Fetch a single alert by primary key."""
+    return db.session.get(SystemAlert, alert_id)
+
+
+def get_or_create_notif_prefs(admin_id: int):
+    """Return the admin's notification preferences, creating defaults if absent."""
+    from app.model.entities.admin_notification_pref import AdminNotificationPref
+    pref = AdminNotificationPref.query.filter_by(admin_id=admin_id).first()
+    if pref is None:
+        pref = AdminNotificationPref(admin_id=admin_id)
+        db.session.add(pref)
+        db.session.commit()
+    return pref
+
+
+def update_notif_prefs(admin_id: int, data: dict):
+    """Update the admin's notification preferences. Creates defaults if absent."""
+    from app.model.entities.admin_notification_pref import AdminNotificationPref
+    pref = AdminNotificationPref.query.filter_by(admin_id=admin_id).first()
+    if pref is None:
+        pref = AdminNotificationPref(admin_id=admin_id)
+        db.session.add(pref)
+    pref.update_from_dict(data)
+    db.session.commit()
+    return pref

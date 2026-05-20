@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import current_user, login_required
 
 from app.model.services import auth_service
+from app.rest.dtos.forms import LoginForm
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -13,16 +14,16 @@ def login():
         return redirect(url_for("dashboard.index"))
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-
-        user = auth_service.authenticate(username, password)
-        if user:
-            auth_service.perform_login(user)
-            next_page = request.args.get("next") or url_for("dashboard.index")
-            return redirect(next_page)
-        else:
-            flash("Credenciales incorrectas. Inténtalo de nuevo.", "danger")
+        form = LoginForm(request.form)
+        if form.validate():
+            user = auth_service.authenticate(
+                form.username.data.strip(), form.password.data
+            )
+            if user:
+                auth_service.perform_login(user)
+                next_page = request.args.get("next") or url_for("dashboard.index")
+                return redirect(next_page)
+        flash("Credenciales incorrectas. Inténtalo de nuevo.", "danger")
 
     return render_template("auth/login.html")
 

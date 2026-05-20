@@ -85,9 +85,7 @@ uploads/
 
 # ─── Notas y documentación de desarrollo ─────────────────────────────────────
 .claude/
-CLAUDE.md
-REFACTORING.md
-ARCHITECTURE.md
+docs/
 
 # ─── Archivos generados en tiempo de ejecución ───────────────────────────────
 *.pdf

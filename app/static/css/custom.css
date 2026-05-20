@@ -2,10 +2,23 @@
    Overleaf Admin Platform — custom styles
    ============================================================ */
 
-/* ── Brand color ─────────────────────────────────────────────────────────── */
+/* ── Brand color & shared tokens ─────────────────────────────────────────── */
 :root {
-  --ol-green:      #3d8b3d;
-  --ol-green-dark: #2d6a2d;
+  --ol-green:        #3d8b3d;
+  --ol-green-dark:   #2d6a2d;
+  --ol-green-subtle: rgba(61,139,61,.08);
+  --ol-green-light:  rgba(61,139,61,.18);
+  --ol-green-border: rgba(61,139,61,.30);
+  --ol-green-hover:  rgba(61,139,61,.04);
+  --ol-focus-ring:   rgba(61,139,61,.18);
+  --ol-input-focus:  #7fba7f;
+
+  /* Alert level colours */
+  --level-critical-bg:  rgba(220,53,69,.09);
+  --level-danger-bg:    rgba(220,53,69,.06);
+  --level-warning-bg:   rgba(255,193,7,.09);
+  --level-info-bg:      rgba(13,110,253,.05);
+  --level-resolved-bg:  rgba(25,135,84,.07);
 }
 
 /* ── Overleaf green buttons ──────────────────────────────────────────────── */
@@ -149,10 +162,122 @@ footer { font-size: 0.78rem; }
 
 /* ── Tabla: transición suave al actualizar datos ─────────────────────────── */
 #projects-tbody,
-#users-tbody {
+#users-tbody,
+#alerts-tbody {
   transition: opacity 0.18s ease;
 }
 .tbody-loading {
   opacity: 0.25;
   pointer-events: none;
+}
+
+/* ── Search input group (compartido: users, projects, alerts) ────────────── */
+.search-group {
+  border: 1px solid #dee2e6;
+  border-radius: .5rem;
+  overflow: hidden;
+  transition: box-shadow .15s;
+}
+.search-group:focus-within {
+  box-shadow: 0 0 0 .2rem var(--ol-focus-ring);
+  border-color: var(--ol-input-focus);
+}
+.search-group .input-group-text,
+.search-group .form-control { border: none; background: #fff; }
+.search-group .form-control:focus { box-shadow: none; }
+
+/* ── Filas clicables (users, projects) ───────────────────────────────────── */
+.tbody-clickable tr { cursor: pointer; }
+.tbody-clickable tr:hover { background-color: var(--ol-green-hover); }
+
+/* ── Summary cards (alerts, dashboard) ──────────────────────────────────── */
+.summary-card {
+  text-decoration: none; color: inherit;
+  transition: box-shadow .15s;
+}
+.summary-card:hover { box-shadow: 0 .2rem .6rem rgba(0,0,0,.1) !important; }
+.summary-card .stat-num { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.summary-card .stat-lbl { font-size: .72rem; color: #6c757d; margin-top: .15rem; }
+
+/* ── Alert level — colores de fila ───────────────────────────────────────── */
+tr.row-critical { --bs-table-bg: var(--level-critical-bg);  --bs-table-hover-bg: rgba(220,53,69,.15); }
+tr.row-danger   { --bs-table-bg: var(--level-danger-bg);    --bs-table-hover-bg: rgba(220,53,69,.11); }
+tr.row-warning  { --bs-table-bg: var(--level-warning-bg);   --bs-table-hover-bg: rgba(255,193,7,.15); }
+tr.row-info     { --bs-table-bg: var(--level-info-bg);      --bs-table-hover-bg: rgba(13,110,253,.10); }
+tr.row-resolved { --bs-table-bg: var(--level-resolved-bg);  --bs-table-hover-bg: rgba(25,135,84,.13); }
+
+/* Left-border indicador de nivel */
+tr.row-critical td:first-child { box-shadow: inset 3px 0 0 rgba(176,42,55,.5); }
+tr.row-danger   td:first-child { box-shadow: inset 3px 0 0 rgba(176,42,55,.3); }
+tr.row-warning  td:first-child { box-shadow: inset 3px 0 0 rgba(200,150,0,.5); }
+tr.row-info     td:first-child { box-shadow: inset 3px 0 0 rgba(13,110,253,.3); }
+tr.row-resolved td:first-child { box-shadow: inset 3px 0 0 rgba(25,135,84,.6); }
+
+/* ── Alert level — texto coloreado ──────────────────────────────────────── */
+.level-text-critical { color: #b02a37; font-weight: 600; }
+.level-text-danger   { color: #842029; font-weight: 600; }
+.level-text-warning  { color: #664d03; font-weight: 600; }
+.level-text-info     { color: #084298; font-weight: 500; }
+
+/* ── Entity links (alerts table) ─────────────────────────────────────────── */
+a.entity-link {
+  text-decoration: none; color: #0d6efd;
+  font-weight: 500; font-size: .82rem;
+  transition: color .15s;
+}
+a.entity-link:hover { color: #0a58ca; text-decoration: underline; }
+a.entity-link i.bi-box-arrow-up-right {
+  font-size: .62rem; opacity: .6; transition: opacity .15s;
+}
+a.entity-link:hover i.bi-box-arrow-up-right { opacity: 1; }
+.entity-static { font-size: .82rem; color: #6c757d; }
+
+/* ── Bulk action bar ─────────────────────────────────────────────────────── */
+#bulk-bar {
+  background: #fff3cd; border: 1px solid #ffc107;
+  border-radius: .5rem; padding: .5rem 1rem;
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+}
+#bulk-bar .bulk-count { font-weight: 600; font-size: .875rem; }
+
+/* ── Action buttons (alerts, projects detail…) ───────────────────────────── */
+.btn-action {
+  padding: .3rem .6rem; font-size: .8rem; line-height: 1.4;
+  border-radius: .375rem; transition: transform .1s, box-shadow .1s;
+}
+.btn-action:hover:not(:disabled) {
+  transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,.12);
+}
+.btn-action i { font-size: .85rem; }
+
+/* ── Detail modal — campos genéricos ────────────────────────────────────── */
+.detail-field-label {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+  color: #6c757d; font-weight: 600; margin-bottom: .15rem;
+}
+.detail-field-value { font-size: .85rem; color: #212529; }
+.detail-msg-box {
+  background: #f8f9fa; border: 1px solid #e9ecef; border-radius: .5rem;
+  padding: .75rem 1rem; font-size: .82rem; color: #495057;
+  line-height: 1.55; word-break: break-word;
+}
+
+/* ── Checkbox column (bulk selección) ───────────────────────────────────── */
+.col-check { width: 2.5rem; text-align: center; }
+.row-check  { cursor: pointer; }
+
+/* ── Collab-cell tooltip (compartido: projects/list + users/detail) ──────── */
+.collab-cell { display: inline-block; cursor: default; }
+.collab-tip {
+  display: none; position: fixed; transform: translateY(-50%);
+  background: #1e2a38; color: #fff;
+  padding: 6px 12px; border-radius: 6px;
+  font-size: .74rem; line-height: 1.7; white-space: nowrap;
+  z-index: 9999; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,.3);
+}
+.collab-tip::before {
+  content: ''; position: absolute;
+  right: 100%; top: 50%; transform: translateY(-50%);
+  border: 6px solid transparent; border-right-color: #1e2a38;
 }

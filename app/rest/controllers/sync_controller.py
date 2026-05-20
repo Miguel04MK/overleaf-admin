@@ -5,7 +5,7 @@ import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 
-from app.model.entities import sync_run_dao
+from app.model.services import sync_service
 from app.model.services.admin import admin_service as audit_service
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ sync_bp = Blueprint("sync", __name__, url_prefix="/sincronizacion")
 @sync_bp.route("/")
 @login_required
 def status():
-    runs = sync_run_dao.get_recent_runs(limit=20)
+    runs = sync_service.get_recent_syncs(limit=20)
     return render_template(
         "sync/status.html",
         runs=runs,
@@ -39,7 +39,7 @@ def trigger():
 
     def _run():
         from app.etl.runners.runner import run_sync
-        run_sync(app, triggered_by="manual")
+        run_sync(app, triggered_by="manual", triggered_by_user=actor)
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()

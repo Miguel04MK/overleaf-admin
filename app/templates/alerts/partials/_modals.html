@@ -1,0 +1,117 @@
+{# ── Modal: Resolver con comentario ──────────────────────────────────────────── #}
+<div class="modal fade" id="resolveModal" tabindex="-1" aria-labelledby="resolveModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-semibold" id="resolveModalLabel">
+          <i class="bi bi-check-circle me-2 text-success"></i>Resolver alerta
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-medium mb-1 small" id="resolve-alert-title"></p>
+        <p class="text-muted small mb-3" id="resolve-alert-message"></p>
+        <label class="form-label small fw-medium" for="resolve-comment">
+          Comentario de resolución <span class="text-muted fw-normal">(opcional)</span>
+        </label>
+        <textarea id="resolve-comment" class="form-control form-control-sm" rows="3"
+                  placeholder="Ej: Revisado. Era un fallo temporal de MongoDB."></textarea>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-success" id="resolve-confirm-btn">
+          <i class="bi bi-check-lg me-1"></i>Resolver alerta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal: Detalle de alerta ─────────────────────────────────────────────────── #}
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      {# Header strip — colored dynamically by JS #}
+      <div id="detail-header" class="detail-header-strip">
+        <div class="d-flex align-items-start justify-content-between">
+          <div id="detail-header-content">
+            <div class="text-center py-4 text-muted">
+              <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+            </div>
+          </div>
+          <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal"></button>
+        </div>
+      </div>
+      <div class="modal-body pt-3 pb-2 px-4" id="detail-body"></div>
+      <div class="modal-footer border-top px-4 py-2" id="detail-footer"></div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal: Preferencias de notificación ─────────────────────────────────────── #}
+<div class="modal fade" id="notifModal" tabindex="-1" aria-labelledby="notifModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold" id="notifModalLabel">
+          <i class="bi bi-bell me-2 text-primary"></i>Mis preferencias de notificación
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="notif-body">
+        <div class="text-center py-4 text-muted">
+          <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <span id="notif-save-msg" class="small me-auto d-none"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-sm btn-ol" id="notif-save-btn">
+          <i class="bi bi-floppy me-1"></i>Guardar preferencias
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{# ── Modal: Confirmar guardado de umbrales ─────────────────────────────────── #}
+<div class="modal fade" id="confirmThresholdModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-shield-check me-2 text-warning-emphasis"></i>
+          Confirmar cambios de umbrales
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body py-2">
+        <table class="table table-sm small mb-3">
+          <thead class="table-light">
+            <tr><th>Parámetro</th><th class="text-muted">Anterior</th><th>Nuevo</th></tr>
+          </thead>
+          <tbody id="threshold-diff-body"></tbody>
+        </table>
+
+        <div class="p-3 rounded bg-light border small">
+          <p class="mb-0 text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            Al guardar se ejecutará un recálculo automático de alertas con los nuevos valores.
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0 pt-1 gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-dismiss="modal">
+          <i class="bi bi-x me-1"></i>Cancelar, seguir editando
+        </button>
+        <button type="button" id="confirm-threshold-btn" class="btn btn-sm btn-ol">
+          <i class="bi bi-check2 me-1"></i>Confirmar y guardar
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

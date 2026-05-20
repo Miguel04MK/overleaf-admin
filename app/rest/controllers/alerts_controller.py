@@ -3,8 +3,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 from app.model.services import alerts_service
-from app.config.extensions import db
-from app.model.entities.system_alert import SystemAlert
 
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/alertas")
 
@@ -116,7 +114,7 @@ def search():
 @login_required
 def alert_detail(alert_id: int):
     """JSON endpoint — returns full detail of a single alert for the detail modal."""
-    alert = db.session.get(SystemAlert, alert_id)
+    alert = alerts_service.get_alert_by_id(alert_id)
     if not alert:
         return jsonify({"error": "Alerta no encontrada."}), 404
     return jsonify(_serialize(alert))
@@ -226,12 +224,7 @@ def update_config():
 @login_required
 def get_notif_prefs():
     """Return current user's notification preferences (creates defaults if absent)."""
-    from app.model.entities.admin_notification_pref import AdminNotificationPref
-    pref = AdminNotificationPref.query.filter_by(admin_id=current_user.id).first()
-    if pref is None:
-        pref = AdminNotificationPref(admin_id=current_user.id)
-        db.session.add(pref)
-        db.session.commit()
+    pref = alerts_service.get_or_create_notif_prefs(current_user.id)
     return jsonify({"ok": True, "prefs": pref.to_dict()})
 
 
@@ -239,14 +232,8 @@ def get_notif_prefs():
 @login_required
 def update_notif_prefs():
     """Update current user's notification preferences from JSON body."""
-    from app.model.entities.admin_notification_pref import AdminNotificationPref
     body = request.get_json(silent=True) or {}
-    pref = AdminNotificationPref.query.filter_by(admin_id=current_user.id).first()
-    if pref is None:
-        pref = AdminNotificationPref(admin_id=current_user.id)
-        db.session.add(pref)
-    pref.update_from_dict(body)
-    db.session.commit()
+    alerts_service.update_notif_prefs(current_user.id, body)
     return jsonify({"ok": True, "msg": "Preferencias de notificación guardadas."})
 
 

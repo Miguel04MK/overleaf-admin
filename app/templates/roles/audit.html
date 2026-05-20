@@ -1,27 +1,10 @@
 {% extends "base.html" %}
+{% from 'macros/ui.html' import pagination_nav, empty_state, role_badge %}
 {% block title %}Auditoría de roles{% endblock %}
 {% block page_title %}Auditoría de cambios de rol{% endblock %}
 
 {% block extra_head %}
-<style>
-  #search-wrapper .input-group {
-    border: 1px solid #dee2e6; border-radius: .5rem;
-    overflow: hidden; transition: box-shadow .15s; width: 300px;
-  }
-  #search-wrapper .input-group:focus-within {
-    box-shadow: 0 0 0 .2rem rgba(61,139,61,.18); border-color: #7fba7f;
-  }
-  #search-wrapper .input-group-text,
-  #search-wrapper .form-control { border: none; background: #fff; }
-  #search-wrapper .form-control:focus { box-shadow: none; }
-  .action-badge-assigned { background: rgba(25,135,84,.12); color: #198754; border: 1px solid rgba(25,135,84,.25); }
-  .action-badge-changed  { background: rgba(13,110,253,.08); color: #0d6efd; border: 1px solid rgba(13,110,253,.2); }
-  .action-badge-removed  { background: rgba(108,117,125,.1); color: #6c757d; border: 1px solid rgba(108,117,125,.25); }
-  .action-badge {
-    display: inline-block; padding: .22rem .65rem;
-    border-radius: 999px; font-size: .75rem; font-weight: 500;
-  }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/roles.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -124,27 +107,8 @@
                 {% endif %}
               </td>
 
-              <td>
-                {% if log.role_from %}
-                  <span class="badge bg-{{ log.role_from.color }}
-                        {% if log.role_from.color in ['info','warning'] %}text-dark{% endif %}">
-                    {{ log.role_from.name }}
-                  </span>
-                {% else %}
-                  <span class="text-muted small">Sin rol</span>
-                {% endif %}
-              </td>
-
-              <td>
-                {% if log.role_to %}
-                  <span class="badge bg-{{ log.role_to.color }}
-                        {% if log.role_to.color in ['info','warning'] %}text-dark{% endif %}">
-                    {{ log.role_to.name }}
-                  </span>
-                {% else %}
-                  <span class="text-muted small">—</span>
-                {% endif %}
-              </td>
+              <td>{{ role_badge(log.role_from) }}</td>
+              <td>{{ role_badge(log.role_to) }}</td>
 
               <td class="small text-muted">
                 <i class="bi bi-person-circle me-1"></i>{{ log.changed_by }}
@@ -171,37 +135,10 @@
       </div>
 
       {# Paginación #}
-      {% if pagination.pages > 1 %}
-      <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
-        <span class="small text-muted">
-          {{ pagination.per_page * (pagination.page - 1) + 1 }}–{{ [pagination.per_page * pagination.page, pagination.total]|min }}
-          de {{ pagination.total }}
-        </span>
-        <nav><ul class="pagination pagination-sm mb-0">
-          <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('roles.audit_log', page=pagination.prev_num, role_id=filter_role_id, action=filter_action) }}">‹</a>
-          </li>
-          {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-            {% if p %}
-              <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('roles.audit_log', page=p, role_id=filter_role_id, action=filter_action) }}">{{ p }}</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled"><span class="page-link">…</span></li>
-            {% endif %}
-          {% endfor %}
-          <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('roles.audit_log', page=pagination.next_num, role_id=filter_role_id, action=filter_action) }}">›</a>
-          </li>
-        </ul></nav>
-      </div>
-      {% endif %}
+      {{ pagination_nav(pagination, url_for('roles.audit_log', role_id=filter_role_id, action=filter_action)) }}
 
       {% else %}
-      <div class="text-center text-muted py-5">
-        <i class="bi bi-clock-history fs-1 d-block mb-3 opacity-50"></i>
-        No hay cambios de rol registrados{% if filter_role_id or filter_action %} con los filtros aplicados{% endif %}.
-      </div>
+      {{ empty_state('clock-history', 'No hay cambios de rol registrados' ~ (' con los filtros aplicados' if filter_role_id or filter_action else '') ~ '.') }}
       {% endif %}
     </div>
   </div>

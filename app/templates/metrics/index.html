@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+{% block title %}Métricas{% endblock %}
+{% block page_title %}Métricas y analítica de uso{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/metrics.css') }}">
+{% endblock %}
+
+
+{% block content %}
+<div class="pt-2">
+
+  {# ══════════════════════════════════════════════════════════════════════════
+     1. STAT TILES — key numbers at a glance
+     ══════════════════════════════════════════════════════════════════════ #}
+  <div class="stat-tiles mb-3">
+
+    <div class="stat-tile" style="--accent:#6610f2; --icon-bg:rgba(102,16,242,.10); --icon-fg:#6610f2;">
+      <div class="stat-tile__icon"><i class="bi bi-people-fill"></i></div>
+      <div>
+        <div class="stat-tile__val">{{ d.total_users }}</div>
+        <div class="stat-tile__lbl">Usuarios totales</div>
+      </div>
+    </div>
+
+    <div class="stat-tile" style="--accent:#0d6efd; --icon-bg:rgba(13,110,253,.10); --icon-fg:#0d6efd;">
+      <div class="stat-tile__icon"><i class="bi bi-folder2-open"></i></div>
+      <div>
+        <div class="stat-tile__val">{{ d.total_projects }}</div>
+        <div class="stat-tile__lbl">Proyectos totales</div>
+      </div>
+    </div>
+
+    <div class="stat-tile" style="--accent:#20c997; --icon-bg:rgba(32,201,151,.12); --icon-fg:#138a6c;">
+      <div class="stat-tile__icon"><i class="bi bi-bar-chart-steps"></i></div>
+      <div>
+        <div class="stat-tile__val">{{ d.avg_projects_per_user }}</div>
+        <div class="stat-tile__lbl">Media proyectos/usuario</div>
+      </div>
+    </div>
+
+    <div class="stat-tile" style="--accent:#fd7e14; --icon-bg:rgba(253,126,20,.12); --icon-fg:#d96000;">
+      <div class="stat-tile__icon"><i class="bi bi-hdd-fill"></i></div>
+      <div>
+        <div class="stat-tile__val stat-tile__val--sm">{{ d.total_storage_fmt }}</div>
+        <div class="stat-tile__lbl">Almacenamiento total</div>
+        {% if d.storage_percent is not none %}
+        <div style="font-size:.6rem;color:#6c757d;">{{ d.storage_percent }}% de cuota global</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════════════════════
+     2. GROWTH — user + project growth side by side
+     ══════════════════════════════════════════════════════════════════════ #}
+  <div class="row g-3 mb-3">
+
+    <div class="col-lg-6">
+      <div class="card m-card shadow-sm h-100" style="--accent:#6610f2;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-graph-up-arrow"></i>
+              Crecimiento de usuarios</h6>
+          <span class="aside">Últimos 12 meses</span>
+        </div>
+        <div class="card-body p-3">
+          {% set _gu = d.growth_users|map(attribute='count')|sum %}
+          {% if _gu > 0 %}
+            <div class="chart-box"><canvas id="chartGrowthUsers"></canvas></div>
+          {% else %}
+            <div class="chart-box d-flex align-items-center justify-content-center text-muted small">
+              <div class="text-center"><i class="bi bi-graph-up fs-3 d-block mb-2 opacity-50"></i>Sin datos.</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card m-card shadow-sm h-100" style="--accent:#0d6efd;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-graph-up-arrow"></i>
+              Crecimiento de proyectos</h6>
+          <span class="aside">Últimos 12 meses</span>
+        </div>
+        <div class="card-body p-3">
+          {% set _gp = d.growth_projects|map(attribute='count')|sum %}
+          {% if _gp > 0 %}
+            <div class="chart-box"><canvas id="chartGrowthProjects"></canvas></div>
+          {% else %}
+            <div class="chart-box d-flex align-items-center justify-content-center text-muted small">
+              <div class="text-center"><i class="bi bi-graph-up fs-3 d-block mb-2 opacity-50"></i>Sin datos.</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════════════════════
+     3. RANKINGS — top owners + top storage
+     ══════════════════════════════════════════════════════════════════════ #}
+  <div class="row g-3 mb-3">
+
+    <div class="col-lg-6">
+      <div class="card m-card shadow-sm h-100" style="--accent:#0d6efd;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-trophy-fill"></i>
+              Ranking: más proyectos</h6>
+          <span class="aside">Top 10</span>
+        </div>
+        <div class="card-body p-3">
+          {% if d.top_owners %}
+            <div class="chart-box"><canvas id="chartTopOwners" class="chart-clickable"></canvas></div>
+          {% else %}
+            <div class="chart-box d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card m-card shadow-sm h-100" style="--accent:#138a6c;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-hdd-stack-fill"></i>
+              Ranking: más almacenamiento</h6>
+          <span class="aside">Top 10 (MB)</span>
+        </div>
+        <div class="card-body p-3">
+          {% if d.top_storage %}
+            <div class="chart-box"><canvas id="chartTopStorage" class="chart-clickable"></canvas></div>
+          {% else %}
+            <div class="chart-box d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════════════════════
+     4. DISTRIBUTIONS — size buckets + roles + storage per user
+     ══════════════════════════════════════════════════════════════════════ #}
+  <div class="row g-3 mb-3">
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#0dcaf0;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-diagram-3-fill"></i>
+              Tamaño de proyectos</h6>
+        </div>
+        <div class="card-body p-3">
+          {% set _sb = d.size_buckets|map(attribute='count')|sum %}
+          {% if _sb > 0 %}
+            <div class="chart-box chart-box--sm"><canvas id="chartSizes"></canvas></div>
+          {% else %}
+            <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#6610f2;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-pie-chart-fill"></i>
+              Distribución por rol</h6>
+        </div>
+        <div class="card-body p-3">
+          {% if d.role_distribution %}
+            <div class="chart-box chart-box--sm"><canvas id="chartRoles"></canvas></div>
+          {% else %}
+            <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#fd7e14;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-speedometer2"></i>
+              Almacenamiento por usuario</h6>
+          <span class="aside">vs cuota</span>
+        </div>
+        <div class="card-body p-2">
+          {% if d.storage_per_user %}
+            <div class="table-responsive" style="max-height:230px; overflow-y:auto;">
+              <table class="table table-sm align-middle mb-0" style="font-size:.74rem;">
+                <tbody>
+                {% for u in d.storage_per_user %}
+                  <tr>
+                    <td class="truncate" style="max-width:140px;">
+                      <a href="{{ url_for('users.user_detail', user_id=u.user_id) }}"
+                         class="text-decoration-none text-dark fw-medium"
+                         title="{{ u.label }}">{{ u.label }}</a>
+                    </td>
+                    <td style="width:55%;">
+                      <div class="storage-bar-wrap">
+                        <div class="storage-bar-track">
+                          <div class="storage-bar-fill
+                            {% if u.pct >= 95 %}bg-danger{% elif u.pct >= 80 %}bg-warning{% else %}bg-success{% endif %}"
+                            style="width:{{ [u.pct, 100]|min }}%;"></div>
+                        </div>
+                        <span class="text-muted">{{ u.pct }}%</span>
+                      </div>
+                    </td>
+                    <td class="text-end text-muted" style="white-space:nowrap;">{{ u.used_fmt }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="py-4 text-center text-muted small">Sin datos de cuota.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════════════════════
+     5. SYNC HISTORY — table + stats
+     ══════════════════════════════════════════════════════════════════════ #}
+  <div class="row g-3 mb-3">
+
+    <div class="col-lg-8">
+      <div class="card m-card shadow-sm h-100" style="--accent:#198754;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-arrow-repeat"></i>
+              Historial de sincronizaciones</h6>
+          <a href="{{ url_for('sync.status') }}" class="aside text-decoration-none">
+            Ver todas <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          {% if d.sync_history %}
+            <div class="table-responsive" style="max-height:360px; overflow-y:auto;">
+              <table class="table table-sm table-hover align-middle mb-0 sync-tbl">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Origen</th>
+                    <th>Usuarios</th>
+                    <th>Proyectos</th>
+                    <th>Duración</th>
+                    <th>Mensaje</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {% for r in d.sync_history %}
+                  <tr>
+                    <td class="text-muted" style="white-space:nowrap;">
+                      {{ r.started_at.strftime('%d/%m/%y %H:%M') if r.started_at else '—' }}
+                    </td>
+                    <td>
+                      {% if r.status == 'success' %}
+                        <span class="badge bg-success-subtle text-success sync-badge">Exitosa</span>
+                      {% elif r.status == 'error' %}
+                        <span class="badge bg-danger-subtle text-danger sync-badge">Error</span>
+                      {% elif r.status == 'partial' %}
+                        <span class="badge bg-warning-subtle text-warning sync-badge">Parcial</span>
+                      {% elif r.status == 'running' %}
+                        <span class="badge bg-info-subtle text-info sync-badge">En curso</span>
+                      {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary sync-badge">{{ r.status }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if r.triggered_by == 'manual' %}
+                        <i class="bi bi-hand-index-thumb text-muted" title="Manual"></i>
+                      {% else %}
+                        <i class="bi bi-clock text-muted" title="Programada"></i>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {{ r.users_synced|default(0) }}/{{ r.users_found|default(0) }}
+                      {% if r.users_delta and r.users_delta != 0 %}
+                        <small class="{% if r.users_delta > 0 %}text-success{% else %}text-danger{% endif %}">
+                          {{ '+' if r.users_delta > 0 else '' }}{{ r.users_delta }}
+                        </small>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {{ r.projects_synced|default(0) }}/{{ r.projects_found|default(0) }}
+                      {% if r.projects_delta and r.projects_delta != 0 %}
+                        <small class="{% if r.projects_delta > 0 %}text-success{% else %}text-danger{% endif %}">
+                          {{ '+' if r.projects_delta > 0 else '' }}{{ r.projects_delta }}
+                        </small>
+                      {% endif %}
+                    </td>
+                    <td class="text-muted">
+                      {% if r.duration_seconds is not none %}
+                        {{ '%.1f'|format(r.duration_seconds) }}s
+                      {% else %}—{% endif %}
+                    </td>
+                    <td class="truncate" style="max-width:180px;" title="{{ r.message or '' }}">
+                      {{ r.message or '—' }}
+                    </td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-4 small">
+              <i class="bi bi-arrow-repeat fs-3 d-block mb-2 opacity-50"></i>Sin sincronizaciones registradas.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#198754;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-clipboard-data-fill"></i>
+              Resumen de sincronización</h6>
+        </div>
+        <div class="card-body p-3">
+          {% set ss = d.sync_stats %}
+          {% if ss and ss.total_runs %}
+            <div class="d-flex flex-column gap-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:.78rem;">Ejecuciones totales</span>
+                <span class="fw-bold">{{ ss.total_runs }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:.78rem;">Tasa de éxito</span>
+                <span class="fw-bold {% if ss.success_rate >= 90 %}text-success{% elif ss.success_rate >= 70 %}text-warning{% else %}text-danger{% endif %}">
+                  {{ ss.success_rate }}%
+                </span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:.78rem;">Exitosas</span>
+                <span class="badge bg-success-subtle text-success">{{ ss.success_runs }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:.78rem;">Con errores</span>
+                <span class="badge bg-danger-subtle text-danger">{{ ss.error_runs }}</span>
+              </div>
+              {% if ss.avg_duration_s is not none %}
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:.78rem;">Duración media</span>
+                <span class="fw-bold">{{ ss.avg_duration_s }}s</span>
+              </div>
+              {% endif %}
+            </div>
+
+            {# Mini donut for success rate #}
+            <div class="mt-3" style="height:140px;"><canvas id="chartSyncRate"></canvas></div>
+          {% else %}
+            <div class="text-center text-muted py-4 small">Sin datos de sincronización.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════════════════════
+     6. SYSTEM — services + alerts summary + errors
+     ══════════════════════════════════════════════════════════════════════ #}
+  <div class="row g-3 mb-3">
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#6c757d;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-server"></i>
+              Estado de servicios</h6>
+        </div>
+        <div class="card-body p-3">
+          {% if d.services %}
+            <div class="d-flex flex-column gap-2">
+              {% for svc in d.services %}
+                <div class="d-flex align-items-center justify-content-between"
+                     style="font-size:.78rem;">
+                  <span class="fw-medium">{{ svc.name }}</span>
+                  {% if svc.status == 'online' %}
+                    <span class="badge bg-success-subtle text-success" style="font-size:.62rem;">
+                      <i class="bi bi-circle-fill me-1" style="font-size:.4rem;"></i>En línea
+                    </span>
+                  {% elif svc.status == 'offline' %}
+                    <span class="badge bg-danger-subtle text-danger" style="font-size:.62rem;">
+                      <i class="bi bi-circle-fill me-1" style="font-size:.4rem;"></i>Fuera de línea
+                    </span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary" style="font-size:.62rem;">Desconocido</span>
+                  {% endif %}
+                </div>
+                <div class="text-muted" style="font-size:.65rem;">{{ svc.detail }}</div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-3 small">No se pudo verificar.</div>
+          {% endif %}
+
+          <hr class="my-2">
+          <div class="d-flex align-items-center gap-2" style="font-size:.78rem;">
+            <span class="text-muted">Base de datos:</span>
+            {% if d.db_ok %}
+              <span class="text-success fw-bold">Conectada</span>
+            {% else %}
+              <span class="text-danger fw-bold">Sin conexión</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#ffc107;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-exclamation-triangle-fill"></i>
+              Resumen de alertas</h6>
+          <a href="{{ url_for('alerts.list_alerts') }}" class="aside text-decoration-none">
+            Ver todas <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+        <div class="card-body p-3">
+          {% set al = d.alerts_summary %}
+          {% if al %}
+            <div class="d-flex flex-column gap-2">
+              <div class="d-flex justify-content-between" style="font-size:.78rem;">
+                <span class="text-muted">Activas</span>
+                <span class="fw-bold">{{ al.active|default(0) }}</span>
+              </div>
+              <div class="d-flex justify-content-between" style="font-size:.78rem;">
+                <span class="text-muted">Resueltas</span>
+                <span class="fw-bold text-success">{{ al.resolved|default(0) }}</span>
+              </div>
+              {% if al.by_level %}
+                <hr class="my-1">
+                <div class="d-flex flex-wrap gap-1">
+                  {% for lvl in ['critical','danger','warning','info'] %}
+                    {% if al.by_level.get(lvl) %}
+                      <span class="badge
+                        {% if lvl in ['critical','danger'] %}bg-danger-subtle text-danger
+                        {% elif lvl == 'warning' %}bg-warning-subtle text-warning
+                        {% else %}bg-info-subtle text-info{% endif %}"
+                        style="font-size:.62rem;">
+                        {{ al.by_level[lvl] }} {{ lvl }}
+                      </span>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-3 small">Sin alertas.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card m-card shadow-sm h-100" style="--accent:#dc3545;">
+        <div class="card-header">
+          <h6><span class="bar"></span><i class="bi bi-bug-fill"></i>
+              Errores recientes en auditoría</h6>
+          <a href="{{ url_for('audit.logs') }}" class="aside text-decoration-none">
+            Ver todos <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          {% if d.recent_errors %}
+            <div class="table-responsive" style="max-height:220px; overflow-y:auto;">
+              <table class="table table-sm align-middle mb-0" style="font-size:.74rem;">
+                <tbody>
+                {% for log in d.recent_errors %}
+                  <tr>
+                    <td class="text-muted" style="width:5rem; white-space:nowrap;">
+                      {{ log.created_at.strftime('%d/%m %H:%M') if log.created_at else '—' }}
+                    </td>
+                    <td>
+                      <span class="badge
+                        {% if log.level == 'error' %}bg-danger-subtle text-danger
+                        {% else %}bg-warning-subtle text-warning{% endif %}"
+                        style="font-size:.6rem;">{{ log.level }}</span>
+                    </td>
+                    <td class="truncate" style="max-width:200px;" title="{{ log.detail or '' }}">
+                      {{ log.action }} — {{ log.actor }}
+                    </td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-4 small">
+              <i class="bi bi-shield-check fs-3 d-block mb-2 opacity-50"></i>Sin errores recientes.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+const CHART_DATA = {
+  growthUsers:      {{ d.growth_users      | tojson }},
+  growthProjects:   {{ d.growth_projects   | tojson }},
+  topOwners:        {{ d.top_owners        | tojson }},
+  topStorage:       {{ d.top_storage       | tojson }},
+  sizeBuckets:      {{ d.size_buckets      | tojson }},
+  roleDistribution: {{ d.role_distribution | tojson }},
+  syncSuccessRate:  {{ d.sync_stats.get('success_rate', 0) | tojson }},
+};
+const USER_DETAIL_BASE = "{{ url_for('users.user_detail', user_id=0) }}".replace('/0', '/');
+</script>
+<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+{% endblock %}

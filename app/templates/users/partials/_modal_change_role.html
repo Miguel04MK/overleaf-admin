@@ -1,0 +1,54 @@
+{# ── Modal: Cambiar rol ──────────────────────────────────────────────────── #}
+<div class="modal fade" id="modalCambiarRol" tabindex="-1" aria-labelledby="modalCambiarRolLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('roles.assign_role', user_id=user.id) }}">
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title fw-bold" id="modalCambiarRolLabel">
+            <i class="bi bi-person-badge me-2 text-muted"></i>Cambiar rol de usuario
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <p class="text-muted small mb-3">
+            Usuario: <strong>{{ user.display_name }}</strong>
+            ({{ user.email or '—' }})
+          </p>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Nuevo rol</label>
+            <select name="role_id" class="form-select form-select-sm" id="roleSelect">
+              <option value="">— Retirar rol (asignar rol por defecto) —</option>
+              {% for r in all_roles %}
+                <option value="{{ r.id }}"
+                  {% if user.role and user.role.id == r.id %}selected{% endif %}>
+                  {{ r.name | capitalize }}
+                  {% if r.is_default %}(por defecto){% endif %}
+                  — {{ r.storage_quota_fmt }} / {{ r.max_projects_fmt }} proyectos
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label fw-semibold small">Motivo <span class="text-muted fw-normal">(opcional)</span></label>
+            <textarea name="reason" class="form-control form-control-sm" rows="2"
+                      placeholder="Ej: Cambio de plan, solicitud del usuario..."></textarea>
+          </div>
+
+          {# Advertencia cuota #}
+          <div class="alert alert-warning py-2 px-3 small mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Asignar un nuevo rol actualizará automáticamente la cuota de almacenamiento del usuario.
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-ol">
+            <i class="bi bi-check2 me-1"></i>Confirmar cambio
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

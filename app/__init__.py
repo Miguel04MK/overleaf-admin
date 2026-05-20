@@ -55,9 +55,10 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.rest.controllers.projects_controller import projects_bp
     from app.rest.controllers.sync_controller import sync_bp
     from app.rest.controllers.admin_controller import audit_bp, dev_bp
-    from app.modules.reports.routes import reports_bp
+    from app.rest.controllers.reports_controller import reports_bp
     from app.rest.controllers.roles_controller import roles_bp
     from app.rest.controllers.alerts_controller import alerts_bp
+    from app.rest.controllers.metrics_controller import metrics_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -69,6 +70,7 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(reports_bp)
     app.register_blueprint(roles_bp)
     app.register_blueprint(alerts_bp)
+    app.register_blueprint(metrics_bp)
 
     # Seed default roles and alert thresholds if DB is ready (idempotent)
     with app.app_context():
@@ -83,17 +85,20 @@ def create_app(config_name: str | None = None) -> Flask:
         except Exception:
             pass  # DB might not be migrated yet
 
-    # Context processor: inject unread alert count for sidebar badge
+    # Context processor: inject ACTIVE alert count for sidebar badge.
+    # Active = is_resolved == False. This is shown on every page so the badge
+    # is always visible, not only inside /alertas/. The query is a single
+    # COUNT — cheap enough to run per-request without caching.
     @app.context_processor
     def inject_alert_counts():
         from flask_login import current_user
         if current_user and current_user.is_authenticated:
             try:
                 from app.model.services import alerts_service
-                return {"sidebar_unread_alerts": alerts_service.get_unread_count()}
+                return {"sidebar_active_alerts": alerts_service.get_active_count()}
             except Exception:
                 pass
-        return {"sidebar_unread_alerts": 0}
+        return {"sidebar_active_alerts": 0}
 
     # Register error handlers
     _register_error_handlers(app)

@@ -1,0 +1,34 @@
+  {# ── Tabla ────────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:.875rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="col-check ps-3">
+                <input type="checkbox" id="chk-all" class="form-check-input" title="Seleccionar todos">
+              </th>
+              <th style="width:9rem;">Nivel</th>
+              <th style="width:11rem;">Tipo</th>
+              <th>Título / Mensaje</th>
+              <th style="width:8rem;">Entidad</th>
+              <th style="width:8rem;">Fecha</th>
+              <th style="width:13rem;">Estado / Resolución</th>
+              <th class="text-center pe-3" style="width:9rem;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="alerts-tbody">
+            <tr>
+              <td colspan="8" class="text-center py-5 text-muted">
+                <span class="spinner-border spinner-border-sm me-2"></span>Cargando alertas…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="alerts-pagination"
+           class="d-none d-flex align-items-center justify-content-between px-3 py-2 border-top">
+      </div>
+    </div>
+  </div>

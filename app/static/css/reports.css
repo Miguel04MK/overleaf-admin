@@ -1,0 +1,104 @@
+/* ============================================================
+   Reports pages — estilos específicos de /informes
+   (reports/index.html + reports/preview_general.html)
+   ============================================================ */
+
+/* ── Format buttons (CSV / PDF) ──────────────────────────────────────────── */
+.rpt-format-btn {
+  font-size: .7rem; font-weight: 500;
+  padding: .18rem .42rem; border-radius: .3rem;
+  text-decoration: none; display: inline-flex; align-items: center; gap: .18rem;
+  transition: all .12s; white-space: nowrap;
+}
+.rpt-format-btn.csv { color: #198754; border: 1px solid #198754; }
+.rpt-format-btn.csv:hover { background: #198754; color: #fff; }
+.rpt-format-btn.pdf { color: #dc3545; border: 1px solid #dc3545; }
+.rpt-format-btn.pdf:hover { background: #dc3545; color: #fff; }
+
+/* ── Top cards (general + bundle) ────────────────────────────────────────── */
+.rpt-top-cards { display: flex; gap: .75rem; flex-shrink: 0; align-items: stretch; }
+.rpt-top-cards > * { flex: 1 1 0; min-width: 0; }
+.rpt-card-body { display: flex; flex-direction: column; height: 100%; }
+.rpt-card-body .rpt-card-actions { margin-top: auto; }
+
+.rpt-general-card {
+  border: 2px solid #198754; border-radius: .75rem;
+  background: linear-gradient(135deg, rgba(25,135,84,.03) 0%, rgba(25,135,84,.08) 100%);
+}
+.rpt-bundle-card {
+  border: 2px solid #0d6efd; border-radius: .75rem;
+  background: linear-gradient(135deg, rgba(13,110,253,.03) 0%, rgba(13,110,253,.08) 100%);
+  overflow: hidden;
+}
+
+/* ── Page grid ───────────────────────────────────────────────────────────── */
+.rpt-grid { display: flex; height: calc(100vh - 112px); gap: 1rem; min-height: 0; }
+.rpt-left {
+  flex: 0 0 66.6%; max-width: 66.6%;
+  display: flex; flex-direction: column; gap: .5rem; min-height: 0;
+}
+.rpt-right { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; }
+
+/* ── Downloads card ──────────────────────────────────────────────────────── */
+.rpt-downloads-card {
+  flex: 1 1 0; min-height: 0;
+  display: flex; flex-direction: column;
+  border-radius: .5rem; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08); background: #fff;
+}
+.rpt-downloads-card .table-responsive { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+.rpt-downloads-card table { table-layout: fixed; width: 100%; height: 100%; }
+
+.rpt-col-name    { width: 28%; }
+.rpt-col-desc    { width: 37%; }
+.rpt-col-lastdl  { width: 20%; }
+.rpt-col-formats { width: 15%; }
+
+.rpt-downloads-card tbody tr { height: calc((100% - 36px) / 7); }
+.rpt-downloads-card td,
+.rpt-downloads-card th { vertical-align: middle; }
+
+.rpt-report-name { display: flex; align-items: center; gap: .4rem; white-space: nowrap; overflow: hidden; }
+.rpt-report-name span { overflow: hidden; text-overflow: ellipsis; }
+.rpt-report-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* ── Last-download hint ──────────────────────────────────────────────────── */
+.rpt-last-download { font-size: .7rem; color: #667085; line-height: 1.35; white-space: nowrap; }
+.rpt-last-download i { font-size: .65rem; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.rpt-sidebar-card {
+  flex: 1 1 0; min-height: 0;
+  display: flex; flex-direction: column;
+  border: 1px solid #e9ecef; border-radius: .6rem;
+  background: #fff; padding: 1rem; overflow: hidden;
+}
+.rpt-sidebar-title {
+  font-weight: 600; font-size: .85rem;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; margin-bottom: .75rem;
+}
+.rpt-export-list { flex: 1 1 0; overflow-y: auto; min-height: 0; }
+
+/* ── Preview general sections (reports/preview_general.html) ─────────────── */
+.gen-section { margin-bottom: 1.5rem; }
+.gen-section-title {
+  font-size: .95rem; font-weight: 600; color: #198754;
+  border-bottom: 2px solid #198754; padding-bottom: .4rem; margin-bottom: .75rem;
+}
+.gen-metric { font-size: .85rem; }
+.gen-metric .label { color: #6c757d; }
+.gen-metric .value { font-weight: 600; }
+.gen-back-link {
+  display: inline-flex; align-items: center; gap: .35rem;
+  color: #6c757d; text-decoration: none; font-size: .85rem; transition: color .15s;
+}
+.gen-back-link:hover { color: #198754; }
+.section-loading { display: flex; align-items: center; gap: .5rem; padding: 1.5rem; color: #6c757d; font-size: .85rem; }
+.section-error { padding: 1rem; color: #842029; background: #f8d7da; border-radius: .5rem; font-size: .85rem; }
+.spinner-sm {
+  width: 1rem; height: 1rem;
+  border: 2px solid #dee2e6; border-top-color: #198754;
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

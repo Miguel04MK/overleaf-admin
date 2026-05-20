@@ -1,50 +1,11 @@
 {% extends "base.html" %}
+{% from 'macros/ui.html' import empty_state, role_badge %}
 {% block title %}Roles{% endblock %}
 {% block page_title %}Gestión de roles{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<style>
-  /* ── Chart ──────────────────────────────────────────────────────── */
-  .chart-wrap { position: relative; height: 300px; }
-
-  /* ── Role card ─────────────────────────────────────────────────── */
-  .role-card {
-    border-radius: .65rem;
-    transition: box-shadow .15s, transform .15s;
-  }
-  .role-card:hover {
-    box-shadow: 0 4px 14px rgba(0,0,0,.08);
-    transform: translateY(-1px);
-  }
-  .role-icon {
-    width: 44px; height: 44px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.15rem; flex-shrink: 0;
-  }
-
-  /* ── Metric chips inside cards ─────────────────────────────────── */
-  .mchip {
-    display: inline-flex; align-items: center; gap: .25rem;
-    padding: .3rem .65rem; border-radius: 999px;
-    background: #f8f9fa; border: 1px solid #e9ecef;
-    font-size: .78rem; color: #495057; white-space: nowrap;
-  }
-  .mchip i { font-size: .72rem; opacity: .7; }
-
-  /* ── Log items ─────────────────────────────────────────────────── */
-  .log-row { transition: background .12s; }
-  .log-row:hover { background: rgba(0,0,0,.025); }
-
-  /* ── Action badges ─────────────────────────────────────────────── */
-  .abadge {
-    display: inline-block; padding: .12rem .42rem;
-    border-radius: 999px; font-size: .65rem; font-weight: 500;
-  }
-  .abadge-assigned { background:rgba(25,135,84,.12);  color:#198754; border:1px solid rgba(25,135,84,.25); }
-  .abadge-changed  { background:rgba(13,110,253,.08); color:#0d6efd; border:1px solid rgba(13,110,253,.2); }
-  .abadge-removed  { background:rgba(108,117,125,.1); color:#6c757d; border:1px solid rgba(108,117,125,.25); }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/roles.css') }}">
 {% endblock %}
 
 
@@ -124,21 +85,9 @@
               {# Rol from → to + acción #}
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <div class="d-flex align-items-center gap-1">
-                  {% if log.role_from %}
-                    <span class="badge bg-{{ log.role_from.color }}
-                          {% if log.role_from.color in ['info','warning'] %}text-dark{% endif %}"
-                          style="font-size:.62rem;">{{ log.role_from.name }}</span>
-                  {% else %}
-                    <span class="text-muted" style="font-size:.65rem;">sin rol</span>
-                  {% endif %}
+                  {{ role_badge(log.role_from) }}
                   <i class="bi bi-arrow-right text-muted" style="font-size:.6rem;"></i>
-                  {% if log.role_to %}
-                    <span class="badge bg-{{ log.role_to.color }}
-                          {% if log.role_to.color in ['info','warning'] %}text-dark{% endif %}"
-                          style="font-size:.62rem;">{{ log.role_to.name }}</span>
-                  {% else %}
-                    <span class="text-muted" style="font-size:.65rem;">—</span>
-                  {% endif %}
+                  {{ role_badge(log.role_to) }}
                 </div>
 
                 {% if log.action == 'assigned' %}
@@ -157,10 +106,7 @@
             </div>
             {% endfor %}
           {% else %}
-          <div class="text-center text-muted py-4 small">
-            <i class="bi bi-clock-history fs-3 d-block mb-2 opacity-40"></i>
-            Sin cambios registrados.
-          </div>
+          {{ empty_state('clock-history', 'Sin cambios registrados.', small=true) }}
           {% endif %}
         </div>
 
@@ -182,12 +128,12 @@
 
     <div class="col-md-4">
       <div class="card role-card border shadow-sm h-100">
-        <div class="card-body p-3 d-flex flex-column gap-3">
+        <div class="card-body p-3 d-flex flex-column gap-3" style="min-width:0;">
 
           {# ── Cabecera: icono + nombre + badges ─────────────────────── #}
-          <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center gap-3" style="min-width:0;">
 
-            <div class="role-icon bg-{{ role.color }}-subtle">
+            <div class="role-icon bg-{{ role.color }}-subtle flex-shrink-0">
               {% if role.name == 'admin' %}
                 <i class="bi bi-shield-fill-check text-{{ role.color }}"></i>
               {% elif role.name == 'profesor' %}
@@ -197,7 +143,7 @@
               {% endif %}
             </div>
 
-            <div class="flex-grow-1 min-width-0">
+            <div style="min-width:0; flex:1;">
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="fw-bold text-capitalize">{{ role.name }}</span>
                 <span class="badge bg-{{ role.color }}
@@ -260,184 +206,16 @@
 
 {% block extra_js %}
 <script>
-(function () {
-  'use strict';
-
-  const ROLE_ORDER = ['alumno', 'profesor', 'admin'];
-
-  const SERVER = {
-    {% for r in roles %}
-    {{ r.name | tojson }}: {
-      name:         {{ r.name | tojson }},
-      userCount:    {{ stats.get(r.id, 0) }},
-      quotaBytes:   {{ r.storage_quota_bytes | tojson }},
-      maxProjects:  {{ r.max_projects | tojson }},
-    },
-    {% endfor %}
-  };
-
-  const ROLES       = ROLE_ORDER.map(n => SERVER[n]).filter(Boolean);
-  const TOTAL_USERS = ROLES.reduce((s, r) => s + r.userCount, 0);
-
-  /* ── Colores planos por métrica ─────────────────────────────────── */
-  const COL = {
-    users:    { bg: 'rgba(25,135,84,.50)',    border: '#198754' },   /* verde */
-    quota:    { bg: 'rgba(13,110,253,.55)',   border: '#0d6efd' },   /* azul  */
-    projects: { bg: 'rgba(255,193,7,.50)',    border: '#ffc107' },   /* amber */
-  };
-
-  /* ── Plugin: valor encima de cada barra ──────────────────────────── */
-  const valueLabels = {
-    id: 'valueLabels',
-    afterDatasetsDraw(chart) {
-      const { ctx } = chart;
-      chart.data.datasets.forEach((ds, di) => {
-        chart.getDatasetMeta(di).data.forEach((bar, j) => {
-          const val = ds.data[j];
-          if (val == null) return;
-          ctx.save();
-          ctx.fillStyle    = '#495057';
-          ctx.font         = '600 10px system-ui, sans-serif';
-          ctx.textAlign    = 'center';
-          ctx.textBaseline = 'bottom';
-          const label = ds.yAxisID === 'y1' ? val + ' MB' : String(val);
-          ctx.fillText(label, bar.x, bar.y - 4);
-          ctx.restore();
-        });
-      });
-    },
-  };
-
-  /* ── Plugin: ∞ para barras nulas (admin ilimitado) ───────────────── */
-  const infinityLabels = {
-    id: 'infinityLabels',
-    afterDatasetsDraw(chart) {
-      const { ctx, chartArea } = chart;
-      chart.data.datasets.forEach((ds, di) => {
-        chart.getDatasetMeta(di).data.forEach((bar, j) => {
-          if (ds.data[j] !== null) return;
-          ctx.save();
-          ctx.fillStyle = '#adb5bd';
-          ctx.font      = 'bold 15px system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText('∞', bar.x, chartArea.bottom - 4);
-          ctx.restore();
-        });
-      });
-    },
-  };
-
-  /* ── Chart ──────────────────────────────────────────────────────── */
-  const canvas = document.getElementById('rolesChart');
-  if (!canvas) return;
-
-  const BAR_OPTS = {
-    borderWidth:        1,
-    borderRadius:       4,
-    borderSkipped:      false,
-    maxBarThickness:    52,
-    categoryPercentage: 0.78,
-    barPercentage:      0.82,
-  };
-
-  new Chart(canvas, {
-    type: 'bar',
-    plugins: [valueLabels, infinityLabels],
-    data: {
-      labels: ROLES.map(r => r.name.charAt(0).toUpperCase() + r.name.slice(1)),
-      datasets: [
-        {
-          label: 'Usuarios',
-          data: ROLES.map(r => r.userCount),
-          yAxisID: 'y',
-          backgroundColor: COL.users.bg,
-          borderColor:      COL.users.border,
-          ...BAR_OPTS,
-        },
-        {
-          label: 'Cuota (MB)',
-          data: ROLES.map(r =>
-            r.quotaBytes != null ? Math.round(r.quotaBytes / (1024 * 1024)) : null
-          ),
-          yAxisID: 'y1',
-          backgroundColor: COL.quota.bg,
-          borderColor:      COL.quota.border,
-          ...BAR_OPTS,
-        },
-        {
-          label: 'Proyectos',
-          data: ROLES.map(r => r.maxProjects),
-          yAxisID: 'y',
-          backgroundColor: COL.projects.bg,
-          borderColor:      COL.projects.border,
-          ...BAR_OPTS,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 20, bottom: 2, left: 2, right: 2 } },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          align: 'end',
-          labels: {
-            boxWidth: 12, boxHeight: 12,
-            borderRadius: 2, useBorderRadius: true,
-            padding: 14,
-            font: { size: 11, weight: '500' },
-            color: '#495057',
-          },
-        },
-        tooltip: {
-          backgroundColor: 'rgba(33,37,41,.9)',
-          padding: 10,
-          cornerRadius: 5,
-          callbacks: {
-            label(ctx) {
-              if (ctx.raw === null) return ` ${ctx.dataset.label}: ∞ Ilimitado`;
-              if (ctx.dataset.yAxisID === 'y1') return ` ${ctx.dataset.label}: ${ctx.raw} MB`;
-              return ` ${ctx.dataset.label}: ${ctx.raw}`;
-            },
-          },
-        },
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 12, weight: '600' }, color: '#343a40' },
-        },
-        y: {
-          type: 'linear',
-          position: 'left',
-          beginAtZero: true,
-          border: { dash: [3, 3] },
-          grid: { color: 'rgba(0,0,0,.05)' },
-          ticks: { precision: 0, font: { size: 10 }, color: '#9ca3af' },
-          title: {
-            display: true, text: 'Cantidad',
-            font: { size: 10, weight: '500' }, color: '#9ca3af',
-          },
-        },
-        y1: {
-          type: 'linear',
-          position: 'right',
-          beginAtZero: true,
-          border: { dash: [3, 3] },
-          grid: { drawOnChartArea: false },
-          ticks: { precision: 0, font: { size: 10 }, color: '#9ca3af' },
-          title: {
-            display: true, text: 'Cuota (MB)',
-            font: { size: 10, weight: '500' }, color: '#9ca3af',
-          },
-        },
-      },
-    },
-  });
-
-})();
+const ROLES_DATA = {
+  {% for r in roles %}
+  {{ r.name | tojson }}: {
+    name:        {{ r.name | tojson }},
+    userCount:   {{ stats.get(r.id, 0) }},
+    quotaBytes:  {{ r.storage_quota_bytes | tojson }},
+    maxProjects: {{ r.max_projects | tojson }},
+  },
+  {% endfor %}
+};
 </script>
+<script src="{{ url_for('static', filename='js/roles-list.js') }}"></script>
 {% endblock %}

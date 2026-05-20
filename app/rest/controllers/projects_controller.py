@@ -1,19 +1,11 @@
 """Projects controller — list and detail views for synchronized Overleaf projects."""
-from datetime import datetime, timezone
-
 from flask import Blueprint, render_template, request, abort, current_app, jsonify, url_for
 from flask_login import login_required
 
 from app.model.services import projects_service
+from app.rest.common.helpers import parse_date
 
 projects_bp = Blueprint("projects", __name__, url_prefix="/proyectos")
-
-
-def _parse_date(value: str) -> datetime | None:
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    except (ValueError, TypeError):
-        return None
 
 
 def _fmt_size(size_bytes: int | None) -> str | None:
@@ -79,8 +71,8 @@ def list_projects():
     data   = projects_service.get_projects_list_data(
         page=p["page"], per_page=p["per_page"],
         search=p["search"], owner_id=p["owner_id"],
-        date_from=_parse_date(p["date_from_str"]),
-        date_to=_parse_date(p["date_to_str"]),
+        date_from=parse_date(p["date_from_str"]),
+        date_to=parse_date(p["date_to_str"]),
         indicators=p["indicators_filter"] or None,
         sort=p["sort_col"], order=p["sort_order"],
     )
@@ -114,8 +106,8 @@ def search_projects():
     data = projects_service.get_projects_list_data(
         page=p["page"], per_page=p["per_page"],
         search=p["search"], owner_id=p["owner_id"],
-        date_from=_parse_date(p["date_from_str"]),
-        date_to=_parse_date(p["date_to_str"]),
+        date_from=parse_date(p["date_from_str"]),
+        date_to=parse_date(p["date_to_str"]),
         indicators=p["indicators_filter"] or None,
         sort=p["sort_col"], order=p["sort_order"],
     )

@@ -1,0 +1,89 @@
+{#
+  Macros de UI reutilizables.
+  Uso: {% from 'macros/ui.html' import pagination_nav, empty_state, role_badge %}
+#}
+
+{# ── Paginación server-side ─────────────────────────────────────────────────────
+   pagination : objeto Pagination de Flask-Paginate / helper propio que exponga:
+                has_prev, has_next, prev_num, next_num, page, pages,
+                per_page, total, iter_pages()
+   base_url   : URL base SIN el parámetro 'page' (puede llevar otros query params).
+                La macro añade '?page=N' o '&page=N' según corresponda.
+
+   Ejemplos:
+     {{ pagination_nav(pagination, url_for('audit.logs')) }}
+     {{ pagination_nav(pagination, url_for('roles.audit_log',
+            role_id=filter_role_id, action=filter_action)) }}
+#}
+{% macro pagination_nav(pagination, base_url) %}
+{% if pagination.pages > 1 %}
+{% set sep = '&' if '?' in base_url else '?' %}
+<div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
+  <span class="small text-muted">
+    {{ pagination.per_page * (pagination.page - 1) + 1 }}–{{ [pagination.per_page * pagination.page, pagination.total]|min }}
+    de {{ pagination.total }}
+  </span>
+  <nav><ul class="pagination pagination-sm mb-0">
+
+    {# Anterior #}
+    <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+      {% if pagination.has_prev %}
+        <a class="page-link" href="{{ base_url }}{{ sep }}page={{ pagination.prev_num }}">‹</a>
+      {% else %}
+        <span class="page-link">‹</span>
+      {% endif %}
+    </li>
+
+    {# Páginas numeradas #}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {{ 'active' if p == pagination.page }}">
+          <a class="page-link" href="{{ base_url }}{{ sep }}page={{ p }}">{{ p }}</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+
+    {# Siguiente #}
+    <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+      {% if pagination.has_next %}
+        <a class="page-link" href="{{ base_url }}{{ sep }}page={{ pagination.next_num }}">›</a>
+      {% else %}
+        <span class="page-link">›</span>
+      {% endif %}
+    </li>
+
+  </ul></nav>
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{# ── Estado vacío (bloque standalone) ──────────────────────────────────────────
+   icon    : nombre de icono Bootstrap Icons sin 'bi-' (ej. 'journal', 'clock-history')
+   message : texto a mostrar
+   small   : si es true usa tamaño reducido (py-4, fs-3) en lugar del normal (py-5, fs-1)
+#}
+{% macro empty_state(icon, message, small=false) %}
+<div class="text-center text-muted {{ 'py-4 small' if small else 'py-5' }}">
+  <i class="bi bi-{{ icon }} {{ 'fs-3 d-block mb-2 opacity-40' if small else 'fs-1 d-block mb-3 opacity-50' }}"></i>
+  {{ message }}
+</div>
+{% endmacro %}
+
+
+{# ── Badge de rol ───────────────────────────────────────────────────────────────
+   role : objeto con atributos .color y .name
+   sm   : si es true aplica font-size reducido (.68rem)
+#}
+{% macro role_badge(role, sm=true) %}
+{% if role %}
+<span class="badge bg-{{ role.color }}{% if role.color in ['info', 'warning'] %} text-dark{% endif %}"
+      {% if sm %}style="font-size:.68rem;"{% endif %}>
+  {{ role.name }}
+</span>
+{% else %}
+<span class="text-muted small">—</span>
+{% endif %}
+{% endmacro %}

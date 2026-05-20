@@ -32,6 +32,9 @@ class SyncRun(db.Model):
     # "manual" | "scheduled"
     triggered_by = db.Column(db.String(32), nullable=False, default="manual")
 
+    # Username of the admin who triggered a manual sync (NULL for scheduled)
+    triggered_by_user = db.Column(db.String(128), nullable=True)
+
     message = db.Column(db.Text, nullable=True)
 
     @property

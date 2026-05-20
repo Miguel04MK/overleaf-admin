@@ -38,23 +38,35 @@ def get_effective_role(user: OverleafUser) -> Role | None:
     return user.role or get_default_role()
 
 
-def get_role_stats() -> dict[int, int]:
-    """Return {role_id: user_count} for all roles.
-    Users with NULL role_id are counted under the default role."""
+def _role_counts() -> list[tuple]:
+    """Return [(role_id, role_name, user_count), …] including null-role users
+    counted under the default role."""
     from sqlalchemy import func
     rows = (
-        db.session.query(OverleafUser.role_id, func.count(OverleafUser.id))
+        db.session.query(OverleafUser.role_id, Role.name, func.count(OverleafUser.id))
+        .join(Role, Role.id == OverleafUser.role_id)
         .filter(OverleafUser.role_id.isnot(None))
-        .group_by(OverleafUser.role_id)
+        .group_by(OverleafUser.role_id, Role.name)
         .all()
     )
-    stats = {role_id: cnt for role_id, cnt in rows}
+    counts = {rid: (name, cnt) for rid, name, cnt in rows}
     default = get_default_role()
     if default:
         null_count = OverleafUser.query.filter(OverleafUser.role_id.is_(None)).count()
         if null_count:
-            stats[default.id] = stats.get(default.id, 0) + null_count
-    return stats
+            name, prev = counts.get(default.id, (default.name, 0))
+            counts[default.id] = (name, prev + null_count)
+    return [(rid, name, cnt) for rid, (name, cnt) in counts.items()]
+
+
+def get_role_stats() -> dict[str, int]:
+    """Return {role_name: user_count} for all roles (keyed by name for charts)."""
+    return {name: cnt for _, name, cnt in _role_counts()}
+
+
+def get_role_stats_by_id() -> dict[int, int]:
+    """Return {role_id: user_count} for all roles (keyed by ID for lookups)."""
+    return {rid: cnt for rid, _, cnt in _role_counts()}
 
 
 def get_users_stats_for_role(role_id: int) -> list[dict]:
@@ -324,6 +336,16 @@ def assign_role(
         logger.info(
             "Role change: user=%s %s→%s by %s", user.email, old_name, new_role.name, actor
         )
+
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_user_quota(user_id)
+            alerts_service.check_user_project_limit(user_id)
+        except Exception as exc:
+            logger.warning(
+                "Role assigned to user %s but alert recheck failed: %s", user_id, exc
+            )
+
         return True, f"Rol cambiado de «{old_name}» a «{new_role.name}»."
 
     except Exception as exc:
@@ -377,6 +399,16 @@ def remove_role(
         user.max_quota_bytes = default.storage_quota_bytes
 
         db.session.commit()
+
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_user_quota(user_id)
+            alerts_service.check_user_project_limit(user_id)
+        except Exception as exc:
+            logger.warning(
+                "Role removed from user %s but alert recheck failed: %s", user_id, exc
+            )
+
         return True, f"Rol retirado. Usuario resetado a «{default.name}»."
 
     except Exception as exc:
@@ -391,17 +423,59 @@ def update_role_config(
     storage_quota_bytes: int | None,
     max_projects: int | None,
 ) -> tuple[bool, str]:
-    """Update role description and quota defaults (does NOT retroactively change users)."""
+    """Update role description and quota defaults.
+
+    Propagation: users in this role whose ``max_quota_bytes`` equals the OLD
+    role quota are migrated to the new value (custom overrides are preserved).
+    Returns a Spanish message that mentions the number of users updated so the
+    caller can flash it to the user.
+    """
     role = db.session.get(Role, role_id)
     if not role:
         return False, "Rol no encontrado."
     try:
+        old_quota = role.storage_quota_bytes
+        old_max_projects = role.max_projects
+
         if description is not None:
             role.description = description.strip() or None
         role.storage_quota_bytes = storage_quota_bytes
         role.max_projects        = max_projects
         role.updated_at = datetime.now(timezone.utc)
+
+        # Propagate the new defaults to users who were inheriting the old ones.
+        # Done in a single bulk UPDATE — no N+1.
+        users_updated = 0
+        if old_quota != storage_quota_bytes:
+            from app.model.entities.overleaf_user import OverleafUser
+            q = OverleafUser.query.filter(OverleafUser.role_id == role.id)
+            if old_quota is None:
+                q = q.filter(OverleafUser.max_quota_bytes.is_(None))
+            else:
+                q = q.filter(OverleafUser.max_quota_bytes == old_quota)
+            users_updated = q.update(
+                {"max_quota_bytes": storage_quota_bytes},
+                synchronize_session=False,
+            )
+
         db.session.commit()
+
+        # Re-evaluate quota / project-limit alerts for everyone in this role,
+        # since both thresholds may have shifted. This is event-driven (single
+        # explicit call), NOT something the dashboard does on every render.
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_role_users(role.id)
+        except Exception as exc:
+            logger.warning(
+                "Role %s updated but alert recheck failed: %s", role.id, exc
+            )
+
+        if users_updated:
+            return True, (
+                f"Configuración de «{role.name}» actualizada. "
+                f"{users_updated} usuario(s) migrados a la nueva cuota."
+            )
         return True, f"Configuración de «{role.name}» actualizada."
     except Exception as exc:
         db.session.rollback()
