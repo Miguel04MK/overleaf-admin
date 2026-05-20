@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'macros/ui.html' import pagination_nav, empty_state %}
 {% block title %}Auditoría{% endblock %}
 {% block page_title %}Registro de auditoría{% endblock %}
 
@@ -55,40 +56,10 @@
         </table>
       </div>
 
-      {% if pagination.pages > 1 %}
-      <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
-        <div class="text-muted small">Página {{ pagination.page }} de {{ pagination.pages }}</div>
-        <nav>
-          <ul class="pagination pagination-sm mb-0">
-            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-              <a class="page-link" href="{{ url_for('audit.logs', page=pagination.prev_num) }}">
-                <i class="bi bi-chevron-left"></i>
-              </a>
-            </li>
-            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-              {% if p %}
-                <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                  <a class="page-link" href="{{ url_for('audit.logs', page=p) }}">{{ p }}</a>
-                </li>
-              {% else %}
-                <li class="page-item disabled"><span class="page-link">…</span></li>
-              {% endif %}
-            {% endfor %}
-            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-              <a class="page-link" href="{{ url_for('audit.logs', page=pagination.next_num) }}">
-                <i class="bi bi-chevron-right"></i>
-              </a>
-            </li>
-          </ul>
-        </nav>
-      </div>
-      {% endif %}
+      {{ pagination_nav(pagination, url_for('audit.logs')) }}
 
       {% else %}
-      <div class="text-center text-muted py-5">
-        <i class="bi bi-journal fs-1 d-block mb-3 opacity-50"></i>
-        No hay entradas en el registro de auditoría todavía.
-      </div>
+      {{ empty_state('journal', 'No hay entradas en el registro de auditoría todavía.') }}
       {% endif %}
     </div>
   </div>

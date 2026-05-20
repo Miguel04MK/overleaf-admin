@@ -67,6 +67,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a href="{{ url_for('metrics.index') }}"
+           class="nav-link text-white {% if active_page == 'metrics' %}active bg-success{% endif %}">
+          <i class="bi bi-graph-up-arrow me-2"></i>Métricas
+        </a>
+      </li>
+      <li class="nav-item">
         <a href="{{ url_for('sync.status') }}"
            class="nav-link text-white {% if active_page == 'sync' %}active bg-success{% endif %}">
           <i class="bi bi-arrow-repeat me-2"></i>Sincronización
@@ -76,10 +82,11 @@
         <a href="{{ url_for('alerts.list_alerts') }}"
            class="nav-link text-white {% if active_page == 'alerts' %}active bg-success{% endif %} d-flex align-items-center justify-content-between">
           <span><i class="bi bi-exclamation-triangle me-2"></i>Alertas</span>
-          {% if sidebar_unread_alerts and sidebar_unread_alerts > 0 %}
+          {% if sidebar_active_alerts and sidebar_active_alerts > 0 %}
             <span class="badge rounded-pill {% if active_page == 'alerts' %}bg-white text-success{% else %}bg-danger{% endif %}"
-                  style="font-size:.65rem; min-width:1.4rem; padding:.2em .45em;">
-              {{ sidebar_unread_alerts }}
+                  style="font-size:.65rem; min-width:1.4rem; padding:.2em .45em;"
+                  title="Alertas activas">
+              {{ sidebar_active_alerts }}
             </span>
           {% endif %}
         </a>
@@ -160,6 +167,7 @@
   crossorigin="anonymous"
 ></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
