@@ -12,8 +12,8 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from app.sync.extractor import OverleafExtractor
-from app.sync.transformer import OverleafTransformer
+from app.etl.extractors.extractor import OverleafExtractor
+from app.etl.transformers.transformer import OverleafTransformer
 
 
 # ── Extractor tests ────────────────────────────────────────────────────────
