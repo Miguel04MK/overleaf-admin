@@ -1,0 +1,76 @@
+/* ============================================================
+   Alerts page — estilos específicos de /alertas
+   ============================================================ */
+
+/* ── Tabla ───────────────────────────────────────────────────────────────── */
+#alerts-tbody tr { vertical-align: middle; }
+
+/* ── Detail modal ────────────────────────────────────────────────────────── */
+#detailModal .modal-content { border: none; border-radius: .75rem; overflow: hidden; }
+#detailModal .detail-header-strip { padding: 1rem 1.5rem .75rem; }
+
+#detailModal .detail-header-strip.level-strip-critical { background: linear-gradient(135deg, rgba(220,53,69,.08), rgba(220,53,69,.02)); border-bottom: 2px solid rgba(220,53,69,.2); }
+#detailModal .detail-header-strip.level-strip-danger   { background: linear-gradient(135deg, rgba(220,53,69,.06), rgba(220,53,69,.01)); border-bottom: 2px solid rgba(220,53,69,.15); }
+#detailModal .detail-header-strip.level-strip-warning  { background: linear-gradient(135deg, rgba(255,193,7,.08),  rgba(255,193,7,.02));  border-bottom: 2px solid rgba(255,193,7,.2); }
+#detailModal .detail-header-strip.level-strip-info     { background: linear-gradient(135deg, rgba(13,110,253,.06), rgba(13,110,253,.01)); border-bottom: 2px solid rgba(13,110,253,.15); }
+#detailModal .detail-header-strip.level-strip-resolved { background: linear-gradient(135deg, rgba(25,135,84,.06),  rgba(25,135,84,.01));  border-bottom: 2px solid rgba(25,135,84,.15); }
+
+.detail-extra-box {
+  background: #fff; border: 1px solid #e9ecef;
+  border-radius: .5rem; overflow: hidden;
+}
+.detail-extra-box .table { margin-bottom: 0; }
+.detail-extra-box .table th { background: #f8f9fa; font-weight: 500; font-size: .78rem; color: #6c757d; }
+.detail-extra-box .table td { font-size: .82rem; }
+.detail-resolved-card {
+  background: linear-gradient(135deg, rgba(25,135,84,.06), rgba(25,135,84,.02));
+  border: 1px solid rgba(25,135,84,.15); border-radius: .5rem;
+  padding: .85rem 1rem;
+}
+
+/* ── Threshold tiles (configuración de umbrales) ─────────────────────────── */
+.thr-tile {
+  display: flex; align-items: center; gap: .75rem;
+  background: #fff; border: 1px solid #dee2e6; border-radius: .6rem;
+  padding: .6rem .9rem; flex: 1 1 180px; min-width: 180px;
+  transition: box-shadow .15s;
+}
+.thr-tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.thr-tile .thr-icon {
+  width: 2.1rem; height: 2.1rem; border-radius: .45rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 1rem;
+}
+.thr-tile .thr-label { font-size: .75rem; color: #6c757d; line-height: 1.2; }
+.thr-tile .thr-val   { font-size: .8rem; font-weight: 600; margin-top: .05rem; }
+.thr-tile input[type=number] {
+  width: 68px; font-size: .85rem; font-weight: 600;
+  border: 1.5px solid #dee2e6; border-radius: .375rem;
+  padding: .2rem .4rem; text-align: center;
+  transition: border-color .15s, box-shadow .15s;
+}
+.thr-tile input[type=number]:focus {
+  outline: none;
+  border-color: var(--ol-input-focus);
+  box-shadow: 0 0 0 .15rem var(--ol-green-light);
+}
+
+/* ── Notification card (preferencias de correo) ──────────────────────────── */
+.notif-card {
+  background: #fff; border: 1px solid #dee2e6; border-radius: .6rem;
+  padding: .5rem .85rem;
+  display: flex; align-items: center; gap: .6rem; flex-shrink: 0;
+}
+.notif-card .notif-icon {
+  width: 2rem; height: 2rem; border-radius: .4rem;
+  background: rgba(13,110,253,.1);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.notif-card .notif-lbl { font-size: .68rem; color: #6c757d; }
+.notif-card .notif-val { font-size: .9rem; font-weight: 700; line-height: 1; }
+
+/* ── Toggle config ───────────────────────────────────────────────────────── */
+#btn-toggle-config { font-size: .8rem; }
+
+/* ── Search bar width (alerts/list) ─────────────────────────────────────── */
+#q-wrapper .input-group { width: 300px; }

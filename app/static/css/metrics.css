@@ -1,0 +1,78 @@
+/* ============================================================
+   Metrics page — estilos específicos de /metricas
+   ============================================================ */
+
+/* ── Stat tiles ──────────────────────────────────────────────────────────── */
+.stat-tiles {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 992px) { .stat-tiles { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px)  { .stat-tiles { grid-template-columns: 1fr; } }
+
+.stat-tile {
+  background: #fff; border: 1px solid rgba(0,0,0,.06);
+  border-radius: .5rem; padding: .6rem .85rem;
+  display: flex; align-items: center; gap: .65rem;
+  transition: box-shadow .15s;
+  border-left: 3px solid var(--accent, #6610f2);
+}
+.stat-tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.stat-tile__icon {
+  width: 34px; height: 34px; border-radius: .45rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+  background: var(--icon-bg, rgba(102,16,242,.10));
+  color: var(--icon-fg, #6610f2);
+}
+.stat-tile__val {
+  font-size: 1.3rem; font-weight: 700; line-height: 1.05; color: #212529;
+}
+.stat-tile__val--sm { font-size: .95rem; }
+.stat-tile__lbl {
+  font-size: .62rem; text-transform: uppercase; letter-spacing: .06em;
+  color: #6c757d; font-weight: 600; margin-top: .08rem;
+}
+
+/* ── Section cards ───────────────────────────────────────────────────────── */
+.m-card { border: 0; border-radius: .55rem; }
+.m-card .card-header {
+  background: #fff; border-bottom: 1px solid rgba(0,0,0,.06);
+  padding: .5rem .85rem;
+  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+}
+.m-card h6 {
+  margin: 0; font-weight: 600; font-size: .82rem;
+  display: flex; align-items: center; gap: .35rem; color: #212529;
+}
+.m-card h6 .bar {
+  display: inline-block; width: 3px; height: 14px; border-radius: 2px;
+  background: var(--accent, #6610f2); flex-shrink: 0;
+}
+.m-card h6 i { color: var(--accent, #6610f2); }
+.m-card .card-header .aside { font-size: .68rem; color: #adb5bd; white-space: nowrap; }
+
+/* ── Chart boxes ─────────────────────────────────────────────────────────── */
+.chart-box     { position: relative; height: 280px; }
+.chart-box--sm { height: 210px; }
+.chart-box--lg { height: 340px; }
+.chart-clickable { cursor: pointer; }
+
+/* ── Sync history table ──────────────────────────────────────────────────── */
+.sync-tbl { font-size: .76rem; }
+.sync-tbl th {
+  font-size: .65rem; text-transform: uppercase; letter-spacing: .04em;
+  color: #6c757d; font-weight: 600;
+}
+.sync-badge { font-size: .62rem; }
+
+/* ── Storage bar (sección por usuario) ──────────────────────────────────── */
+.storage-bar-wrap { display: flex; align-items: center; gap: .5rem; font-size: .75rem; }
+.storage-bar-track {
+  flex: 1; height: 6px; background: rgba(0,0,0,.06);
+  border-radius: 3px; overflow: hidden;
+}
+.storage-bar-fill { height: 100%; border-radius: 3px; transition: width .3s ease; }
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
