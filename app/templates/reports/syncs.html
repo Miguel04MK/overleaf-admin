@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Informe de sincronizaciones{% endblock %}
+{% block page_title %}Informe de sincronizaciones{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Informes</a></li>
+      <li class="breadcrumb-item active">Sincronizaciones</li>
+    </ol>
+  </nav>
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold text-secondary">{{ stats.total }}</div>
+        <div class="small text-muted">Total ejecuciones</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold text-success">{{ stats.success }}</div>
+        <div class="small text-muted">Exitosas</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold {% if stats.errors > 0 %}text-danger{% else %}text-muted{% endif %}">{{ stats.errors }}</div>
+        <div class="small text-muted">Con error</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="fs-4 fw-bold text-info">
+          {% if stats.avg_duration_s is not none %}{{ stats.avg_duration_s }}s{% else %}—{% endif %}
+        </div>
+        <div class="small text-muted">Duración media</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+          <select name="status" class="form-select form-select-sm">
+            <option value="">Estado: todos</option>
+            <option value="success" {% if args.get('status') == 'success' %}selected{% endif %}>Exitosa</option>
+            <option value="error"   {% if args.get('status') == 'error'   %}selected{% endif %}>Error</option>
+            <option value="partial" {% if args.get('status') == 'partial' %}selected{% endif %}>Parcial</option>
+            <option value="running" {% if args.get('status') == 'running' %}selected{% endif %}>En curso</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <select name="triggered_by" class="form-select form-select-sm">
+            <option value="">Origen: todos</option>
+            <option value="manual"    {% if args.get('triggered_by') == 'manual'    %}selected{% endif %}>Manual</option>
+            <option value="scheduled" {% if args.get('triggered_by') == 'scheduled' %}selected{% endif %}>Programada</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <input type="date" name="date_from" value="{{ args.get('date_from','') }}"
+                 class="form-control form-control-sm" placeholder="Desde">
+        </div>
+        <div class="col-6 col-md-2">
+          <input type="date" name="date_to" value="{{ args.get('date_to','') }}"
+                 class="form-control form-control-sm" placeholder="Hasta">
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2">
+          <button type="submit" class="btn btn-sm btn-secondary flex-grow-1">
+            <i class="bi bi-search me-1"></i>Filtrar
+          </button>
+          <a href="{{ url_for('reports.syncs_report') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2">
+      <span class="fw-semibold small">
+        <i class="bi bi-arrow-repeat me-2 text-muted"></i>{{ pagination.total }} ejecuciones
+      </span>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('reports.export_syncs_csv', **args) }}" class="btn btn-sm btn-outline-success">
+          <i class="bi bi-filetype-csv me-1"></i>CSV
+        </a>
+        <a href="{{ url_for('reports.export_syncs_pdf', **args) }}" class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-file-pdf me-1"></i>PDF
+        </a>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      {% if pagination.items %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">#</th>
+              <th>Estado</th>
+              <th>Origen</th>
+              <th>Inicio</th>
+              <th>Fin</th>
+              <th>Duración</th>
+              <th>Usuarios</th>
+              <th>Proyectos</th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in pagination.items %}
+            <tr>
+              <td class="ps-3 text-muted small">{{ r.id }}</td>
+              <td>
+                {% if r.status == 'success' %}
+                  <span class="badge bg-success">Exitosa</span>
+                {% elif r.status == 'error' %}
+                  <span class="badge bg-danger">Error</span>
+                {% elif r.status == 'running' %}
+                  <span class="badge bg-primary">En curso</span>
+                {% elif r.status == 'partial' %}
+                  <span class="badge bg-warning text-dark">Parcial</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ r.status }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.triggered_by == 'manual' %}
+                  <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small">Manual</span>
+                {% else %}
+                  <span class="badge bg-info-subtle text-info border border-info-subtle small">Programada</span>
+                {% endif %}
+              </td>
+              <td class="small text-nowrap text-muted">
+                {{ r.started_at.strftime('%d/%m/%Y %H:%M') if r.started_at else '—' }}
+              </td>
+              <td class="small text-nowrap text-muted">
+                {{ r.finished_at.strftime('%d/%m/%Y %H:%M') if r.finished_at else '—' }}
+              </td>
+              <td class="small text-center">
+                {% if r.duration_seconds is not none %}
+                  {{ r.duration_seconds | round(1) }}s
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="small text-center">
+                {{ r.users_synced }}<span class="text-muted">/{{ r.users_found }}</span>
+              </td>
+              <td class="small text-center">
+                {{ r.projects_synced }}<span class="text-muted">/{{ r.projects_found }}</span>
+              </td>
+              <td class="small text-muted"
+                  style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                  title="{{ r.message or '' }}">
+                {{ r.message or '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if pagination.pages > 1 %}
+      {% set base_qs %}{% for k,v in args.items() %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}{% endset %}
+      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+        <div class="text-muted small">Página {{ pagination.page }} de {{ pagination.pages }}</div>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+              <a class="page-link" href="?{{ base_qs }}page={{ pagination.prev_num }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+              {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                  <a class="page-link" href="?{{ base_qs }}page={{ p }}">{{ p }}</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+              {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+              <a class="page-link" href="?{{ base_qs }}page={{ pagination.next_num }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-arrow-repeat fs-1 d-block mb-3 opacity-50"></i>
+        No hay sincronizaciones con los filtros aplicados.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
