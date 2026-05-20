@@ -1,0 +1,181 @@
+{# ══ Modal: Confirmar guardado ══════════════════════════════════════════════ #}
+<div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-shield-check me-2 text-warning-emphasis"></i>
+          Confirmar cambios de configuración
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body py-2">
+        <table class="table table-sm small mb-3">
+          <thead class="table-light">
+            <tr><th>Parámetro</th><th class="text-muted">Anterior</th><th>Nuevo</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><i class="bi bi-hdd me-1 text-muted"></i>Cuota</td>
+              <td class="text-muted" id="modal-old-quota">—</td>
+              <td class="fw-semibold" id="modal-new-quota">—</td>
+            </tr>
+            <tr>
+              <td><i class="bi bi-folder me-1 text-muted"></i>Proyectos</td>
+              <td class="text-muted" id="modal-old-projects">—</td>
+              <td class="fw-semibold" id="modal-new-projects">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="p-3 rounded bg-light border small">
+          <div class="fw-semibold text-muted mb-2">
+            <i class="bi bi-bar-chart me-1"></i>
+            Impacto estimado sobre {{ users_stats | length }} usuarios existentes
+          </div>
+          <div class="row g-2 text-center">
+            <div class="col-6">
+              <span class="fw-bold fs-5 text-danger" id="modal-impact-quota">0</span>
+              <div class="text-muted">superarían cuota</div>
+            </div>
+            <div class="col-6">
+              <span class="fw-bold fs-5 text-danger" id="modal-impact-proj">0</span>
+              <div class="text-muted">superarían límite proyectos</div>
+            </div>
+          </div>
+          <p class="text-muted mb-0 mt-2" style="font-size:.75rem;">
+            <i class="bi bi-info-circle me-1"></i>
+            Se recibirá un aviso de los usuarios afectados para tomar las medidas necesarias.
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0 pt-1 gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-dismiss="modal">
+          <i class="bi bi-x me-1"></i>Cancelar, seguir editando
+        </button>
+        <button type="button" id="confirm-save-btn" class="btn btn-sm btn-ol">
+          <i class="bi bi-check2 me-1"></i>Confirmar y guardar
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{# ══ Modal: Salir sin guardar ════════════════════════════════════════════════ #}
+<div class="modal fade" id="unsavedLeaveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-exclamation-triangle me-2 text-warning"></i>
+          Cambios sin guardar
+        </h6>
+      </div>
+
+      <div class="modal-body py-2 small text-muted">
+        Tienes cambios pendientes en la configuración del rol
+        <strong>{{ role.name }}</strong>. ¿Qué quieres hacer?
+      </div>
+
+      <div class="modal-footer border-0 pt-0 flex-column gap-2 align-items-stretch">
+        <button type="button" id="leave-save-btn" class="btn btn-sm btn-ol w-100">
+          <i class="bi bi-check2 me-1"></i>Guardar y salir
+        </button>
+        <button type="button" id="leave-discard-btn" class="btn btn-sm btn-outline-danger w-100">
+          <i class="bi bi-trash me-1"></i>Salir sin guardar
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                data-bs-dismiss="modal">
+          <i class="bi bi-arrow-left me-1"></i>Cancelar, seguir editando
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{# ══ Modal: Administrar usuarios del rol ════════════════════════════════════ #}
+<div class="modal fade" id="manageUsersModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-people me-2 text-primary"></i>
+          Administrar usuarios — rol «{{ role.name }}»
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body py-2">
+        <div class="input-group input-group-sm mb-2">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" id="manage-user-search" class="form-control"
+                 placeholder="Buscar por nombre o email…" autocomplete="off">
+        </div>
+        <div id="manage-user-results" class="list-group list-group-flush"
+             style="max-height:300px; overflow-y:auto;">
+          <div class="text-center text-muted small py-3">
+            Escribe al menos 2 caracteres para buscar.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0 pt-1">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-dismiss="modal">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{# ══ Modal: Confirmar acción sobre usuario ═════════════════════════════════ #}
+<div class="modal fade" id="confirmRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold" id="confirm-title">
+          <i class="bi bi-shield-check me-2 text-warning-emphasis"></i>
+          Confirmar acción
+        </h6>
+      </div>
+
+      <div class="modal-body py-2 small">
+        <p class="mb-2" id="confirm-description"></p>
+        <div class="p-2 rounded bg-light border mb-2">
+          <strong id="confirm-user-name"></strong>
+          <div class="text-muted" style="font-size:.75rem;" id="confirm-user-email"></div>
+        </div>
+        <p class="text-muted mb-0" style="font-size:.75rem;">
+          <i class="bi bi-info-circle me-1"></i>
+          <span id="confirm-detail-text"></span>
+        </p>
+      </div>
+
+      <div class="modal-footer border-0 pt-1 gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                id="confirm-action-back">
+          <i class="bi bi-arrow-left me-1"></i>Volver
+        </button>
+        <form method="POST" id="role-action-form"
+              action="{{ url_for('roles.manage_user_role', role_id=role.id) }}">
+          <input type="hidden" name="user_id" id="action-user-id">
+          <input type="hidden" name="action" id="action-type">
+          <button type="submit" class="btn btn-sm" id="confirm-action-btn">
+            <i class="bi bi-check2 me-1"></i>Confirmar
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>

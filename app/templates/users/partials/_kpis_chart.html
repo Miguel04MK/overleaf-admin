@@ -1,0 +1,115 @@
+  {# ── 3. KPIs + GRÁFICA ────────────────────────────────────────────────── #}
+  <div class="row g-3">
+
+    <div class="col-12 col-lg-4 d-flex flex-column gap-3">
+
+      {# KPI: Cuota % #}
+      {% set qs = user.quota_status %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="text-muted small mb-1">Cuota usada</div>
+              {% if user.quota_percent is not none %}
+                <div class="fs-2 fw-bold lh-1 text-{{ qs }}">{{ user.quota_percent }}%</div>
+                <div class="small text-muted mt-1">{{ user.quota_used_fmt }} / {{ user.quota_max_fmt }}</div>
+              {% else %}
+                <div class="fs-2 fw-bold lh-1 text-secondary">—</div>
+                <div class="small text-muted mt-1">Sin cuota asignada</div>
+              {% endif %}
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-{{ qs }}-subtle flex-shrink-0"
+                 style="width:48px;height:48px;">
+              <i class="bi bi-hdd-fill text-{{ qs }} fs-5"></i>
+            </div>
+          </div>
+          {% if user.quota_percent is not none %}
+            <div class="progress mt-3" style="height:5px;">
+              <div class="progress-bar bg-{{ qs }}" style="width:{{ [user.quota_percent, 100]|min }}%"></div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# KPI: Estado #}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="text-muted small mb-1">Estado de actividad</div>
+              <div class="fs-2 fw-bold lh-1 text-{{ 'success' if is_active else 'secondary' }}">
+                {{ 'Activo' if is_active else 'Inactivo' }}
+              </div>
+              <div class="small text-muted mt-1">
+                {{ 'Acceso en los últimos 90 días' if is_active else 'Sin acceso reciente' }}
+              </div>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-{{ 'success' if is_active else 'secondary' }}-subtle flex-shrink-0"
+                 style="width:48px;height:48px;">
+              <i class="bi bi-{{ 'person-check-fill' if is_active else 'person-dash-fill' }} text-{{ 'success' if is_active else 'secondary' }} fs-5"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# KPI: Tendencia #}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="text-muted small mb-1">Actividad reciente</div>
+              <div class="fs-2 fw-bold lh-1 text-{{ 'success' if recent_activity > 0 else 'secondary' }}">
+                {{ recent_activity }}
+                <span class="fs-4 ms-1">{{ '↑' if recent_activity > 0 else '↓' }}</span>
+              </div>
+              <div class="small text-muted mt-1">Proyectos editados (30 días)</div>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-{{ 'success' if recent_activity > 0 else 'secondary' }}-subtle flex-shrink-0"
+                 style="width:48px;height:48px;">
+              <i class="bi bi-graph-up text-{{ 'success' if recent_activity > 0 else 'secondary' }} fs-5"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {# Gráfica #}
+    <div class="col-12 col-lg-8">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold small">
+            <i class="bi bi-bar-chart-line me-2 text-muted"></i>Métricas analíticas
+          </span>
+          <ul class="nav nav-tabs card-header-tabs border-0 small">
+            <li class="nav-item">
+              <button class="nav-link active px-3 py-1" data-metric="storage" type="button">
+                <i class="bi bi-hdd me-1"></i>Almacenamiento
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link px-3 py-1" data-metric="projects" type="button">
+                <i class="bi bi-folder me-1"></i>Proyectos
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link px-3 py-1" data-metric="collabs" type="button">
+                <i class="bi bi-people me-1"></i>Colaboraciones
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="card-body d-flex flex-column justify-content-center" style="min-height:280px;">
+          <div id="chart-empty" class="text-center text-muted py-4 d-none">
+            <i class="bi bi-bar-chart d-block fs-2 mb-2 opacity-50"></i>
+            <span class="small">No hay datos disponibles.</span>
+          </div>
+          <canvas id="metricsChart"></canvas>
+        </div>
+        <div class="card-footer bg-white border-top small text-muted" id="chart-subtitle">
+          Almacenamiento por proyecto (MB) — top 10
+        </div>
+      </div>
+    </div>
+
+  </div>

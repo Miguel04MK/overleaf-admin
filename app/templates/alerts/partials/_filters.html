@@ -1,0 +1,112 @@
+  {# ── Filtros ──────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+
+        {# Buscador #}
+        <div id="q-wrapper">
+          <div class="input-group search-group">
+            <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+            <input id="f-q" type="text" class="form-control"
+                   placeholder="Buscar alertas…" autocomplete="off">
+            <span id="search-spinner" class="input-group-text d-none">
+              <span class="spinner-border spinner-border-sm text-muted" style="width:.65rem;height:.65rem;"></span>
+            </span>
+          </div>
+        </div>
+
+        {# Tipo #}
+        <div class="dropdown filter-dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-type" type="button">
+            <i class="bi bi-tag me-1"></i>Tipo
+          </button>
+          <ul class="dropdown-menu shadow-sm">
+            <li><h6 class="dropdown-header">Tipo de alerta</h6></li>
+            <li><a class="dropdown-item" href="#" data-val="quota_warning"          data-label="Tipo: Cuota cercana">Cuota cercana</a></li>
+            <li><a class="dropdown-item" href="#" data-val="quota_exceeded"         data-label="Tipo: Cuota excedida">Cuota excedida</a></li>
+            <li><a class="dropdown-item" href="#" data-val="project_limit_warning"  data-label="Tipo: Proy. cercano al límite">Proy. cercano al límite</a></li>
+            <li><a class="dropdown-item" href="#" data-val="project_limit_exceeded" data-label="Tipo: Límite superado">Límite superado</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="#" data-val="sync_failed"            data-label="Tipo: Fallo de sync">Fallo de sync</a></li>
+            <li><a class="dropdown-item" href="#" data-val="service_down"           data-label="Tipo: Servicio caído">Servicio caído</a></li>
+            <li><a class="dropdown-item" href="#" data-val="repeated_errors"        data-label="Tipo: Errores repetidos">Errores repetidos</a></li>
+            <li><a class="dropdown-item" href="#" data-val="administrative_warning" data-label="Tipo: Aviso administrativo">Aviso administrativo</a></li>
+          </ul>
+        </div>
+
+        {# Nivel #}
+        <div class="dropdown filter-dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-level" type="button">
+            <i class="bi bi-exclamation-triangle me-1"></i>Nivel
+          </button>
+          <ul class="dropdown-menu shadow-sm">
+            <li><h6 class="dropdown-header">Nivel de gravedad</h6></li>
+            <li><a class="dropdown-item text-danger fw-medium"  href="#" data-val="critical" data-label="Nivel: Crítico"><i class="bi bi-exclamation-octagon-fill me-2"></i>Crítico</a></li>
+            <li><a class="dropdown-item text-danger"            href="#" data-val="danger"   data-label="Nivel: Peligro"><i class="bi bi-x-octagon me-2"></i>Peligro</a></li>
+            <li><a class="dropdown-item text-warning"           href="#" data-val="warning"  data-label="Nivel: Aviso"><i class="bi bi-exclamation-triangle me-2"></i>Aviso</a></li>
+            <li><a class="dropdown-item text-primary"           href="#" data-val="info"     data-label="Nivel: Info"><i class="bi bi-info-circle me-2"></i>Info</a></li>
+          </ul>
+        </div>
+
+        {# Estado #}
+        <div class="dropdown filter-dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-status" type="button">
+            <i class="bi bi-check-circle me-1"></i>Estado
+          </button>
+          <ul class="dropdown-menu shadow-sm">
+            <li><h6 class="dropdown-header">Estado de la alerta</h6></li>
+            <li><a class="dropdown-item" href="#" data-val="active"   data-label="Solo activas"><i class="bi bi-exclamation-circle me-2 text-warning"></i>Solo activas</a></li>
+            <li><a class="dropdown-item" href="#" data-val="resolved" data-label="Resueltas"><i class="bi bi-check-circle me-2 text-success"></i>Resueltas</a></li>
+          </ul>
+        </div>
+
+        {# Lectura #}
+        <div class="dropdown filter-dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-unread" type="button">
+            <i class="bi bi-envelope me-1"></i>Lectura
+          </button>
+          <ul class="dropdown-menu shadow-sm">
+            <li><h6 class="dropdown-header">Estado de lectura</h6></li>
+            <li><a class="dropdown-item" href="#" data-val="yes" data-label="Sin leer"><i class="bi bi-envelope me-2"></i>Sin leer</a></li>
+            <li><a class="dropdown-item" href="#" data-val="no"  data-label="Leídas"><i class="bi bi-envelope-open me-2"></i>Leídas</a></li>
+          </ul>
+        </div>
+
+        {# Fecha #}
+        <div class="dropdown filter-dropdown">
+          <button class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle"
+                  id="btn-f-date" type="button">
+            <i class="bi bi-calendar me-1"></i>Fecha
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:220px;">
+            <p class="small fw-semibold text-muted mb-2">Rango de fechas</p>
+            <div class="mb-2">
+              <label class="form-label small text-muted mb-1" for="f-date-from">Desde</label>
+              <input id="f-date-from" type="date" class="form-control form-control-sm">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-muted mb-1" for="f-date-to">Hasta</label>
+              <input id="f-date-to" type="date" class="form-control form-control-sm">
+            </div>
+            <button id="btn-date-apply" class="btn btn-sm btn-ol w-100">
+              <i class="bi bi-check-lg me-1"></i>Aplicar
+            </button>
+          </div>
+        </div>
+
+        {# Contador #}
+        <div class="text-muted small ms-auto text-nowrap" id="result-count"></div>
+      </div>
+
+      {# Chips de filtros activos #}
+      <div id="chips-row"
+           class="d-none mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2">
+      </div>
+
+    </div>
+  </div>

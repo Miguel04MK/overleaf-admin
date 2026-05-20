@@ -1,0 +1,72 @@
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3 px-4">
+      <div class="d-flex align-items-center gap-3">
+
+        <a id="btn-back" href="{{ url_for('roles.list_roles') }}"
+           class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Volver a roles">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+
+        <div class="rounded-circle bg-{{ role.color }}-subtle d-flex align-items-center
+                    justify-content-center flex-shrink-0" style="width:40px;height:40px;">
+          {% if role.name == 'admin' %}
+            <i class="bi bi-shield-fill-check text-{{ role.color }}"></i>
+          {% elif role.name == 'profesor' %}
+            <i class="bi bi-mortarboard-fill text-{{ role.color }}"></i>
+          {% else %}
+            <i class="bi bi-person-fill text-{{ role.color }}"></i>
+          {% endif %}
+        </div>
+
+        <div class="flex-grow-1 min-width-0">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <h6 class="fw-bold mb-0 text-capitalize">{{ role.name }}</h6>
+            <span class="badge bg-{{ role.color }}
+                  {% if role.color in ['info','warning'] %}text-dark{% endif %}">
+              {{ role.name }}
+            </span>
+            {% if role.is_default %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle"
+                    style="font-size:.7rem;">
+                <i class="bi bi-star-fill me-1" style="font-size:.6rem;"></i>Por defecto
+              </span>
+            {% endif %}
+          </div>
+          {%- set _n = users_stats | length -%}
+          {%- if _n > 0 -%}
+            {%- set _total_bytes = users_stats | sum(attribute='used_bytes') -%}
+            {%- set _total_proj  = users_stats | sum(attribute='projects_count') -%}
+            {%- set _avg_bytes   = (_total_bytes / _n) | round(0) | int -%}
+            {%- set _avg_proj    = (_total_proj  / _n) | round(1) -%}
+            {%- if _avg_bytes >= 1073741824 -%}
+              {%- set _avg_storage_str = ((_avg_bytes / 1073741824) | round(1) | string) + ' GB' -%}
+            {%- elif _avg_bytes >= 1048576 -%}
+              {%- set _avg_storage_str = ((_avg_bytes / 1048576) | round(1) | string) + ' MB' -%}
+            {%- elif _avg_bytes >= 1024 -%}
+              {%- set _avg_storage_str = ((_avg_bytes / 1024) | round(1) | string) + ' KB' -%}
+            {%- else -%}
+              {%- set _avg_storage_str = _avg_bytes | string + ' B' -%}
+            {%- endif -%}
+          {%- else -%}
+            {%- set _avg_storage_str = '—' -%}
+            {%- set _avg_proj = '—' -%}
+          {%- endif -%}
+          <p class="text-muted small mb-0 mt-1">
+            Actualizado {{ role.updated_at.strftime('%d/%m/%Y') }} ·
+            <strong>{{ _n }}</strong>
+            usuario{{ 's' if _n != 1 else '' }} asignado{{ 's' if _n != 1 else '' }}
+            <span class="mx-1 text-muted opacity-50">|</span>
+            <i class="bi bi-hdd me-1"></i>Media almacenamiento: <strong>{{ _avg_storage_str }}</strong>
+            <span class="mx-1 text-muted opacity-50">|</span>
+            <i class="bi bi-folder me-1"></i>Media proyectos: <strong>{{ _avg_proj }}</strong>
+          </p>
+        </div>
+
+        <a href="{{ url_for('roles.audit_log', role_id=role.id) }}"
+           class="btn btn-sm btn-outline-secondary flex-shrink-0">
+          <i class="bi bi-clock-history me-1"></i>Auditoría
+        </a>
+
+      </div>
+    </div>
+  </div>
