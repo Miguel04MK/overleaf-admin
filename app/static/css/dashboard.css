@@ -1,0 +1,121 @@
+/* ============================================================
+   Dashboard page — estilos específicos de /dashboard
+   ============================================================ */
+
+/* ── KPI strip ───────────────────────────────────────────────────────────── */
+.kpi-strip { display: grid; gap: .4rem;
+             grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px)  { .kpi-strip { grid-template-columns: 1fr; } }
+
+.kpi {
+  display: flex; align-items: center; gap: .45rem;
+  padding: .35rem .6rem;
+  background: #fff; border: 1px solid rgba(0,0,0,.06);
+  border-radius: .45rem; transition: box-shadow .15s ease; min-width: 0;
+}
+.kpi:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.kpi-link { text-decoration: none; color: inherit; display: block; }
+.kpi__icon {
+  width: 32px; height: 32px; border-radius: .45rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+  background: var(--ic-bg, rgba(61,139,61,.12)); color: var(--ic-fg, #3d8b3d);
+}
+.kpi__body { min-width: 0; flex: 1; }
+.kpi__num {
+  font-size: 1.25rem; font-weight: 700; line-height: 1.05; color: #212529;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kpi__num--sm { font-size: .92rem; }
+.kpi__label {
+  font-size: .62rem; color: #6c757d; margin-top: .1rem;
+  text-transform: uppercase; letter-spacing: .06em; font-weight: 600; white-space: nowrap;
+}
+.kpi__sub { font-size: .65rem; color: #6c757d; margin-top: .1rem; }
+
+.kpi--users    { --ic-bg: rgba(13,110,253,.10);  --ic-fg: #0d6efd; }
+.kpi--projects { --ic-bg: rgba(61,139,61,.12);   --ic-fg: #3d8b3d; }
+.kpi--storage  { --ic-bg: rgba(32,201,151,.12);  --ic-fg: #138a6c; }
+.kpi--alerts   { --ic-bg: rgba(220,53,69,.10);   --ic-fg: #dc3545; }
+.kpi--alerts.is-quiet { --ic-bg: rgba(108,117,125,.10); --ic-fg: #6c757d; }
+.kpi--sync-ok  { --ic-bg: rgba(25,135,84,.10);   --ic-fg: #198754; }
+.kpi--sync-bad { --ic-bg: rgba(220,53,69,.10);   --ic-fg: #dc3545; }
+.kpi--sync-na  { --ic-bg: rgba(108,117,125,.10); --ic-fg: #6c757d; }
+
+.kpi__pill {
+  display: inline-flex; align-items: center; gap: .2rem;
+  font-size: .58rem; padding: .1em .4em; border-radius: 999px;
+  background: rgba(0,0,0,.05); color: #495057; margin-right: .1rem;
+}
+.kpi__pill.is-danger  { background: rgba(220,53,69,.12);  color: #b02a37; }
+.kpi__pill.is-warning { background: rgba(255,193,7,.18);  color: #997404; }
+.kpi__pill.is-info    { background: rgba(13,202,240,.15); color: #087990; }
+
+/* ── Section cards ───────────────────────────────────────────────────────── */
+.section-card { border: 0; }
+.section-card .card-header {
+  background: #fff; border-bottom: 1px solid rgba(0,0,0,.06);
+  padding: .35rem .7rem;
+  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+}
+.section-card .card-body { padding: .4rem .65rem; }
+.section-card .card-body.p-0 { padding: 0 !important; }
+.section-card h6 {
+  margin: 0; color: #212529; font-weight: 600; font-size: .78rem;
+  display: flex; align-items: center; gap: .35rem; min-width: 0;
+}
+.section-card h6 .accent-bar {
+  display: inline-block; width: 3px; height: 13px; border-radius: 2px;
+  background: var(--accent, #3d8b3d); flex-shrink: 0;
+}
+.section-card h6 i { color: var(--accent, #3d8b3d); }
+.section-card .card-header .small-aside {
+  font-size: .68rem; color: #adb5bd; white-space: nowrap;
+}
+
+/* ── Alert row severity indicators ──────────────────────────────────────── */
+.alert-row-critical { box-shadow: inset 3px 0 0 #dc3545; }
+.alert-row-danger   { box-shadow: inset 3px 0 0 #fd7e14; }
+.alert-row-warning  { box-shadow: inset 3px 0 0 #ffc107; }
+.alert-row-info     { box-shadow: inset 3px 0 0 #0dcaf0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Status line ─────────────────────────────────────────────────────────── */
+.status-line { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; padding: .4rem .7rem; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .75rem; font-weight: 600; padding: .22em .55em; border-radius: 999px;
+}
+.status-pill.ok   { background: rgba(25,135,84,.10);  color: #198754; }
+.status-pill.warn { background: rgba(255,193,7,.18);  color: #997404; }
+.status-pill.bad  { background: rgba(220,53,69,.12);  color: #b02a37; }
+.status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.status-item { display: inline-flex; gap: .35rem; align-items: center; font-size: .75rem; color: #495057; }
+.status-item .lbl { color: #adb5bd; text-transform: uppercase; letter-spacing: .05em; font-size: .62rem; }
+
+/* ── Quota rotation widget ───────────────────────────────────────────────── */
+.quota-item { display: flex; align-items: center; gap: .4rem; padding: .18rem 0; font-size: .72rem; }
+.quota-pct { font-size: .68rem; white-space: nowrap; width: 3.2rem; text-align: right; flex-shrink: 0; color: #6c757d; }
+.quota-bar { flex: 1; height: 7px; background: rgba(0,0,0,.06); border-radius: 4px; overflow: hidden; min-width: 40px; }
+.quota-bar-fill { height: 100%; border-radius: 3px; }
+.quota-nav { display: inline-flex; align-items: center; gap: .15rem; }
+.quota-nav button {
+  background: none; border: 1px solid rgba(0,0,0,.1); border-radius: 50%;
+  width: 20px; height: 20px; padding: 0; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #6c757d; font-size: .6rem; transition: background .15s;
+}
+.quota-nav button:hover { background: rgba(0,0,0,.06); color: #212529; }
+.quota-list { transition: opacity .25s; min-height: 175px; }
+.quota-list.fading { opacity: .3; }
+
+/* ── Role distribution chart ─────────────────────────────────────────────── */
+.chart-roles { position: relative; flex: 1 1 0; min-height: 0; }
+.card-body.roles-body { padding: .2rem .35rem .1rem !important; display: flex; flex-direction: column; }
+
+/* ── Sync history mini-table ─────────────────────────────────────────────── */
+.sync-mini th { font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; padding: .25rem .4rem !important; }
+.sync-mini td { font-size: .72rem; padding: .25rem .4rem !important; }
+.sync-row-success { background: rgba(25,135,84,.06); }
+.sync-row-error   { background: rgba(220,53,69,.07); }
+.sync-row-partial { background: rgba(255,193,7,.08); }

@@ -1,0 +1,41 @@
+{# ══════════════════════════════════════════════════════════════════════════
+   4. SYSTEM STATUS
+   ══════════════════════════════════════════════════════════════════════ #}
+{% set _critical_alerts = (d.alerts_by_level.get('critical', 0)
+                        + d.alerts_by_level.get('danger', 0)) %}
+{% set _sys_state = 'bad' if not d.db_ok or _critical_alerts > 0
+                  else ('warn' if d.alerts_active > 0
+                        or (d.last_sync and d.last_sync.status == 'error')
+                        else 'ok') %}
+<div class="card section-card shadow-sm mb-2" style="--accent:#6c757d;">
+  <div class="status-line">
+    <span class="status-pill {{ _sys_state }}">
+      <span class="dot"></span>
+      {% if _sys_state == 'ok' %}Sistema correcto
+      {% elif _sys_state == 'warn' %}Con avisos
+      {% else %}Con incidencias{% endif %}
+    </span>
+    <span class="status-item">
+      <span class="lbl">BD</span>
+      {% if d.db_ok %}<span class="text-success">OK</span>
+      {% else %}<span class="text-danger">Sin conexión</span>{% endif %}
+    </span>
+    <span class="status-item">
+      <span class="lbl">Última sync</span>
+      {% if d.last_sync %}
+        {{ (d.last_sync.finished_at or d.last_sync.started_at).strftime('%d/%m %H:%M') }}
+      {% else %}Nunca{% endif %}
+    </span>
+    <span class="status-item">
+      <span class="lbl">Alertas</span>
+      {{ d.alerts_active|default(0) }} activas
+    </span>
+    {% if d.services %}
+      {% set _offline = d.services|selectattr('status','equalto','offline')|list|length %}
+      <span class="status-item">
+        <span class="lbl">Servicios</span>
+        {{ d.services|length - _offline }}/{{ d.services|length }} en línea
+      </span>
+    {% endif %}
+  </div>
+</div>
