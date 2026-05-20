@@ -94,6 +94,8 @@ class OverleafUser(db.Model):
 
     @property
     def quota_percent(self):
+        if hasattr(self, '_cached_quota_percent'):
+            return self._cached_quota_percent
         if not self.max_quota_bytes:
             return None
         return round((self.quota_used_bytes / self.max_quota_bytes) * 100, 1)
