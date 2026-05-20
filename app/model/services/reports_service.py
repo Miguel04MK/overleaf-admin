@@ -1,1 +1,0 @@
-"""ReportsService — reporting logic (stub)."""
