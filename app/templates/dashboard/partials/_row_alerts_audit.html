@@ -1,0 +1,127 @@
+{# ══════════════════════════════════════════════════════════════════════════
+   3. RECENT ALERTS + RECENT AUDIT
+   ══════════════════════════════════════════════════════════════════════ #}
+<div class="row g-2 mb-2">
+
+  <div class="col-lg-7">
+    <div class="card section-card shadow-sm h-100" style="--accent:#ffc107;">
+      <div class="card-header">
+        <h6><span class="accent-bar"></span>
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            Alertas recientes</h6>
+        <a href="{{ url_for('alerts.list_alerts') }}" class="small-aside text-decoration-none">
+          Ver todas <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if d.recent_alerts %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size:.76rem;">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:5.5rem;">Nivel</th>
+                  <th>Mensaje</th>
+                  <th style="width:5.5rem;">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in d.recent_alerts %}
+                <tr class="alert-row-{{ a.level }}" style="cursor:pointer;"
+                    onclick="window.location.href='{{ url_for('alerts.list_alerts') }}?open={{ a.id }}'">
+                  <td>
+                    <span class="badge {{ a.level_badge_class }}" style="font-size:.6rem;">
+                      <i class="bi {{ a.level_icon }} me-1"></i>{{ a.level_label }}
+                    </span>
+                  </td>
+                  <td class="truncate" style="max-width:340px;" title="{{ a.title }} — {{ a.message }}">
+                    <span class="fw-medium">{{ a.title }}</span>
+                    <span class="text-muted">— {{ a.message }}</span>
+                  </td>
+                  <td class="small text-muted">
+                    {{ a.created_at.strftime('%d/%m %H:%M') if a.created_at else '—' }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-4 small">
+            <i class="bi bi-shield-check fs-3 d-block mb-2 opacity-50"></i>
+            No hay alertas activas.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card section-card shadow-sm h-100" style="--accent:#6c757d;">
+      <div class="card-header">
+        <h6><span class="accent-bar"></span>
+            <i class="bi bi-journal-text"></i>
+            Auditoría reciente</h6>
+        <a href="{{ url_for('audit.logs') }}" class="small-aside text-decoration-none">
+          Ver todos <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if d.recent_audit %}
+          {%- set ACTION_LABELS = {
+            'login': 'Inicio de sesión',
+            'logout': 'Cierre de sesión',
+            'sync_error': 'Error de sincronización',
+            'sync_ok': 'Sincronización OK',
+            'sync_run': 'Sincronización',
+            'role_change': 'Cambio de rol',
+            'role_assign': 'Asignación de rol',
+            'role_remove': 'Rol retirado',
+            'quota_update': 'Cambio de cuota',
+            'alert_resolve': 'Alerta resuelta',
+            'alert_reopen': 'Alerta reabierta',
+            'alert_mark_read': 'Alerta leída',
+            'alert_resolve_bulk': 'Alertas resueltas',
+            'alerts_recalculate': 'Recálculo de alertas',
+            'thresholds_update': 'Umbrales actualizados',
+          } -%}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" style="font-size:.74rem;">
+              <tbody>
+                {% for log in d.recent_audit %}
+                <tr>
+                  <td class="text-muted" style="width:5rem;">
+                    {{ log.created_at.strftime('%d/%m %H:%M') if log.created_at else '—' }}
+                  </td>
+                  <td>
+                    <div class="fw-medium truncate" style="max-width:190px;"
+                         title="{{ log.actor }} — {{ ACTION_LABELS.get(log.action, log.action) }}">
+                      {{ ACTION_LABELS.get(log.action, log.action) }}
+                    </div>
+                    <div class="text-muted small truncate" style="max-width:210px;"
+                         title="{{ log.detail or '' }}">
+                      {{ log.actor }}{% if log.detail %} · {{ log.detail }}{% endif %}
+                    </div>
+                  </td>
+                  <td style="width:3rem;">
+                    <span class="badge
+                      {% if log.level == 'error' %}bg-danger-subtle text-danger
+                      {% elif log.level == 'warning' %}bg-warning-subtle text-warning
+                      {% else %}bg-secondary-subtle text-secondary{% endif %}"
+                      style="font-size:.58rem;">{{ log.level }}</span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-4 small">
+            <i class="bi bi-journal fs-3 d-block mb-2 opacity-50"></i>
+            Sin eventos recientes.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
