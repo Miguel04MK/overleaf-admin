@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+{% block title %}Mi cuenta{% endblock %}
+{% block page_title %}Mi cuenta{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/account.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-2 account-page">
+
+  {# Cabecera #}
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h5 class="fw-semibold mb-0">
+        <i class="bi bi-person-circle text-success me-2"></i>Mi cuenta
+      </h5>
+      <p class="text-muted small mb-0">
+        Gestiona tus datos, contraseña, notificaciones y revisa la actividad reciente.
+      </p>
+    </div>
+  </div>
+
+  {# ── Fila 1: Perfil + Seguridad ───────────────────────────────────────── #}
+  <div class="row g-3 mb-3">
+
+    {# Card 1 — Perfil del administrador #}
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom fw-semibold py-2">
+          <i class="bi bi-person-badge me-2 text-muted"></i>Perfil del administrador
+        </div>
+        <div class="card-body py-3 px-3">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="account-avatar">{{ overview.initial }}</div>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold fs-5 text-truncate">{{ overview.username }}</div>
+              <div class="text-muted small text-truncate">{{ overview.email or '—' }}</div>
+              <div class="mt-1">
+                {% if overview.is_active %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle">
+                    <i class="bi bi-check-circle me-1"></i>Cuenta activa
+                  </span>
+                {% else %}
+                  <span class="badge bg-secondary-subtle text-secondary border">
+                    <i class="bi bi-pause-circle me-1"></i>Cuenta inactiva
+                  </span>
+                {% endif %}
+                <span class="badge bg-light text-muted border ms-1">
+                  <i class="bi bi-shield-lock me-1"></i>Administrador interno
+                </span>
+              </div>
+            </div>
+          </div>
+          <dl class="account-dl mb-0 border-top pt-2">
+            <dt>ID</dt>
+            <dd class="text-muted small">#{{ overview.id }}</dd>
+
+            <dt>Creada</dt>
+            <dd class="small">
+              {{ overview.created_at.strftime('%d/%m/%Y %H:%M') if overview.created_at else '—' }}
+            </dd>
+
+            <dt>Último acceso</dt>
+            <dd class="small">
+              {% if overview.last_login_at %}
+                {{ overview.last_login_at.strftime('%d/%m/%Y %H:%M') }}
+              {% else %}
+                <span class="text-muted">Sin registro</span>
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    {# Card 2 — Seguridad y cambio de contraseña #}
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom fw-semibold py-2">
+          <i class="bi bi-shield-lock me-2 text-muted"></i>Seguridad y contraseña
+        </div>
+        <div class="card-body py-3 px-3">
+          <div class="security-meta small text-muted mb-2 d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history"></i>
+            <span>
+              Último cambio:
+              {% if last_pw_change %}
+                <span class="text-body">{{ last_pw_change.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+              {% else %}
+                <span>nunca</span>
+              {% endif %}
+            </span>
+          </div>
+
+          <form method="POST"
+                action="{{ url_for('account.change_password') }}"
+                id="pw-form"
+                class="row g-2"
+                autocomplete="off">
+            <div class="col-12">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="current_password">
+                Contraseña actual
+              </label>
+              <input type="password" class="form-control form-control-sm" id="current_password"
+                     name="current_password" required autocomplete="current-password">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="new_password">
+                Nueva contraseña
+              </label>
+              <input type="password" class="form-control form-control-sm" id="new_password"
+                     name="new_password" required minlength="8" autocomplete="new-password">
+              <div class="form-text small">Mínimo 8 caracteres y distinta de la actual.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="confirm_password">
+                Repetir contraseña
+              </label>
+              <input type="password" class="form-control form-control-sm" id="confirm_password"
+                     name="confirm_password" required minlength="8" autocomplete="new-password">
+              <div id="pw-match-hint" class="form-text small"></div>
+            </div>
+            <div class="col-12 d-flex justify-content-end pt-1">
+              <button type="button" class="btn btn-sm btn-success" id="pw-update-btn">
+                <i class="bi bi-check2-circle me-1"></i>Actualizar contraseña
+              </button>
+            </div>
+          </form>
+
+          <div class="security-tip mt-3">
+            <i class="bi bi-info-circle me-1 text-primary"></i>
+            <span class="small text-muted">
+              Por seguridad, utiliza una contraseña diferente a la de otros servicios.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Fila 2: Notificaciones + Actividad ──────────────────────────────── #}
+  <div class="row g-3">
+
+    {# Card 3 — Preferencias de notificación (dos pestañas independientes) #}
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom fw-semibold py-2">
+          <i class="bi bi-bell me-2 text-muted"></i>Preferencias de notificación
+        </div>
+        <div class="card-body py-3 px-3">
+
+          {% set notif_levels = [
+            ('notify_critical', 'Nivel: Crítico'),
+            ('notify_danger',   'Nivel: Peligro'),
+            ('notify_warning',  'Nivel: Aviso'),
+            ('notify_info',     'Nivel: Info'),
+          ] %}
+          {% set notif_types = [
+            ('notify_sync_failed',            'Fallo de sync'),
+            ('notify_quota_exceeded',         'Cuota excedida'),
+            ('notify_quota_warning',          'Cuota cercana'),
+            ('notify_project_limit_exceeded', 'Límite proyectos superado'),
+            ('notify_project_limit_warning',  'Proyectos cercano al límite'),
+            ('notify_repeated_errors',        'Errores repetidos'),
+            ('notify_administrative_warning', 'Aviso administrativo'),
+          ] %}
+
+          <form method="POST"
+                action="{{ url_for('account.update_notifications') }}"
+                id="notif-form">
+
+            {# ── Tab bar ─────────────────────────────────────────────────── #}
+            <ul class="nav nav-tabs nav-tabs-sm mb-3" id="notifAccountTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-semibold" id="notif-imm-tab"
+                        data-bs-toggle="tab" data-bs-target="#notif-imm-pane"
+                        type="button" role="tab" aria-controls="notif-imm-pane" aria-selected="true">
+                  <i class="bi bi-lightning-charge me-1 text-success"></i>Inmediato
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="notif-dig-tab"
+                        data-bs-toggle="tab" data-bs-target="#notif-dig-pane"
+                        type="button" role="tab" aria-controls="notif-dig-pane" aria-selected="false">
+                  <i class="bi bi-calendar-event me-1 text-primary"></i>Periódico
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content" id="notifAccountTabContent">
+
+              {# ── Pestaña Inmediato ──────────────────────────────────────── #}
+              <div class="tab-pane fade show active" id="notif-imm-pane" role="tabpanel"
+                   aria-labelledby="notif-imm-tab">
+                <p class="text-muted small mb-3">
+                  Recibirás un correo al instante cuando se genere una alerta
+                  de los tipos marcados.
+                </p>
+
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <p class="fw-semibold small text-muted mb-2">
+                      <i class="bi bi-layers me-1"></i>Por nivel de gravedad
+                    </p>
+                    {% for fname, label in notif_levels %}
+                      <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox"
+                               role="switch"
+                               name="immediate_{{ fname }}"
+                               id="imm-{{ fname }}"
+                               {% if prefs.is_immediate(fname) %}checked{% endif %}>
+                        <label class="form-check-label small" for="imm-{{ fname }}">{{ label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <p class="fw-semibold small text-muted mb-2">
+                      <i class="bi bi-tag me-1"></i>Por tipo de alerta
+                    </p>
+                    {% for fname, label in notif_types %}
+                      <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox"
+                               role="switch"
+                               name="immediate_{{ fname }}"
+                               id="imm-{{ fname }}"
+                               {% if prefs.is_immediate(fname) %}checked{% endif %}>
+                        <label class="form-check-label small" for="imm-{{ fname }}">{{ label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+
+              {# ── Pestaña Periódico ──────────────────────────────────────── #}
+              <div class="tab-pane fade" id="notif-dig-pane" role="tabpanel"
+                   aria-labelledby="notif-dig-tab">
+                <p class="text-muted small mb-3">
+                  Los tipos marcados se incluirán en el correo resumen periódico. Solo se envía si hay alertas pendientes.
+                </p>
+                <div class="border-top mt-3 pt-3">
+                  {% set freq_options = [
+                    ('disabled', 'Desactivado'),
+                    ('12h',     'Cada 12 horas'),
+                    ('daily',   'Cada día'),
+                    ('3days',   'Cada 3 días'),
+                    ('5days',   'Cada 5 días'),
+                    ('weekly',  'Cada semana'),
+                    ('2weeks',  'Cada 2 semanas'),
+                    ('monthly', 'Cada mes'),
+                  ] %}
+                  <div class="d-flex flex-wrap gap-3 align-items-end">
+                    <div>
+                      <label class="fw-semibold small mb-1" for="digest_frequency">
+                        <i class="bi bi-calendar-event me-1"></i>Frecuencia del resumen
+                      </label>
+                      <select class="form-select form-select-sm mt-1" id="digest_frequency"
+                              name="digest_frequency" style="min-width:200px;">
+                        {% for val, lbl in freq_options %}
+                          <option value="{{ val }}" {% if prefs.digest_frequency == val %}selected{% endif %}>{{ lbl }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div id="digest-hour-group" {% if prefs.digest_frequency == 'disabled' %}style="display:none"{% endif %}>
+                      <label class="fw-semibold small mb-1" for="digest_hour">
+                        <i class="bi bi-alarm me-1"></i>Hora de envío
+                      </label>
+                      <select class="form-select form-select-sm mt-1" id="digest_hour"
+                              name="digest_hour" style="min-width:110px;">
+                        {% for h in range(24) %}
+                          <option value="{{ h }}"
+                            {% if prefs.digest_hour is not none and prefs.digest_hour == h %}selected
+                            {% elif prefs.digest_hour is none and h == 8 %}selected
+                            {% endif %}>{{ '%02d'|format(h) }}:00</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <script>
+                    (function () {
+                      var sel = document.getElementById('digest_frequency');
+                      var grp = document.getElementById('digest-hour-group');
+                      if (sel && grp) {
+                        sel.addEventListener('change', function () {
+                          grp.style.display = this.value === 'disabled' ? 'none' : '';
+                        });
+                      }
+                    })();
+                  </script>
+                </div>
+                <div class="row g-3" style="margin-top:0.4rem;">
+                  <div class="col-12 col-md-6">
+                    <p class="fw-semibold small text-muted mb-2">
+                      <i class="bi bi-layers me-1"></i>Por nivel de gravedad
+                    </p>
+                    {% for fname, label in notif_levels %}
+                      <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox"
+                               role="switch"
+                               name="digest_{{ fname }}"
+                               id="dig-{{ fname }}"
+                               {% if prefs.is_in_digest(fname) %}checked{% endif %}>
+                        <label class="form-check-label small" for="dig-{{ fname }}">{{ label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <p class="fw-semibold small text-muted mb-2">
+                      <i class="bi bi-tag me-1"></i>Por tipo de alerta
+                    </p>
+                    {% for fname, label in notif_types %}
+                      <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox"
+                               role="switch"
+                               name="digest_{{ fname }}"
+                               id="dig-{{ fname }}"
+                               {% if prefs.is_in_digest(fname) %}checked{% endif %}>
+                        <label class="form-check-label small" for="dig-{{ fname }}">{{ label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>{# /tab-content #}
+
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-3 mt-2 border-top">
+              <button type="submit" class="btn btn-sm btn-success">
+                <i class="bi bi-floppy me-1"></i>Guardar preferencias
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# Card 4 — Actividad reciente #}
+    <div class="col-12 col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom fw-semibold py-2 d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-clock-history me-2 text-muted"></i>Actividad reciente</span>
+          <a href="{{ url_for('audit.logs') }}"
+             class="small text-decoration-none"
+             title="Ver historial completo en Auditoría">
+            Ver todo <i class="bi bi-arrow-up-right-square ms-1"></i>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          {% if recent_activity %}
+            <ul class="activity-list list-unstyled mb-0">
+              {% for ev in recent_activity %}
+                <li class="activity-item">
+                  <span class="activity-dot level-{{ ev.level }}"></span>
+                  <div class="activity-body">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                      <span class="fw-semibold small">{{ ev.action_label }}</span>
+                      <small class="text-muted text-nowrap" style="font-size:.7rem;">
+                        {{ ev.created_at.strftime('%d/%m %H:%M') if ev.created_at else '' }}
+                      </small>
+                    </div>
+                    {% if ev.detail %}
+                      <div class="text-muted small text-truncate" title="{{ ev.detail }}">
+                        {{ ev.detail }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-4 d-block mb-2 opacity-50"></i>
+              <small>No hay actividad reciente registrada.</small>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>  
+
+</div>
+
+{# ── Modal: confirmar cambio de contraseña ──────────────────────────────── #}
+<div class="modal fade" id="confirmPwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold">
+          <i class="bi bi-shield-exclamation me-2 text-warning-emphasis"></i>
+          Confirmar cambio de contraseña
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-2">
+        <p class="small mb-2">
+          Vas a cambiar tu contraseña. Tendrás que iniciar sesión con la nueva
+          la próxima vez que vuelvas a entrar.
+        </p>
+        <p class="small text-muted mb-0">¿Quieres continuar?</p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" id="pw-confirm-btn">
+          <i class="bi bi-check2-circle me-1"></i>Sí, cambiar contraseña
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/account.js') }}"></script>
+{% endblock %}
