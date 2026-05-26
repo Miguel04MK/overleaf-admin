@@ -89,10 +89,14 @@ function renderTable(projects) {
 function buildRow(p) {
   const url = esc(p.detail_url);
 
+  // Propietario como "pill" clickable: deja claro hasta dónde llega el área
+  // que lleva a /usuarios/<id>. El stopPropagation impide que el click se
+  // propague al <tr> (que llevaría al detalle del proyecto).
   const ownerHtml = p.owner_name
     ? `<a href="${esc(p.owner_url)}"
-          class="text-decoration-none text-muted d-flex align-items-center gap-1"
-          onclick="event.stopPropagation()">
+          class="owner-pill text-decoration-none"
+          onclick="event.stopPropagation()"
+          title="Ver perfil de ${esc(p.owner_name)}">
          <i class="bi bi-person-fill"></i>${esc(p.owner_name)}
        </a>`
     : `<span class="text-muted">—</span>`;
@@ -120,7 +124,7 @@ function buildRow(p) {
     indHtml += `<span class="badge bg-primary bg-opacity-75" title="${p.member_count} colaboradores"><i class="bi bi-people-fill me-1"></i>Colaborativo</span>`;
   indHtml += '</div>';
 
-  return `<tr onclick="window.location='${url}'">
+  return `<tr class="row-clickable" onclick="window.location='${url}'">
     <td class="ps-3 fw-medium small">
       <a href="${url}" class="text-decoration-none text-body" onclick="event.stopPropagation()">${esc(p.name) || '—'}</a>
     </td>

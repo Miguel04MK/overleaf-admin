@@ -186,16 +186,19 @@
             {% set names = member_names.get(proj.id, []) %}
             {% set flags = indicators.get(proj.id, []) %}
             {% set detail_url = url_for('projects.project_detail', project_id=proj.id) %}
-            <tr onclick="window.location='{{ detail_url }}'">
+            <tr class="row-clickable" onclick="window.location='{{ detail_url }}'">
               <td class="ps-3 fw-medium small">
                 <a href="{{ detail_url }}" class="text-decoration-none text-body"
                    onclick="event.stopPropagation()">{{ proj.name or "—" }}</a>
               </td>
               <td class="small">
                 {% if proj.owner %}
+                  {# Pill clickable que delimita el área "ir al usuario";
+                     el resto de la fila sigue llevando al detalle del proyecto. #}
                   <a href="{{ url_for('users.user_detail', user_id=proj.owner.id) }}"
-                     class="text-decoration-none text-muted d-flex align-items-center gap-1"
-                     onclick="event.stopPropagation()">
+                     class="owner-pill text-decoration-none"
+                     onclick="event.stopPropagation()"
+                     title="Ver perfil de {{ proj.owner.display_name }}">
                     <i class="bi bi-person-fill"></i>{{ proj.owner.display_name }}
                   </a>
                 {% else %}<span class="text-muted">—</span>{% endif %}
