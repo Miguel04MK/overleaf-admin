@@ -521,21 +521,52 @@ class TestMetricsRoute:
     def test_metrics_shows_growth_charts(self, client, login, seed_users, seed_projects):
         resp = client.get("/metricas/")
         html = resp.data.decode()
-        assert "chartGrowthUsers" in html or "Crecimiento de usuarios" in html
+        # Tras la reorganización, las gráficas usuarios/proyectos se fusionan
+        # en una card "Crecimiento" con un switcher. Buscamos cualquier marcador.
+        assert (
+            "Crecimiento" in html
+            and ("growth-panel" in html or "chartGrowthUsers" in html)
+        )
 
     def test_metrics_shows_rankings(self, client, login, seed_projects):
         resp = client.get("/metricas/")
         html = resp.data.decode()
-        assert "chartTopOwners" in html or "Ranking" in html
+        # Ranking ahora vive en la tab "Usuarios y proyectos" con switcher
+        # entre "Más proyectos" y "Más almacenamiento".
+        assert "Ranking" in html and "ranking-panel" in html
 
     def test_metrics_shows_sync_history(self, client, login, seed_sync):
         resp = client.get("/metricas/")
         html = resp.data.decode()
-        assert "Historial de sincronizaciones" in html
+        # Tras la reorganización, el historial vive en la tab "Sincronización";
+        # buscamos cualquier marcador estable de esa sección.
+        assert (
+            "Historial" in html
+            and ("Sincronización" in html or "sync-tbl" in html)
+        )
 
     def test_metrics_empty_db_no_errors(self, client, login):
         resp = client.get("/metricas/")
         assert resp.status_code == 200
+
+    def test_metrics_renders_tab_structure(self, client, login):
+        """La pantalla de métricas ahora se organiza en 5 tabs temáticas."""
+        resp = client.get("/metricas/")
+        html = resp.data.decode()
+        assert 'id="metricsTabs"' in html
+        # Las 5 pestañas y sus target ids
+        for tid in ("tab-resumen", "tab-usuarios", "tab-storage",
+                    "tab-sync", "tab-salud"):
+            assert f'data-bs-target="#{tid}"' in html, f"falta tab {tid}"
+
+    def test_metrics_has_chart_switchers(self, client, login):
+        """Las gráficas hermanas (crecimiento / ranking) se fusionan con un
+        switcher dentro de la misma card."""
+        resp = client.get("/metricas/")
+        html = resp.data.decode()
+        assert 'class="chart-switch"' in html or "chart-switch" in html
+        assert "growth-panel" in html
+        assert "ranking-panel" in html
 
 
 # ── Metrics service tests ────────────────────────────────────────────────────

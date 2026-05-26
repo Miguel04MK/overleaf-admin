@@ -103,11 +103,6 @@ def get_metrics_data() -> dict:
         # Sync history
         "sync_history": [],
         "sync_stats": {},
-        # System
-        "services": [],
-        "db_ok": False,
-        "alerts_summary": {},
-        "recent_errors": [],
     }
 
     # ── 1. Totals ────────────────────────────────────────────────────────
@@ -374,52 +369,5 @@ def get_metrics_data() -> dict:
     except Exception as exc:
         db.session.rollback()
         logger.error("Metrics: error fetching sync history: %s", exc)
-
-    # ── 8. Alerts summary ────────────────────────────────────────────────
-    try:
-        from app.model.services import alerts_service
-        alert_counts = dict(
-            db.session.query(SystemAlert.level, func.count())
-            .filter(SystemAlert.is_resolved == False)  # noqa: E712
-            .group_by(SystemAlert.level)
-            .all()
-        )
-        data["alerts_summary"] = {
-            "active": alerts_service.get_active_count(),
-            "by_level": alert_counts,
-            "resolved": alerts_service.get_resolved_count(),
-        }
-    except Exception as exc:
-        db.session.rollback()
-        logger.error("Metrics: error fetching alerts summary: %s", exc)
-
-    # ── 9. Recent error audit logs ───────────────────────────────────────
-    try:
-        data["recent_errors"] = (
-            AuditLog.query
-            .filter(AuditLog.level.in_(["error", "warning"]))
-            .order_by(AuditLog.created_at.desc())
-            .limit(10)
-            .all()
-        )
-    except Exception as exc:
-        db.session.rollback()
-        logger.error("Metrics: error fetching recent errors: %s", exc)
-
-    # ── 10. System status ────────────────────────────────────────────────
-    try:
-        import concurrent.futures
-        from app.model.services.admin.admin_service import get_service_statuses
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(get_service_statuses)
-            data["services"] = future.result(timeout=3)
-    except Exception:
-        pass
-
-    try:
-        db.session.execute(db.text("SELECT 1"))
-        data["db_ok"] = True
-    except Exception:
-        data["db_ok"] = False
 
     return data
