@@ -101,9 +101,6 @@ def get_dashboard_data() -> dict:
         # Tables
         "recent_alerts": [],
         "recent_audit": [],
-        # System
-        "services": [],
-        "db_ok": False,
     }
 
     # ── 1. KPI totals ────────────────────────────────────────────────────
@@ -251,22 +248,5 @@ def get_dashboard_data() -> dict:
     except Exception as exc:
         db.session.rollback()
         logger.error("Dashboard: error fetching audit logs: %s", exc)
-
-    # ── 8. System status ─────────────────────────────────────────────────
-    try:
-        import concurrent.futures
-        from app.model.services.admin.admin_service import get_service_statuses
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(get_service_statuses)
-            data["services"] = future.result(timeout=3)
-    except Exception:
-        pass
-
-    # ── 9. DB check ──────────────────────────────────────────────────────
-    try:
-        db.session.execute(db.text("SELECT 1"))
-        data["db_ok"] = True
-    except Exception:
-        data["db_ok"] = False
 
     return data
