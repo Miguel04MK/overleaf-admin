@@ -28,6 +28,9 @@ const BULK_RESOLVE_URL = "{{ url_for('alerts.bulk_resolve') }}";
 const BULK_REOPEN_URL  = "{{ url_for('alerts.bulk_reopen') }}";
 const PER_PAGE         = 10;
 const ALERT_DETAIL_URL_TPL = "{{ url_for('alerts.alert_detail', alert_id=0) }}";
+window.NOTIF_URL       = NOTIF_URL;
+window.NOTIF_ON_SAVE   = function () { if (typeof loadNotifSummary === "function") loadNotifSummary(); };
 </script>
 <script src="{{ url_for('static', filename='js/alerts-list.js') }}"></script>
+<script src="{{ url_for('static', filename='js/notif-modal.js') }}"></script>
 {% endblock %}

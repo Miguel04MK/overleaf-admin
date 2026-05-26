@@ -1220,9 +1220,10 @@ class TestNotificationPrefs:
     def test_type_true_notifies(self, app, db):
         from app.model.services.notification_service import should_notify
         with app.app_context():
+            # service_down se eliminó; usamos sync_failed como tipo equivalente
             pref = self._make_pref(db, notify_info=False,
-                                   notify_service_down=True)
-            assert should_notify(pref, "service_down", "info") is True
+                                   notify_sync_failed=True)
+            assert should_notify(pref, "sync_failed", "info") is True
 
     def test_both_false_no_notify(self, app, db):
         from app.model.services.notification_service import should_notify
@@ -1231,22 +1232,29 @@ class TestNotificationPrefs:
                 db,
                 notify_critical=False, notify_danger=False,
                 notify_warning=False,  notify_info=False,
-                notify_service_down=False, notify_sync_failed=False,
+                notify_sync_failed=False,
                 notify_quota_exceeded=False, notify_quota_warning=False,
                 notify_project_limit_exceeded=False,
                 notify_project_limit_warning=False,
                 notify_repeated_errors=False,
                 notify_administrative_warning=False,
             )
-            assert should_notify(pref, "service_down", "critical") is False
+            assert should_notify(pref, "sync_failed", "critical") is False
 
-    def test_to_dict_has_all_boolean_fields(self, app, db):
+    def test_to_dict_has_all_keys(self, app, db):
+        """to_dict() en el nuevo formato de dos pestañas devuelve
+        {immediate:{...}, digest:{...}, digest_frequency:...}.
+        Verificamos que cada clave de NOTIFY_KEYS está en ambos dicts."""
         from app.model.entities.admin_notification_pref import AdminNotificationPref
         with app.app_context():
             pref = self._make_pref(db)
             d = pref.to_dict()
-            for field in AdminNotificationPref.BOOLEAN_FIELDS:
-                assert field in d
+            assert "immediate" in d, "falta 'immediate' en to_dict()"
+            assert "digest"    in d, "falta 'digest' en to_dict()"
+            assert "digest_frequency" in d
+            for key in AdminNotificationPref.NOTIFY_KEYS:
+                assert key in d["immediate"], f"falta {key} en immediate"
+                assert key in d["digest"],    f"falta {key} en digest"
 
     def test_update_from_dict(self, app, db):
         with app.app_context():
@@ -1272,7 +1280,11 @@ class TestNotificationPrefs:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["ok"] is True
-        assert "notify_critical" in data["prefs"]
+        # Formato dos pestañas: prefs.immediate y prefs.digest
+        prefs = data["prefs"]
+        assert "immediate" in prefs and "notify_critical" in prefs["immediate"]
+        assert "digest"    in prefs and "notify_critical" in prefs["digest"]
+        assert "digest_frequency" in prefs
 
     def test_post_notif_prefs_saves(self, app, db, auth_client):
         resp = auth_client.post(

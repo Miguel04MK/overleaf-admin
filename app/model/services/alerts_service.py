@@ -9,7 +9,6 @@ Alert generation uses an event-driven model:
   - check_all_quotas()               → bulk quota sweep
   - check_all_project_limits()       → bulk project-limit sweep
   - check_repeated_errors()          → called after sync or on demand
-  - check_service_status()           → called after sync or on demand
   - recalculate_alerts(actor)        → manual button / scheduled tasks only
 
 Deduplication is handled by _upsert():
@@ -31,7 +30,7 @@ from app.model.entities.system_alert import SystemAlert
 from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.sync_run import SyncRun
 from app.model.entities.audit_log import AuditLog
-from app.model.services.admin.admin_service import log_action, get_service_statuses
+from app.model.services.admin.admin_service import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -539,9 +538,6 @@ def check_repeated_errors() -> None:
     generate_audit_alerts()
 
 
-def check_service_status() -> None:
-    generate_service_alerts()
-
 
 # ── Bulk generators ───────────────────────────────────────────────────────────
 
@@ -611,25 +607,6 @@ def generate_audit_alerts() -> None:
         _auto_resolve("repeated_errors", entity_type, entity_id)
 
 
-def generate_service_alerts() -> None:
-    try:
-        statuses = get_service_statuses()
-    except Exception as exc:
-        logger.warning("Could not retrieve service statuses: %s", exc)
-        return
-
-    for svc in statuses:
-        if svc.status == "offline":
-            _upsert(
-                type="service_down", level="danger",
-                title="Servicio no disponible",
-                message=f"El servicio '{svc.name}' no se encuentra operativo. {svc.detail}",
-                entity_type="service", entity_id=svc.name, source="service_checker",
-                extra_data={"service_name": svc.name, "status": svc.status, "detail": svc.detail},
-            )
-        elif svc.status == "online":
-            _auto_resolve("service_down", "service", svc.name)
-        # "unknown" → don't touch existing alerts
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
@@ -641,7 +618,6 @@ def recalculate_alerts(actor: str = "system") -> None:
         generate_project_limit_alerts()
         generate_sync_alerts()
         generate_audit_alerts()
-        generate_service_alerts()
     except Exception as exc:
         logger.error("Error during alert recalculation: %s", exc)
 

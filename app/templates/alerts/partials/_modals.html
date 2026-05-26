@@ -48,31 +48,8 @@
   </div>
 </div>
 
-{# ── Modal: Preferencias de notificación ─────────────────────────────────────── #}
-<div class="modal fade" id="notifModal" tabindex="-1" aria-labelledby="notifModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="modal-header border-0 pb-1">
-        <h6 class="modal-title fw-semibold" id="notifModalLabel">
-          <i class="bi bi-bell me-2 text-primary"></i>Mis preferencias de notificación
-        </h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="notif-body">
-        <div class="text-center py-4 text-muted">
-          <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
-        </div>
-      </div>
-      <div class="modal-footer border-0 pt-0">
-        <span id="notif-save-msg" class="small me-auto d-none"></span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-        <button type="button" class="btn btn-sm btn-ol" id="notif-save-btn">
-          <i class="bi bi-floppy me-1"></i>Guardar preferencias
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+{# ── Modal: Preferencias de notificación (partial compartido con Mi cuenta) ── #}
+{% include "partials/_notif_modal.html" %}
 {# ── Modal: Confirmar guardado de umbrales ─────────────────────────────────── #}
 <div class="modal fade" id="confirmThresholdModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
