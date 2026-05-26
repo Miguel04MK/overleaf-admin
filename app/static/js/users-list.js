@@ -229,7 +229,7 @@ function renderRows(users) {
   }
 
   tbody.innerHTML = users.map(u => `
-    <tr data-href="${esc(u.detail_url)}">
+    <tr class="row-clickable" data-href="${esc(u.detail_url)}">
       <td class="ps-3 small"><span class="fw-medium">${esc(u.email) || '—'}</span></td>
       <td class="text-muted small">${esc(u.display_name) || '—'}</td>
       <td class="text-center small">${roleBadgeHtml(u)}</td>

@@ -2,7 +2,7 @@
 import json
 
 from flask import Blueprint, render_template, request, abort, redirect, url_for, flash, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from app.model.services import users_service
 from app.model.services import roles_service
@@ -66,6 +66,9 @@ def set_quota(user_id: int):
         return redirect(url_for("users.user_detail", user_id=user_id))
 
     max_bytes = form.to_bytes()
-    ok, msg = users_service.set_user_quota(user_id, max_bytes)
+    ok, msg = users_service.set_user_quota(
+        user_id, max_bytes,
+        actor=current_user.username, ip_address=request.remote_addr,
+    )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

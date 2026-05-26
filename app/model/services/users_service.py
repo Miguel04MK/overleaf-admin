@@ -364,7 +364,13 @@ def get_user_detail_data(user_id: int, projects_page: int = 1, per_page: int = 1
     }
 
 
-def set_user_quota(user_id: int, max_bytes) -> tuple:
+def set_user_quota(
+    user_id: int,
+    max_bytes,
+    *,
+    actor: str = "system",
+    ip_address: str | None = None,
+) -> tuple:
     user = OverleafUser.query.get(user_id)
     if not user:
         return False, "Usuario no encontrado."
@@ -372,8 +378,34 @@ def set_user_quota(user_id: int, max_bytes) -> tuple:
     if max_bytes is not None and max_bytes < 0:
         return False, "La cuota no puede ser negativa."
 
+    old_bytes = user.max_quota_bytes
     user.max_quota_bytes = max_bytes
     db.session.commit()
+
+    # AuditLog para que aparezca en /auditoria/ bajo la categoría "Cuotas".
+    try:
+        from app.model.services.admin import admin_service as audit_service
+        def _fmt(b):
+            if b is None:
+                return "Ilimitada"
+            for unit in ("B", "KB", "MB", "GB", "TB"):
+                if abs(b) < 1024:
+                    return f"{b:.0f} {unit}"
+                b /= 1024
+            return f"{b:.1f} PB"
+        detail = (
+            f"Cuota del usuario «{user.email or user.id}» "
+            f"actualizada: {_fmt(old_bytes)} → {_fmt(max_bytes)}"
+        )
+        audit_service.log_action(
+            action="quota_change",
+            actor=actor,
+            detail=detail,
+            level="info",
+            ip_address=ip_address,
+        )
+    except Exception as exc:
+        logger.warning("AuditLog of quota_change failed for user %s: %s", user_id, exc)
 
     try:
         from app.model.services import alerts_service
