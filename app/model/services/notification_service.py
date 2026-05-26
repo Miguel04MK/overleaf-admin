@@ -82,7 +82,6 @@ _LEVEL_TO_PREF: dict[str, str] = {
 
 # Mapping alert type -> AdminNotificationPref attribute
 _TYPE_TO_PREF: dict[str, str] = {
-    "service_down":            "notify_service_down",
     "sync_failed":             "notify_sync_failed",
     "quota_exceeded":          "notify_quota_exceeded",
     "quota_warning":           "notify_quota_warning",
@@ -94,7 +93,7 @@ _TYPE_TO_PREF: dict[str, str] = {
 
 # Defaults when an admin has no pref row
 _DEFAULT_LEVELS = {"critical", "danger"}
-_DEFAULT_TYPES  = {"service_down", "sync_failed", "quota_exceeded", "repeated_errors"}
+_DEFAULT_TYPES  = {"sync_failed", "quota_exceeded", "repeated_errors"}
 
 _LEVEL_LABELS = {
     "critical": "Critico",
@@ -109,7 +108,6 @@ _TYPE_LABELS = {
     "project_limit_warning":  "Proyectos cercano al limite",
     "project_limit_exceeded": "Limite de proyectos superado",
     "sync_failed":            "Fallo de sincronizacion",
-    "service_down":           "Servicio caido",
     "repeated_errors":        "Errores repetidos",
     "administrative_warning": "Aviso administrativo",
 }
@@ -118,15 +116,9 @@ _TYPE_LABELS = {
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def should_notify(pref, alert_type: str, alert_level: str) -> bool:
-    """
-    Return True if an admin with *pref* should receive this alert.
-
-    An admin is notified if EITHER:
-      - Their level preference for alert.level is True, OR
-      - Their type preference for alert.type is True.
-
-    If pref is None (no row in DB), fall back to safe defaults.
-    """
+    """Compat hacia atrás: True si el admin recibe la alerta en cualquier modo
+    (inmediato o resumen). Las llamadas existentes que querían "¿debo enviar
+    ya un email?" deben usar should_notify_now() en su lugar."""
     if pref is None:
         return alert_level in _DEFAULT_LEVELS or alert_type in _DEFAULT_TYPES
 
@@ -134,6 +126,50 @@ def should_notify(pref, alert_type: str, alert_level: str) -> bool:
     type_attr  = _TYPE_TO_PREF.get(alert_type)
     level_ok   = bool(getattr(pref, level_attr, False)) if level_attr else False
     type_ok    = bool(getattr(pref, type_attr,  False)) if type_attr  else False
+    return level_ok or type_ok
+
+
+def should_notify_now(pref, alert_type: str, alert_level: str) -> bool:
+    """True si el admin debe recibir un email INMEDIATO para esta alerta.
+
+    Comprueba la pestaña "Inmediato" (notify_X = True para nivel o tipo).
+    Cuando pref es None, asume "immediate" para los defaults conservadores.
+    """
+    if pref is None:
+        return alert_level in _DEFAULT_LEVELS or alert_type in _DEFAULT_TYPES
+
+    level_attr = _LEVEL_TO_PREF.get(alert_level)
+    type_attr  = _TYPE_TO_PREF.get(alert_type)
+
+    if hasattr(pref, "is_immediate"):
+        level_ok = pref.is_immediate(level_attr) if level_attr else False
+        type_ok  = pref.is_immediate(type_attr)  if type_attr  else False
+    else:
+        level_ok = bool(getattr(pref, level_attr, False)) if level_attr else False
+        type_ok  = bool(getattr(pref, type_attr,  False)) if type_attr  else False
+
+    return level_ok or type_ok
+
+
+def should_include_in_digest(pref, alert_type: str, alert_level: str) -> bool:
+    """True si la alerta debe entrar en el resumen periódico del admin.
+
+    Comprueba la pestaña "Periódico" (notify_X_digest_only = True para nivel o tipo).
+    Un tipo puede estar en AMBAS pestañas simultáneamente.
+    """
+    if pref is None:
+        return False
+
+    level_attr = _LEVEL_TO_PREF.get(alert_level)
+    type_attr  = _TYPE_TO_PREF.get(alert_type)
+
+    if hasattr(pref, "is_in_digest"):
+        level_ok = pref.is_in_digest(level_attr) if level_attr else False
+        type_ok  = pref.is_in_digest(type_attr)  if type_attr  else False
+    else:
+        level_ok = bool(getattr(pref, level_attr + "_digest_only", False)) if level_attr else False
+        type_ok  = bool(getattr(pref, type_attr  + "_digest_only", False)) if type_attr  else False
+
     return level_ok or type_ok
 
 
