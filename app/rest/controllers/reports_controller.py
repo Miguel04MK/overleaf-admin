@@ -129,7 +129,7 @@ def index():
         {
             "key": "actividad",
             "name": "Actividad administrativa",
-            "desc": "Log de auditoria: acciones, actores, niveles.",
+            "desc": "Auditoría por categoría: accesos, administración, cuotas, sincronización y cambios de rol.",
             "icon": "bi-journal-text",
             "color": "#e6a817",
             "url_csv": url_for("reports.export_activity_csv"),
@@ -463,11 +463,12 @@ def export_activity_csv():
         level=args.get("level") or None,
         action=args.get("action") or None,
         actor=args.get("actor") or None,
+        category=args.get("category") or None,
         date_from=service._parse_date(args.get("date_from")),
         date_to=service._parse_date(args.get("date_to")),
     )
     data, filename, ct = exporters.export_activity_csv(entries)
-    _log_export("actividad", "csv", filename)
+    _log_export("actividad", "csv", filename, {"category": args.get("category")})
     return _csv_response(data, filename, ct)
 
 
@@ -479,16 +480,18 @@ def export_activity_pdf():
         level=args.get("level") or None,
         action=args.get("action") or None,
         actor=args.get("actor") or None,
+        category=args.get("category") or None,
         date_from=service._parse_date(args.get("date_from")),
         date_to=service._parse_date(args.get("date_to")),
     )
     ft = _filters_text([
-        ("Nivel", args.get("level")),
-        ("Accion", args.get("action")),
-        ("Actor", args.get("actor")),
+        ("Categoria", args.get("category")),
+        ("Nivel",     args.get("level")),
+        ("Accion",    args.get("action")),
+        ("Actor",     args.get("actor")),
     ])
     pdf_data, filename, ct = exporters.export_activity_pdf(entries, generated_by=_actor(), filters_text=ft)
-    _log_export("actividad", "pdf", filename)
+    _log_export("actividad", "pdf", filename, {"category": args.get("category")})
     return _pdf_response(pdf_data, filename)
 
 
