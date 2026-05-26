@@ -56,7 +56,10 @@ class OverleafExtractor:
     def extract_users(self) -> list[dict[str, Any]]:
         """
         Extract all users from Overleaf's users collection.
-        Returns a list of raw dicts (ObjectIds converted to strings).
+        Returns a list of raw dicts (ObjectIds converted to strings),
+        deduplicados por email: si MongoDB contiene dos documentos con el
+        mismo email se conserva el más reciente (last_login_at > signup_date)
+        y se emite una advertencia.
         """
         logger.info("Extracting users from MongoDB...")
         projection = {field: 0 for field in _USER_EXCLUDED_FIELDS}
@@ -70,7 +73,33 @@ class OverleafExtractor:
                 normalized.append(self._normalize_user(u))
             except ValueError as exc:
                 logger.warning("Skipping user %s: %s", u.get("_id"), exc)
-        return normalized
+
+        # Deduplicar por email: MongoDB no garantiza unicidad de email.
+        # Ante duplicados conservamos el registro con actividad más reciente.
+        seen: dict[str, dict] = {}
+        for u in normalized:
+            email = u["email"]
+            if email not in seen:
+                seen[email] = u
+                continue
+            prev = seen[email]
+            prev_ts = prev.get("last_login_at") or prev.get("signup_date")
+            new_ts  = u.get("last_login_at")   or u.get("signup_date")
+            if new_ts and (not prev_ts or new_ts > prev_ts):
+                seen[email] = u
+            logger.warning(
+                "Email duplicado en MongoDB: %s "
+                "(overleaf_id %s vs %s). Se conserva el más reciente.",
+                email, prev["overleaf_id"], u["overleaf_id"],
+            )
+
+        deduped = list(seen.values())
+        if len(deduped) < len(normalized):
+            logger.warning(
+                "Se descartaron %d usuarios por email duplicado en MongoDB.",
+                len(normalized) - len(deduped),
+            )
+        return deduped
 
     def _normalize_user(self, doc: dict) -> dict[str, Any]:
         """Convert ObjectIds to strings and handle missing fields.

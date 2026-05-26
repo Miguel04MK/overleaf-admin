@@ -1,35 +1,36 @@
 """
-SyncRunner — orchestrates the full ETL pipeline.
+SyncRunner — orchestrates the ETL pipeline with configurable scope.
 
-Flow:
-    1. Create SyncRun record (status=running)
-    2. Connect to MongoDB via OverleafMongoAdapter
-    3. Extract users and projects (OverleafExtractor)
-    4. Upsert into PostgreSQL (OverleafLoader)
-    5. Upsert memberships
-    6. Mark SyncRun as success/error
-    7. Write audit log entry
+Soporta los siguientes sync_type:
+  - full           Extrae y carga usuarios + proyectos + memberships (todo)
+  - users          Solo usuarios
+  - projects       Solo proyectos (+ memberships; el user_map se construye en DB)
+  - resync_total   Como `full` pero hace explícito el commit por etapas y se
+                   marca semánticamente como "revisión completa"
+  - scheduled      Igual que `full` por defecto, pero el triggered_by es "scheduled"
 
-This is the only public entry point for triggering a sync.
-Call: run_sync(app, triggered_by="manual")
+Punto de entrada único: run_sync(app, sync_type=..., triggered_by=..., triggered_by_user=...)
 """
 import logging
+import threading
 from datetime import datetime, timezone
 
 from flask import Flask
 
 from app.config.extensions import db
-from app.model.entities.sync_run import SyncRun
+from app.model.entities.sync_run import SyncRun, SYNC_TYPES
 from app.model.services.admin import admin_service as audit_service
-from app.etl.extractors.adapter import OverleafMongoAdapter, make_adapter
+from app.etl.extractors.adapter import make_adapter
 from app.etl.extractors.extractor import OverleafExtractor
 from app.etl.loaders.loader import OverleafLoader
 
 logger = logging.getLogger(__name__)
 
+# Lock global: sólo una sync corriendo al mismo tiempo dentro del proceso.
+_SYNC_LOCK = threading.Lock()
 
-def _fmt_delta(delta: int) -> str:
-    """Format a delta as a signed string: +3, -2, 0."""
+
+def _fmt_delta(delta: int | None) -> str:
     if delta is None:
         return "?"
     if delta > 0:
@@ -37,63 +38,115 @@ def _fmt_delta(delta: int) -> str:
     return str(delta)
 
 
-def run_sync(app: Flask, triggered_by: str = "manual",
-             triggered_by_user: str | None = None) -> SyncRun:
+def is_sync_running() -> bool:
+    """True si actualmente hay una SyncRun con status='running'.
+
+    Se basa en DB (más fiable que el lock en proceso, que se pierde si reinicias).
     """
-    Execute a full sync cycle.
-    Must be called within an app context (or wraps itself in one).
-    Returns the completed SyncRun record.
+    return SyncRun.query.filter_by(status="running").first() is not None
+
+
+def run_sync(
+    app: Flask,
+    *,
+    sync_type: str = "full",
+    triggered_by: str = "manual",
+    triggered_by_user: str | None = None,
+) -> SyncRun:
+    """Ejecuta una sincronización con el alcance indicado.
+
+    Se debe llamar idealmente desde un hilo de fondo. Es seguro re-ejecutar
+    (idempotente): los upserts trabajan por `overleaf_id`.
     """
+    if sync_type not in SYNC_TYPES:
+        logger.warning("sync_type desconocido '%s', se usa 'full'.", sync_type)
+        sync_type = "full"
+
     with app.app_context():
-        sync_run = SyncRun(triggered_by=triggered_by,
-                           triggered_by_user=triggered_by_user)
-        db.session.add(sync_run)
-        db.session.commit()
-        logger.info("SyncRun #%d started (triggered_by=%s)", sync_run.id, triggered_by)
-
-        audit_service.log_action(
-            action="sync_start",
-            actor="system",
-            detail=f"Sincronización iniciada (modo: {triggered_by})",
-            level="info",
-        )
-
-        adapter = make_adapter(app)
-
-        # Reference counts from the previous *successful* sync, so the delta
-        # reflects changes in the Overleaf source (additions and removals)
-        # independently of our local upsert-only loader.
-        prev = (
-            SyncRun.query
-            .filter(SyncRun.id != sync_run.id, SyncRun.status == "success")
-            .order_by(SyncRun.started_at.desc())
-            .first()
-        )
-        prev_users_found = prev.users_found if prev else None
-        prev_projects_found = prev.projects_found if prev else None
+        # Bloqueo global: si ya hay una sync corriendo, no la duplicamos.
+        if not _SYNC_LOCK.acquire(blocking=False):
+            logger.info("Otra sync ya está en marcha en este proceso — abortando.")
+            audit_service.log_action(
+                action="sync_skip",
+                actor=triggered_by_user or "system",
+                detail="Sincronización solicitada con otra en curso (ignorada).",
+                level="warning",
+            )
+            # Devolvemos una SyncRun fantasma sin persistir para no romper callers.
+            placeholder = SyncRun(
+                status="error", sync_type=sync_type,
+                triggered_by=triggered_by, triggered_by_user=triggered_by_user,
+                message="Ya hay una sincronización en curso.",
+            )
+            return placeholder
 
         try:
-            # Step 1: Connect
-            adapter.connect()
+            return _do_sync(app, sync_type, triggered_by, triggered_by_user)
+        finally:
+            _SYNC_LOCK.release()
 
-            with adapter.get_db() as mongo_db:
-                extractor = OverleafExtractor(mongo_db)
-                loader = OverleafLoader()
 
-                # Step 2: Extract
+def _do_sync(
+    app: Flask, sync_type: str, triggered_by: str, triggered_by_user: str | None,
+) -> SyncRun:
+    sync_run = SyncRun(
+        sync_type=sync_type,
+        triggered_by=triggered_by,
+        triggered_by_user=triggered_by_user,
+    )
+    db.session.add(sync_run)
+    db.session.commit()
+    logger.info("SyncRun #%d started (type=%s, triggered_by=%s)",
+                sync_run.id, sync_type, triggered_by)
+
+    audit_service.log_action(
+        action="sync_start",
+        actor=triggered_by_user or "system",
+        detail=f"Sincronización iniciada (tipo: {sync_type}, modo: {triggered_by})",
+        level="info",
+    )
+
+    adapter = make_adapter(app)
+
+    # Referencia para los deltas: la última sync correcta del MISMO tipo.
+    prev = (
+        SyncRun.query
+        .filter(SyncRun.id != sync_run.id,
+                SyncRun.status == "success",
+                SyncRun.sync_type.in_([sync_type, "full", "resync_total"]))
+        .order_by(SyncRun.started_at.desc())
+        .first()
+    )
+    prev_users_found = prev.users_found if prev else None
+    prev_projects_found = prev.projects_found if prev else None
+
+    try:
+        adapter.connect()
+        with adapter.get_db() as mongo_db:
+            extractor = OverleafExtractor(mongo_db)
+            loader = OverleafLoader()
+
+            # ── USUARIOS ─────────────────────────────────────────────────────
+            if sync_type in ("full", "users", "resync_total", "scheduled"):
                 raw_users = extractor.extract_users()
+                u_found, u_synced, u_created, u_updated = loader.upsert_users(raw_users)
+                sync_run.users_found    = u_found
+                sync_run.users_synced   = u_synced
+                sync_run.users_created  = u_created
+                sync_run.users_updated  = u_updated
+                db.session.flush()
+            else:
+                # Para sync_type='projects' no tocamos usuarios — pero sí necesitamos
+                # el mapeo (overleaf_id → internal id) que ya tengamos en DB.
+                pass
+
+            user_map = loader.build_user_map()
+
+            # ── PROYECTOS ────────────────────────────────────────────────────
+            if sync_type in ("full", "projects", "resync_total", "scheduled"):
                 raw_projects = extractor.extract_projects()
 
-                # Step 3: Upsert users first (needed for FK resolution)
-                users_found, users_synced = loader.upsert_users(raw_users)
-                sync_run.users_found = users_found
-                sync_run.users_synced = users_synced
-                db.session.flush()
-
-                # Step 4: Build user map (overleaf_id → internal id)
-                user_map = loader.build_user_map()
-
-                # Step 5: Prepare memberships data alongside projects
+                # Construir membresías mientras tengamos los raw_projects en mano
                 memberships_data = []
                 for raw_proj in raw_projects:
                     members = []
@@ -105,85 +158,96 @@ def run_sync(app: Flask, triggered_by: str = "manual",
                             members.append({"overleaf_user_id": oid, "role": "read_only"})
                     memberships_data.append((raw_proj["overleaf_id"], members))
 
-                # Step 6: Upsert projects + memberships (sync_run_id → per-project logs)
-                projects_found, projects_synced = loader.upsert_projects(
+                p_found, p_synced, p_created, p_updated, m_synced = loader.upsert_projects(
                     raw_projects, memberships_data, user_map,
                     sync_run_id=sync_run.id,
                 )
-                sync_run.projects_found = projects_found
-                sync_run.projects_synced = projects_synced
-
+                sync_run.projects_found    = p_found
+                sync_run.projects_synced   = p_synced
+                sync_run.projects_created  = p_created
+                sync_run.projects_updated  = p_updated
+                sync_run.members_synced    = m_synced
                 db.session.commit()
 
-            adapter.disconnect()
+        adapter.disconnect()
 
-            # Compute deltas: change in Overleaf-source counts since last
-            # successful sync. If this is the first run, leave as None.
-            sync_run.users_delta = (
-                users_found - prev_users_found if prev_users_found is not None else None
-            )
-            sync_run.projects_delta = (
-                projects_found - prev_projects_found if prev_projects_found is not None else None
-            )
+        # Deltas vs. sync anterior
+        if prev_users_found is not None and (sync_type in ("full", "users", "resync_total", "scheduled")):
+            sync_run.users_delta = sync_run.users_found - prev_users_found
+        if prev_projects_found is not None and (sync_type in ("full", "projects", "resync_total", "scheduled")):
+            sync_run.projects_delta = sync_run.projects_found - prev_projects_found
 
+        # Mensaje final compuesto según el alcance
+        parts = []
+        if sync_type in ("full", "users", "resync_total", "scheduled"):
+            parts.append(
+                f"{sync_run.users_synced}/{sync_run.users_found} usuarios "
+                f"({_fmt_delta(sync_run.users_delta)})"
+            )
+        if sync_type in ("full", "projects", "resync_total", "scheduled"):
+            parts.append(
+                f"{sync_run.projects_synced}/{sync_run.projects_found} proyectos "
+                f"({_fmt_delta(sync_run.projects_delta)})"
+            )
+        message = f"Sincronización completada: {', '.join(parts)}."
+
+        sync_run.mark_finished(status="success", message=message)
+        db.session.commit()
+
+        audit_service.log_action(
+            action="sync_ok",
+            actor=triggered_by_user or "system",
+            detail=sync_run.message,
+            level="info",
+        )
+        logger.info("SyncRun #%d finished successfully (type=%s).",
+                    sync_run.id, sync_type)
+
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_last_sync()
+            if sync_type in ("full", "users", "resync_total", "scheduled"):
+                alerts_service.check_all_quotas()
+            if sync_type in ("full", "projects", "resync_total", "scheduled"):
+                alerts_service.check_all_project_limits()
+            alerts_service.check_repeated_errors()
+        except Exception as alert_exc:
+            logger.warning("Alert checks after sync failed: %s", alert_exc)
+
+    except Exception as exc:
+        db.session.rollback()
+        error_msg = f"Error de sincronización: {exc}"
+        logger.error("SyncRun #%d failed: %s", sync_run.id, exc, exc_info=True)
+
+        try:
             sync_run.mark_finished(
-                status="success",
-                message=(
-                    f"Sincronización completada: "
-                    f"{users_synced}/{users_found} usuarios "
-                    f"({_fmt_delta(sync_run.users_delta)}), "
-                    f"{projects_synced}/{projects_found} proyectos "
-                    f"({_fmt_delta(sync_run.projects_delta)})."
-                ),
+                status="error",
+                message=error_msg,
+                errors_count=(sync_run.errors_count or 0) + 1,
+                error_detail=repr(exc),
             )
             db.session.commit()
-
-            audit_service.log_action(
-                action="sync_ok",
-                actor="system",
-                detail=sync_run.message,
-                level="info",
-            )
-            logger.info("SyncRun #%d finished successfully.", sync_run.id)
-
-            try:
-                from app.model.services import alerts_service
-                alerts_service.check_last_sync()
-                alerts_service.check_all_quotas()
-                alerts_service.check_all_project_limits()
-                alerts_service.check_repeated_errors()
-            except Exception as alert_exc:
-                logger.warning("Alert checks after sync failed: %s", alert_exc)
-
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            error_msg = f"Error de sincronización: {exc}"
-            logger.error("SyncRun #%d failed: %s", sync_run.id, exc, exc_info=True)
 
-            try:
-                sync_run.mark_finished(status="error", message=error_msg)
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+        audit_service.log_action(
+            action="sync_error",
+            actor=triggered_by_user or "system",
+            detail=error_msg,
+            level="error",
+        )
 
-            audit_service.log_action(
-                action="sync_error",
-                actor="system",
-                detail=error_msg,
-                level="error",
-            )
+        try:
+            from app.model.services import alerts_service
+            alerts_service.check_last_sync()
+            alerts_service.check_repeated_errors()
+        except Exception as alert_exc:
+            logger.warning("Alert checks after sync error failed: %s", alert_exc)
 
-            try:
-                from app.model.services import alerts_service
-                alerts_service.check_last_sync()
-                alerts_service.check_repeated_errors()
-            except Exception as alert_exc:
-                logger.warning("Alert checks after sync error failed: %s", alert_exc)
+    finally:
+        try:
+            adapter.disconnect()
+        except Exception:
+            pass
 
-        finally:
-            try:
-                adapter.disconnect()
-            except Exception:
-                pass
-
-        return sync_run
+    return sync_run
