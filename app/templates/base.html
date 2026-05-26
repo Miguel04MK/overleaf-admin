@@ -97,23 +97,24 @@
           <i class="bi bi-journal-text me-2"></i>Auditoría
         </a>
       </li>
-
-      <li class="nav-item mt-3">
-        <div class="text-uppercase text-white-50 small px-3 mb-1" style="font-size:.7rem; letter-spacing:.05em;">
-          Desarrollo
-        </div>
-        <a href="{{ url_for('dev.index') }}"
-           class="nav-link text-white {% if active_page == 'dev' %}active bg-warning text-dark{% endif %}">
-          <i class="bi bi-tools me-2"></i>Dev
+      <li class="nav-item">
+        <a href="{{ url_for('admins.index') }}"
+           class="nav-link text-white {% if active_page == 'admins' %}active bg-success{% endif %}">
+          <i class="bi bi-people me-2"></i>Administradores
         </a>
       </li>
+
     </ul>
 
     <hr class="border-secondary" />
     <div class="d-flex align-items-center gap-2">
-      <i class="bi bi-person-circle fs-5"></i>
-      <small class="text-white-50">{{ current_user.username }}</small>
-      <a href="{{ url_for('auth.logout') }}" class="ms-auto btn btn-sm btn-outline-danger py-0 px-2">
+      <a href="{{ url_for('account.index') }}"
+         class="sidebar-user-link d-flex align-items-center gap-2 text-decoration-none flex-grow-1 px-2 py-1 rounded {% if active_page == 'account' %}active bg-success text-white{% else %}text-white-50{% endif %}"
+         title="Mi cuenta">
+        <i class="bi bi-person-circle fs-5"></i>
+        <small class="text-truncate">{{ current_user.username }}</small>
+      </a>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-danger py-0 px-2" title="Cerrar sesión">
         <i class="bi bi-box-arrow-right"></i>
       </a>
     </div>
