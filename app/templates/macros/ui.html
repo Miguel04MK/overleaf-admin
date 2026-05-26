@@ -84,6 +84,44 @@
   {{ role.name }}
 </span>
 {% else %}
-<span class="text-muted small">—</span>
+<span class="text-muted small fst-italic">Sin rol</span>
+{% endif %}
+{% endmacro %}
+
+
+{# ── Badge de rol en historial de cambios ────────────────────────────────────
+   Usa las propiedades display_role_from / display_role_to del RoleChangeLog
+   para mostrar siempre un texto legible, incluso si el rol fue eliminado.
+
+   log       : objeto RoleChangeLog
+   direction : 'from' o 'to'
+   sm        : font-size reducido
+#}
+{% macro role_change_badge(log, direction='from', sm=true) %}
+{% if direction == 'from' %}
+  {% set label = log.display_role_from %}
+  {% set color = log.display_role_from_color %}
+{% else %}
+  {% set label = log.display_role_to %}
+  {% set color = log.display_role_to_color %}
+{% endif %}
+
+{% if label == 'Sin rol' %}
+  <span class="text-muted small fst-italic" {% if sm %}style="font-size:.68rem;"{% endif %}>Sin rol</span>
+{% elif '(eliminado)' in label %}
+  <span class="badge bg-secondary border border-secondary-subtle" {% if sm %}style="font-size:.68rem;"{% endif %}
+        title="Este rol ya no existe">
+    <i class="bi bi-trash3 me-1" style="font-size:.6rem;"></i>{{ label }}
+  </span>
+{% elif label == 'Rol no disponible' %}
+  <span class="badge bg-secondary opacity-75" {% if sm %}style="font-size:.68rem;"{% endif %}
+        title="No se pudo determinar el rol">
+    Rol no disponible
+  </span>
+{% else %}
+  <span class="badge bg-{{ color }}{% if color in ['info', 'warning'] %} text-dark{% endif %}"
+        {% if sm %}style="font-size:.68rem;"{% endif %}>
+    {{ label }}
+  </span>
 {% endif %}
 {% endmacro %}
