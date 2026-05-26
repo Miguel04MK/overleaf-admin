@@ -342,6 +342,53 @@ class TestActivityReport:
             entries = reports_service.get_activity_report_all(level="error")
             assert len(entries) == 1
 
+    # ── Filtros y stats por categoría (auditoría enriquecida) ──────────
+
+    def test_filter_by_category_auth(self, app, db):
+        with app.app_context():
+            make_audit(db, action="login")           # auth
+            make_audit(db, action="logout")          # auth
+            make_audit(db, action="sync_ok")         # sync
+            data = reports_service.get_activity_report(category="auth", per_page=10)
+            assert data["pagination"].total == 2
+
+    def test_filter_by_category_role(self, app, db):
+        with app.app_context():
+            make_audit(db, action="role_assigned")
+            make_audit(db, action="role_changed")
+            make_audit(db, action="role_removed")
+            make_audit(db, action="login")
+            data = reports_service.get_activity_report(category="role", per_page=10)
+            assert data["pagination"].total == 3
+
+    def test_stats_by_category(self, app, db):
+        with app.app_context():
+            make_audit(db, action="login")           # auth
+            make_audit(db, action="logout")          # auth
+            make_audit(db, action="quota_change")    # quota
+            make_audit(db, action="sync_error", level="error")  # sync
+            data = reports_service.get_activity_report(per_page=10)
+            assert data["stats"]["by_category"]["auth"]  == 2
+            assert data["stats"]["by_category"]["quota"] == 1
+            assert data["stats"]["by_category"]["sync"]  == 1
+            assert data["stats"]["by_category"]["role"]  == 0
+
+    def test_get_activity_report_all_with_category(self, app, db):
+        with app.app_context():
+            make_audit(db, action="quota_change")
+            make_audit(db, action="login")
+            entries = reports_service.get_activity_report_all(category="quota")
+            assert len(entries) == 1
+            assert entries[0].action == "quota_change"
+
+    def test_unknown_category_ignored(self, app, db):
+        """Una categoría desconocida no filtra (mismo comportamiento que None)."""
+        with app.app_context():
+            make_audit(db, action="login")
+            make_audit(db, action="logout")
+            data = reports_service.get_activity_report(category="invented", per_page=10)
+            assert data["pagination"].total == 2
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SERVICE — Syncs report
@@ -586,6 +633,27 @@ class TestGeneralSections:
             assert "active_alerts_count" in data
             assert "recent_errors" in data
             assert "recent_role_changes" in data
+            # Breakdown por categoría incluido tras la refactorización
+            assert "by_category" in data
+            keys = {c["key"] for c in data["by_category"]}
+            assert {"auth", "admin", "quota", "sync", "role"} <= keys
+
+    def test_auditoria_section_humanized_labels(self, app, db):
+        with app.app_context():
+            make_audit(db, action="sync_error", level="error", detail="boom")
+            data = reports_service.get_general_section_auditoria()
+            assert any(e["action_label"] == "Sincronización con error"
+                       for e in data["recent_errors"])
+
+    def test_general_report_data_includes_audit_by_category(self, app, db):
+        with app.app_context():
+            make_audit(db, action="login")
+            make_audit(db, action="quota_change")
+            data = reports_service.get_general_report_data()
+            assert "audit_by_category" in data
+            cats = {c["label"]: c["count"] for c in data["audit_by_category"]}
+            assert cats.get("Acceso", 0) >= 1
+            assert cats.get("Cuotas", 0) >= 1
 
     def test_resumen_section_counts(self, app, db):
         with app.app_context():
@@ -754,8 +822,15 @@ class TestExporters:
             entry = make_audit(db, actor="admin", action="login", level="info")
             data, filename, ct = exporters.export_activity_csv([entry])
             text = data.decode("utf-8-sig")
+            # Cabeceras nuevas tras la refactorización
             assert "Actor" in text
+            assert "Categoría" in text
+            assert "Acción legible" in text
             assert "admin" in text
+            # Acción traducida en la fila
+            assert "Inicio de sesión" in text
+            # Categoría traducida en la fila
+            assert "Acceso" in text
             assert filename.startswith("informe_actividad_") and filename.endswith(".csv")
 
     def test_export_syncs_csv(self, app, db):
@@ -1315,13 +1390,17 @@ class TestActionTranslation:
     """Internal action names should be translated to Spanish."""
 
     def test_translate_known_actions(self):
-        assert exporters._translate_action("changed") == "Cambio de rol"
-        assert exporters._translate_action("sync_error") == "Error de sincronización"
-        assert exporters._translate_action("login") == "Inicio de sesión"
-        assert exporters._translate_action("export") == "Exportación"
+        # Las traducciones provienen ahora de admin_service.ACTION_LABELS
+        # (fuente única, mismas etiquetas que en /auditoria/).
+        assert exporters._translate_action("changed")    == "Rol cambiado"
+        assert exporters._translate_action("sync_error") == "Sincronización con error"
+        assert exporters._translate_action("login")      == "Inicio de sesión"
+        assert exporters._translate_action("export")     == "Exportación"
 
-    def test_translate_unknown_action_returns_original(self):
-        assert exporters._translate_action("custom_action") == "custom_action"
+    def test_translate_unknown_action_returns_humanized(self):
+        # Para acciones desconocidas, label_for_action capitaliza con espacios
+        # en vez de devolver el código literal (mejor UX en los PDFs).
+        assert exporters._translate_action("custom_action") == "Custom action"
 
     def test_translate_none_returns_empty(self):
         assert exporters._translate_action(None) == ""
