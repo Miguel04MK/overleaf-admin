@@ -232,6 +232,8 @@ def get_general_section_sincronizacion() -> dict[str, Any]:
 
 
 def get_general_section_auditoria() -> dict[str, Any]:
+    from app.model.services.admin import admin_service as _audit
+
     now      = datetime.now(timezone.utc)
     last_24h = now - timedelta(hours=24)
 
@@ -242,6 +244,18 @@ def get_general_section_auditoria() -> dict[str, Any]:
         .count()
     )
 
+    # Conteo de eventos por categoría (auth/admin/quota/sync/role).
+    by_category: list[dict[str, Any]] = []
+    for cat_key, cat in _audit.CATEGORIES.items():
+        cnt = AuditLog.query.filter(AuditLog.action.in_(cat["actions"])).count()
+        by_category.append({
+            "key":   cat_key,
+            "label": cat["label"],
+            "icon":  cat["icon"],
+            "color": cat["color"],
+            "count": int(cnt),
+        })
+
     recent_errors = (
         AuditLog.query
         .filter(AuditLog.level.in_(["error", "warning"]))
@@ -251,11 +265,13 @@ def get_general_section_auditoria() -> dict[str, Any]:
     )
     errors_list = [
         {
-            "created_at": e.created_at.strftime("%d/%m/%Y %H:%M") if e.created_at else "",
-            "level":      e.level,
-            "actor":      e.actor,
-            "action":     e.action,
-            "detail":     (e.detail or "")[:100],
+            "created_at":   e.created_at.strftime("%d/%m/%Y %H:%M") if e.created_at else "",
+            "level":        e.level,
+            "actor":        e.actor,
+            "action":       e.action,
+            "action_label": _audit.label_for_action(e.action),
+            "category":     _audit.category_for_action(e.action),
+            "detail":       (e.detail or "")[:100],
         }
         for e in recent_errors
     ]
@@ -266,19 +282,23 @@ def get_general_section_auditoria() -> dict[str, Any]:
         .limit(5)
         .all()
     )
+    # Mapa simple para los 3 valores que vienen de RoleChangeLog.action
+    _RC_LABELS = {"assigned": "Asignado", "changed": "Cambiado", "removed": "Retirado"}
     role_changes_list = [
         {
-            "changed_at": rc.changed_at.strftime("%d/%m/%Y %H:%M") if rc.changed_at else "",
-            "changed_by": rc.changed_by,
-            "action":     rc.action,
-            "role_from":  rc.role_from.name if rc.role_from else "",
-            "role_to":    rc.role_to.name   if rc.role_to   else "",
+            "changed_at":   rc.changed_at.strftime("%d/%m/%Y %H:%M") if rc.changed_at else "",
+            "changed_by":   rc.changed_by,
+            "action":       rc.action,
+            "action_label": _RC_LABELS.get(rc.action, rc.action),
+            "role_from":    rc.display_role_from,
+            "role_to":      rc.display_role_to,
         }
         for rc in recent_role_changes
     ]
 
     return {
         "active_alerts_count":  active_alerts_count,
+        "by_category":          by_category,
         "recent_errors":        errors_list,
         "recent_role_changes":  role_changes_list,
     }
@@ -425,6 +445,17 @@ def get_general_report_data() -> dict[str, Any]:
         .count()
     )
 
+    # Eventos de auditoría por categoría (auth/admin/quota/sync/role)
+    from app.model.services.admin import admin_service as _audit
+    audit_by_category: list[dict[str, Any]] = []
+    for cat_key, cat in _audit.CATEGORIES.items():
+        cnt = AuditLog.query.filter(AuditLog.action.in_(cat["actions"])).count()
+        audit_by_category.append({
+            "key":   cat_key,
+            "label": cat["label"],
+            "count": int(cnt),
+        })
+
     # System alerts
     system_alerts_active = (
         SystemAlert.query
@@ -471,6 +502,7 @@ def get_general_report_data() -> dict[str, Any]:
         "recent_role_changes":  recent_role_changes,
         "recent_errors":        recent_errors,
         "active_alerts_count":  active_alerts_count,
+        "audit_by_category":    audit_by_category,
         # System alerts
         "system_alerts_active":     system_alerts_active,
         "system_alerts_total":      system_alerts_total,

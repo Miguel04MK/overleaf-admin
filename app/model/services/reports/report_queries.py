@@ -334,12 +334,20 @@ def get_activity_report(
     level: str | None = None,
     action: str | None = None,
     actor: str | None = None,
+    category: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     page: int = 1,
     per_page: int = 50,
 ) -> dict[str, Any]:
-    """Paginated audit log entries."""
+    """Paginated audit log entries.
+
+    El filtro `category` usa el mapeo definido en admin_service.CATEGORIES
+    (auth/admin/quota/sync/role). Devuelve además un breakdown por categoría
+    en `stats` para los KPIs del informe.
+    """
+    from app.model.services.admin import admin_service as _audit
+
     q = AuditLog.query.order_by(desc(AuditLog.created_at))
 
     if search:
@@ -354,6 +362,8 @@ def get_activity_report(
     if level:  q = q.filter(AuditLog.level == level)
     if action: q = q.filter(AuditLog.action == action)
     if actor:  q = q.filter(AuditLog.actor == actor)
+    if category and category in _audit.CATEGORIES:
+        q = q.filter(AuditLog.action.in_(_audit.CATEGORIES[category]["actions"]))
     if date_from: q = q.filter(AuditLog.created_at >= date_from)
     if date_to:   q = q.filter(AuditLog.created_at <= date_to)
 
@@ -362,6 +372,12 @@ def get_activity_report(
     total    = AuditLog.query.count()
     errors   = AuditLog.query.filter(AuditLog.level == "error").count()
     warnings = AuditLog.query.filter(AuditLog.level == "warning").count()
+
+    by_category: dict[str, int] = {}
+    for cat_key, cat in _audit.CATEGORIES.items():
+        by_category[cat_key] = AuditLog.query.filter(
+            AuditLog.action.in_(cat["actions"])
+        ).count()
 
     action_names = [
         r[0] for r in db.session.query(AuditLog.action).distinct().order_by(AuditLog.action).all()
@@ -372,9 +388,15 @@ def get_activity_report(
 
     return {
         "pagination":   pagination,
-        "stats":        {"total": total, "errors": errors, "warnings": warnings},
+        "stats": {
+            "total":       total,
+            "errors":      errors,
+            "warnings":    warnings,
+            "by_category": by_category,
+        },
         "action_names": action_names,
         "actor_names":  actor_names,
+        "categories":   _audit.CATEGORIES,
     }
 
 
@@ -383,13 +405,18 @@ def get_activity_report_all(
     level: str | None = None,
     action: str | None = None,
     actor: str | None = None,
+    category: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> list[AuditLog]:
+    from app.model.services.admin import admin_service as _audit
+
     q = AuditLog.query.order_by(desc(AuditLog.created_at))
     if level:     q = q.filter(AuditLog.level == level)
     if action:    q = q.filter(AuditLog.action == action)
     if actor:     q = q.filter(AuditLog.actor == actor)
+    if category and category in _audit.CATEGORIES:
+        q = q.filter(AuditLog.action.in_(_audit.CATEGORIES[category]["actions"]))
     if date_from: q = q.filter(AuditLog.created_at >= date_from)
     if date_to:   q = q.filter(AuditLog.created_at <= date_to)
     return q.all()
