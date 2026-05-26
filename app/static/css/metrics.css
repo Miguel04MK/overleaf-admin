@@ -76,3 +76,61 @@
 
 /* ── Misc ────────────────────────────────────────────────────────────────── */
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Tabs de métricas ────────────────────────────────────────────────────── */
+.metrics-tabs {
+  border-bottom: 1px solid var(--bs-border-color);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.metrics-tabs::-webkit-scrollbar       { height: 4px; }
+.metrics-tabs::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 2px; }
+
+.metrics-tabs .nav-link {
+  color: var(--bs-secondary);
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: .5rem .9rem;
+  font-size: .82rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 0;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.metrics-tabs .nav-link:hover {
+  color: var(--ol-green, #3d8b3d);
+  background: var(--ol-green-subtle, rgba(61,139,61,.06));
+}
+.metrics-tabs .nav-link.active {
+  color: var(--ol-green, #3d8b3d);
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 2px solid var(--ol-green, #3d8b3d);
+  font-weight: 600;
+}
+
+/* ── Switcher de gráficas dentro de una card ─────────────────────────────── */
+.chart-switch .btn {
+  font-size: .72rem;
+  padding: .25rem .65rem;
+  font-weight: 500;
+}
+/* Cuando el botón outline-success queda "checked", Bootstrap le da fondo verde.
+   Lo igualamos al verde Overleaf de la app. */
+.chart-switch .btn-check:checked + .btn-outline-success,
+.chart-switch .btn-check:active   + .btn-outline-success {
+  background-color: var(--ol-green, #3d8b3d);
+  border-color:     var(--ol-green, #3d8b3d);
+  color: #fff;
+}
+.chart-switch .btn-outline-success {
+  color: var(--ol-green, #3d8b3d);
+  border-color: var(--ol-green-border, rgba(61,139,61,.4));
+}
+.chart-switch .btn-outline-success:hover {
+  background: var(--ol-green-subtle, rgba(61,139,61,.08));
+  color: var(--ol-green-dark, #2d6a2d);
+  border-color: var(--ol-green, #3d8b3d);
+}
