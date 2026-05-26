@@ -28,6 +28,10 @@ class Config:
     # Sync settings
     SYNC_INTERVAL = int(os.getenv("SYNC_INTERVAL", 0))
 
+    # APScheduler — sincronización periódica gobernada por SyncSchedule.
+    # En desarrollo y producción se arranca por defecto; en testing se desactiva.
+    SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"
+
     # Docker monitoring (optional)
     DOCKER_SOCKET = os.getenv("DOCKER_SOCKET", "unix:///var/run/docker.sock")
     OVERLEAF_COMPOSE_PROJECT = os.getenv("OVERLEAF_COMPOSE_PROJECT", "sharelatex")
@@ -48,6 +52,7 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = False
     WTF_CSRF_ENABLED = False
+    SCHEDULER_ENABLED = False  # No arrancar APScheduler durante los tests
     # SQLite in-memory with StaticPool so all connections share the same DB
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     SQLALCHEMY_ENGINE_OPTIONS = {
