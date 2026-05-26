@@ -1,0 +1,24 @@
+{# Controles de paginación de la tabla de historial — server-rendered.
+   Mismo HTML que produce sync.js tras un fetch para que el handler de
+   eventos (delegado en #hist-pagination) los gestione sin distinción. #}
+{% if pagination and pagination.pages > 1 %}
+<nav>
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="#" data-page="{{ pagination.prev_num or 1 }}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+    </li>
+    {% for i in range(1, pagination.pages + 1) %}
+      <li class="page-item {% if i == pagination.page %}active{% endif %}">
+        <a class="page-link" href="#" data-page="{{ i }}">{{ i }}</a>
+      </li>
+    {% endfor %}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="#" data-page="{{ pagination.next_num or pagination.pages }}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
