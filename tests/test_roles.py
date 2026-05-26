@@ -324,13 +324,48 @@ class TestRolesServiceMutations:
             assert refreshed.max_quota_bytes == profesor.storage_quota_bytes
 
     def test_assign_role_creates_audit_log(self, app, db):
+        """Un usuario con role_id=NULL pero con rol por defecto existente
+        es semánticamente "cambiado de default a X", no "asignado por primera vez".
+        El bug previo registraba "Sin rol → X" en estos casos."""
         with app.app_context():
             profesor = roles_service.get_role_by_name("profesor")
-            u = make_user(db, "oid-ar3")
+            default  = roles_service.get_default_role()  # alumno
+            u = make_user(db, "oid-ar3")  # role_id=NULL pero default existe
             roles_service.assign_role(u.id, profesor.id, actor="testactor")
             log = roles_service.get_role_change_logs(user_id=u.id).items[0]
             assert log.changed_by == "testactor"
-            assert log.action == "assigned"
+            # Con el fix, debe quedar como "changed" desde el rol efectivo (default)
+            assert log.action == "changed"
+            assert log.role_from_id == default.id
+            assert log.role_from_name == default.name
+            assert log.role_to_id == profesor.id
+
+    def test_assign_role_uses_effective_old_role_for_log(self, app, db):
+        """Bug fix: el log debe mostrar el rol EFECTIVO (con fallback al default)
+        no None. Si user.role_id es NULL pero existe rol por defecto, role_from_id
+        del log debe apuntar al default — no "Sin rol → X"."""
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            default  = roles_service.get_default_role()
+            # Caso 1: usuario sin rol explícito (role_id=NULL)
+            u = make_user(db, "oid-bug1")
+            assert u.role_id is None
+            roles_service.assign_role(u.id, profesor.id, actor="admin")
+            log = roles_service.get_role_change_logs(user_id=u.id).items[0]
+            assert log.role_from_id == default.id, (
+                "role_from debe ser el rol efectivo (default), no None"
+            )
+            assert log.role_from_name == default.name
+
+    def test_assign_role_rejects_assigning_default_to_implicit_default_user(self, app, db):
+        """Si un usuario tiene role_id=NULL (efectivamente default) y le
+        asignas el default, debe rechazarse: ya lo tiene."""
+        with app.app_context():
+            default = roles_service.get_default_role()
+            u = make_user(db, "oid-bug2")  # role_id=NULL
+            ok, msg = roles_service.assign_role(u.id, default.id, actor="admin")
+            assert ok is False
+            assert "ya tiene" in msg.lower()
 
     def test_assign_role_same_role_fails(self, app, db):
         with app.app_context():
@@ -489,6 +524,283 @@ class TestRolesServiceMutations:
                 9999, description="x", storage_quota_bytes=None, max_projects=None
             )
             assert ok is False
+
+    # ── update_role_config: is_default ────────────────────────────────────────
+
+    def test_update_promotes_to_default_and_unsets_previous(self, app, db):
+        with app.app_context():
+            prev_default = roles_service.get_default_role()  # 'alumno'
+            profesor     = roles_service.get_role_by_name("profesor")
+            ok, _ = roles_service.update_role_config(
+                profesor.id,
+                description=profesor.description,
+                storage_quota_bytes=profesor.storage_quota_bytes,
+                max_projects=profesor.max_projects,
+                is_default=True,
+            )
+            assert ok is True
+            from app.model.entities.role import Role
+            assert db.session.get(Role, profesor.id).is_default is True
+            assert db.session.get(Role, prev_default.id).is_default is False
+
+    def test_update_cannot_unset_default(self, app, db):
+        """Si se intenta desmarcar el rol por defecto actual, debe fallar."""
+        with app.app_context():
+            default = roles_service.get_default_role()
+            ok, msg = roles_service.update_role_config(
+                default.id,
+                description=default.description,
+                storage_quota_bytes=default.storage_quota_bytes,
+                max_projects=default.max_projects,
+                is_default=False,
+            )
+            assert ok is False
+            assert "por defecto" in msg.lower()
+            from app.model.entities.role import Role
+            assert db.session.get(Role, default.id).is_default is True
+
+    def test_update_keeps_default_when_omitted(self, app, db):
+        """is_default=None → no se toca el flag."""
+        with app.app_context():
+            default = roles_service.get_default_role()
+            ok, _ = roles_service.update_role_config(
+                default.id,
+                description="cambio",
+                storage_quota_bytes=default.storage_quota_bytes,
+                max_projects=default.max_projects,
+                # is_default omitido → None
+            )
+            assert ok is True
+            from app.model.entities.role import Role
+            assert db.session.get(Role, default.id).is_default is True
+
+    # ── create_role ───────────────────────────────────────────────────────────
+
+    def test_create_role_ok(self, app, db):
+        with app.app_context():
+            ok, msg, role = roles_service.create_role(
+                name="doctorado", description="PhD students",
+                storage_quota_bytes=10 * GB, max_projects=80,
+                is_default=False, color="info", actor="admin",
+            )
+            assert ok is True
+            assert role is not None
+            assert role.name == "doctorado"
+            assert role.storage_quota_bytes == 10 * GB
+            assert role.max_projects == 80
+
+    def test_create_role_normalizes_to_lowercase(self, app, db):
+        with app.app_context():
+            ok, _, role = roles_service.create_role(
+                name="DocTorAdo", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            assert ok is True
+            assert role.name == "doctorado"
+
+    def test_create_role_duplicate_name_fails(self, app, db):
+        with app.app_context():
+            # 'alumno' ya existe del seed
+            ok, msg, role = roles_service.create_role(
+                name="alumno", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            assert ok is False
+            assert role is None
+            assert "existe" in msg.lower()
+
+    def test_create_role_duplicate_case_insensitive(self, app, db):
+        with app.app_context():
+            ok, _, _ = roles_service.create_role(
+                name="ALUMNO", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            assert ok is False
+
+    def test_create_role_empty_name_fails(self, app, db):
+        with app.app_context():
+            ok, msg, _ = roles_service.create_role(
+                name="   ", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            assert ok is False
+            assert "obligatorio" in msg.lower()
+
+    def test_create_role_negative_quota_fails(self, app, db):
+        with app.app_context():
+            ok, msg, _ = roles_service.create_role(
+                name="negroles", description=None,
+                storage_quota_bytes=-1, max_projects=None,
+                actor="admin",
+            )
+            assert ok is False
+            assert "negativa" in msg.lower()
+
+    def test_create_role_invalid_max_projects_fails(self, app, db):
+        with app.app_context():
+            ok, msg, _ = roles_service.create_role(
+                name="zeroproj", description=None,
+                storage_quota_bytes=None, max_projects=0,
+                actor="admin",
+            )
+            assert ok is False
+
+    def test_create_role_unlimited_quota_and_projects(self, app, db):
+        with app.app_context():
+            ok, _, role = roles_service.create_role(
+                name="unlimited", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            assert ok is True
+            assert role.storage_quota_bytes is None
+            assert role.max_projects is None
+
+    def test_create_role_as_default_unsets_previous(self, app, db):
+        with app.app_context():
+            prev_default = roles_service.get_default_role()
+            assert prev_default is not None  # 'alumno' por seed
+            ok, _, new_role = roles_service.create_role(
+                name="newdef", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                is_default=True, actor="admin",
+            )
+            assert ok is True
+            assert new_role.is_default is True
+            # El anterior ya no es default
+            from app.model.entities.role import Role
+            prev = db.session.get(Role, prev_default.id)
+            assert prev.is_default is False
+
+    def test_create_role_writes_audit_log(self, app, db):
+        from app.model.entities.audit_log import AuditLog
+        with app.app_context():
+            roles_service.create_role(
+                name="audited", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            log = AuditLog.query.filter_by(action="role_create", actor="admin").first()
+            assert log is not None
+            assert "audited" in (log.detail or "")
+
+    def test_role_name_exists_helper(self, app, db):
+        with app.app_context():
+            assert roles_service.role_name_exists("alumno") is True
+            assert roles_service.role_name_exists("ALUMNO") is True  # case-insensitive
+            assert roles_service.role_name_exists("nonexistent") is False
+            assert roles_service.role_name_exists("") is False
+
+    # ── delete_role ───────────────────────────────────────────────────────────
+
+    def test_delete_role_ok(self, app, db):
+        """Rol nuevo sin usuarios y no-default: se puede eliminar."""
+        with app.app_context():
+            _, _, role = roles_service.create_role(
+                name="temporal", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            rid = role.id
+            ok, msg = roles_service.delete_role(rid, actor="admin")
+            assert ok is True
+            assert roles_service.get_role_by_id(rid) is None
+
+    def test_delete_role_writes_audit_log(self, app, db):
+        from app.model.entities.audit_log import AuditLog
+        with app.app_context():
+            _, _, role = roles_service.create_role(
+                name="todelete", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            roles_service.delete_role(role.id, actor="admin")
+            log = AuditLog.query.filter_by(action="role_delete", actor="admin").first()
+            assert log is not None
+            assert "todelete" in (log.detail or "")
+
+    def test_delete_role_blocks_default(self, app, db):
+        with app.app_context():
+            default = roles_service.get_default_role()
+            ok, msg = roles_service.delete_role(default.id, actor="admin")
+            assert ok is False
+            assert "por defecto" in msg.lower()
+            assert roles_service.get_role_by_id(default.id) is not None
+
+    def test_delete_role_reassigns_users_to_default(self, app, db):
+        """Si el rol tiene usuarios, deben reasignarse al rol por defecto
+        (NUEVA política — antes se bloqueaba)."""
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            default  = roles_service.get_default_role()
+            u1 = make_user(db, "oid-del-u1", role=profesor)
+            u2 = make_user(db, "oid-del-u2", role=profesor)
+            u1_id, u2_id = u1.id, u2.id
+
+            ok, msg = roles_service.delete_role(profesor.id, actor="admin")
+            assert ok is True
+            assert "reasignad" in msg.lower()
+            assert roles_service.get_role_by_id(profesor.id) is None
+
+            # Los usuarios ahora tienen el rol por defecto
+            from app.model.entities.overleaf_user import OverleafUser
+            r1 = db.session.get(OverleafUser, u1_id)
+            r2 = db.session.get(OverleafUser, u2_id)
+            assert r1.role_id == default.id
+            assert r2.role_id == default.id
+
+    def test_delete_role_creates_role_change_log_per_user(self, app, db):
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            u = make_user(db, "oid-del-log", role=profesor)
+            uid = u.id
+            roles_service.delete_role(profesor.id, actor="admin")
+            logs = RoleChangeLog.query.filter_by(user_id=uid).all()
+            assert len(logs) >= 1
+            # El log creado por el borrado refleja la reasignación
+            reassign = next(
+                (l for l in logs if "reasignad" in (l.reason or "").lower()),
+                None,
+            )
+            assert reassign is not None
+            assert reassign.changed_by == "admin"
+
+    def test_delete_role_migrates_quota_when_matched(self, app, db):
+        """Un usuario cuya cuota era exactamente la del rol borrado debe
+        migrarse a la del rol por defecto. Si tenía override personalizado,
+        se respeta."""
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            default  = roles_service.get_default_role()
+            # u1: hereda la cuota del rol → debe migrar a la del default
+            u1 = make_user(
+                db, "oid-del-q1", role=profesor,
+                max_quota_bytes=profesor.storage_quota_bytes,
+            )
+            # u2: override personalizado → se conserva
+            u2 = make_user(
+                db, "oid-del-q2", role=profesor,
+                max_quota_bytes=999_999,
+            )
+            u1_id, u2_id = u1.id, u2.id
+
+            roles_service.delete_role(profesor.id, actor="admin")
+
+            from app.model.entities.overleaf_user import OverleafUser
+            r1 = db.session.get(OverleafUser, u1_id)
+            r2 = db.session.get(OverleafUser, u2_id)
+            assert r1.max_quota_bytes == default.storage_quota_bytes
+            assert r2.max_quota_bytes == 999_999  # respetado
+
+    def test_delete_role_not_found(self, app, db):
+        with app.app_context():
+            ok, msg = roles_service.delete_role(99999, actor="admin")
+            assert ok is False
+            assert "no encontrado" in msg.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -680,3 +992,126 @@ class TestRolesController:
             refreshed = db.session.get(OverleafUser, uid)
             default = roles_service.get_default_role()
             assert refreshed.role_id == default.id
+
+
+    # ── New role card + modal + POST /crear ─────────────────────────────────
+
+    def test_list_renders_new_role_card(self, auth_client):
+        resp = auth_client.get("/roles/")
+        assert "Nuevo rol".encode("utf-8") in resp.data
+        assert b"new-role-card" in resp.data
+
+    def test_list_renders_create_role_modal(self, auth_client):
+        resp = auth_client.get("/roles/")
+        assert b'id="createRoleModal"' in resp.data
+        # El form apunta a la ruta correcta
+        assert b'action="/roles/crear"' in resp.data
+
+    def test_list_uses_roles_grid_not_old_hardcoded_loop(self, auth_client):
+        resp = auth_client.get("/roles/")
+        assert b'class="roles-grid"' in resp.data
+        # El bucle viejo ya no existe
+        assert b"ROLE_ORDER" not in resp.data
+
+    def test_create_endpoint_creates_role(self, app, db, auth_client):
+        resp = auth_client.post("/roles/crear", data={
+            "name": "doctorado", "description": "PhD users",
+            "color": "info",
+            "quota_value": "10", "quota_unit": "GB",
+            "max_projects": "80",
+        })
+        assert resp.status_code == 302
+        with app.app_context():
+            r = roles_service.get_role_by_name("doctorado")
+            assert r is not None
+            assert r.storage_quota_bytes == 10 * GB
+            assert r.max_projects == 80
+
+    def test_create_endpoint_with_unlimited(self, app, db, auth_client):
+        auth_client.post("/roles/crear", data={
+            "name": "ilimitado", "description": "x",
+            "color": "secondary",
+            "quota_unlimited": "y",
+            "projects_unlimited": "y",
+        })
+        with app.app_context():
+            r = roles_service.get_role_by_name("ilimitado")
+            assert r is not None
+            assert r.storage_quota_bytes is None
+            assert r.max_projects is None
+
+    def test_create_endpoint_rejects_duplicate(self, app, db, auth_client):
+        auth_client.post("/roles/crear", data={
+            "name": "alumno",  # ya existe del seed
+            "color": "secondary",
+            "quota_unlimited": "y",
+            "projects_unlimited": "y",
+        })
+        # No se crea ningún rol nuevo con ese nombre (ya existía, sigue siendo 1)
+        with app.app_context():
+            n = Role.query.filter_by(name="alumno").count()
+            assert n == 1
+
+    def test_create_endpoint_rejects_missing_quota(self, app, db, auth_client):
+        """Si no se marca 'ilimitado' debe darse valor numérico."""
+        resp = auth_client.post("/roles/crear", data={
+            "name": "incompleto",
+            "color": "secondary",
+            # quota_value vacío, sin marcar ilimitado
+            "projects_unlimited": "y",
+        })
+        assert resp.status_code == 302  # redirige con flash de error
+        with app.app_context():
+            assert roles_service.get_role_by_name("incompleto") is None
+
+    # ── delete role: botón + endpoint ───────────────────────────────────────
+
+    def test_detail_renders_delete_button(self, app, db, auth_client):
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            rid = profesor.id
+        resp = auth_client.get(f"/roles/{rid}")
+        assert b'id="confirmDeleteRoleModal"' in resp.data
+        assert b'data-bs-target="#confirmDeleteRoleModal"' in resp.data
+        assert b'bi-trash' in resp.data
+
+    def test_delete_endpoint_deletes_empty_role(self, app, db, auth_client):
+        with app.app_context():
+            _, _, role = roles_service.create_role(
+                name="todelete_http", description=None,
+                storage_quota_bytes=None, max_projects=None,
+                actor="admin",
+            )
+            rid = role.id
+        resp = auth_client.post(f"/roles/{rid}/eliminar")
+        assert resp.status_code == 302
+        assert "/roles/" in resp.headers["Location"]  # redirige al listado
+        with app.app_context():
+            assert roles_service.get_role_by_id(rid) is None
+
+    def test_delete_endpoint_blocks_default(self, app, db, auth_client):
+        with app.app_context():
+            default = roles_service.get_default_role()
+            rid = default.id
+        resp = auth_client.post(f"/roles/{rid}/eliminar")
+        assert resp.status_code == 302
+        # Falla → redirige al detalle, no al listado
+        assert f"/roles/{rid}" in resp.headers["Location"]
+        with app.app_context():
+            assert roles_service.get_role_by_id(rid) is not None
+
+    def test_delete_endpoint_reassigns_users_and_deletes(self, app, db, auth_client):
+        """Endpoint: con usuarios asignados, los reasigna al default y borra el rol."""
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            default  = roles_service.get_default_role()
+            u = make_user(db, "oid-delc1", role=profesor)
+            rid, uid, did = profesor.id, u.id, default.id
+        resp = auth_client.post(f"/roles/{rid}/eliminar")
+        assert resp.status_code == 302
+        assert "/roles/" in resp.headers["Location"]
+        with app.app_context():
+            assert roles_service.get_role_by_id(rid) is None
+            from app.model.entities.overleaf_user import OverleafUser
+            refreshed = db.session.get(OverleafUser, uid)
+            assert refreshed.role_id == did
