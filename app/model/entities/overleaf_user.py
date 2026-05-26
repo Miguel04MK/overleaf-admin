@@ -38,7 +38,7 @@ class OverleafUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     overleaf_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
 
-    email = db.Column(db.String(255), nullable=True)
+    email = db.Column(db.String(255), nullable=True, unique=True, index=True)
     first_name = db.Column(db.String(255), nullable=True)
     last_name = db.Column(db.String(255), nullable=True)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
