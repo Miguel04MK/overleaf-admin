@@ -3,24 +3,146 @@
 {% block title %}Auditoría{% endblock %}
 {% block page_title %}Registro de auditoría{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/audit.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="pt-3">
+<div class="pt-2 audit-page">
+
+  {# ── Chips de resumen por categoría ─────────────────────────────────── #}
+  <div class="d-flex flex-wrap gap-2 mb-3 align-items-stretch audit-summary">
+
+    <a class="audit-chip {% if not f_category and not f_last_24h and not f_level %}is-active{% endif %}"
+       href="{{ url_for('audit.logs') }}" title="Mostrar todo">
+      <div class="chip-icon bg-light"><i class="bi bi-list-ul text-secondary"></i></div>
+      <div>
+        <div class="chip-lbl">Total</div>
+        <div class="chip-num">{{ summary.total }}</div>
+      </div>
+    </a>
+
+    {% for cat_key, cat in categories.items() %}
+    <a class="audit-chip {% if f_category == cat_key %}is-active{% endif %}"
+       href="{{ url_for('audit.logs', category=cat_key) }}"
+       title="Filtrar por {{ cat.label | lower }}">
+      <div class="chip-icon bg-{{ cat.color }}-subtle">
+        <i class="bi {{ cat.icon }} text-{{ cat.color }}"></i>
+      </div>
+      <div>
+        <div class="chip-lbl">{{ cat.label }}</div>
+        <div class="chip-num">{{ summary.by_category[cat_key] }}</div>
+      </div>
+    </a>
+    {% endfor %}
+
+    <a class="audit-chip {% if f_level == 'error' %}is-active{% endif %}"
+       href="{{ url_for('audit.logs', level='error') }}" title="Sólo errores">
+      <div class="chip-icon bg-danger-subtle">
+        <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+      </div>
+      <div>
+        <div class="chip-lbl">Errores</div>
+        <div class="chip-num text-danger">{{ summary.errors }}</div>
+      </div>
+    </a>
+
+    <a class="audit-chip {% if f_last_24h %}is-active{% endif %}"
+       href="{{ url_for('audit.logs', last_24h=1) }}" title="Últimas 24 h">
+      <div class="chip-icon bg-success-subtle">
+        <i class="bi bi-clock-history text-success"></i>
+      </div>
+      <div>
+        <div class="chip-lbl">Últimas 24 h</div>
+        <div class="chip-num">{{ summary.last_24h }}</div>
+      </div>
+    </a>
+  </div>
+
+  {# ── Filtros avanzados ───────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+      <form method="GET" action="{{ url_for('audit.logs') }}" class="row g-2 align-items-end">
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label small fw-semibold mb-1" for="f-q">Buscar</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" class="form-control" id="f-q" name="q"
+                   value="{{ f_search }}" placeholder="Actor o detalle…" autocomplete="off">
+          </div>
+        </div>
+        <div class="col-6 col-md-2 col-lg-2">
+          <label class="form-label small fw-semibold mb-1" for="f-category">Categoría</label>
+          <select class="form-select form-select-sm" id="f-category" name="category">
+            <option value="">Todas</option>
+            {% for cat_key, cat in categories.items() %}
+              <option value="{{ cat_key }}" {% if f_category == cat_key %}selected{% endif %}>{{ cat.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2 col-lg-1">
+          <label class="form-label small fw-semibold mb-1" for="f-level">Nivel</label>
+          <select class="form-select form-select-sm" id="f-level" name="level">
+            <option value="">Todos</option>
+            <option value="info"    {% if f_level == 'info'    %}selected{% endif %}>Info</option>
+            <option value="warning" {% if f_level == 'warning' %}selected{% endif %}>Aviso</option>
+            <option value="error"   {% if f_level == 'error'   %}selected{% endif %}>Error</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label small fw-semibold mb-1" for="f-actor">Actor</label>
+          <select class="form-select form-select-sm" id="f-actor" name="actor">
+            <option value="">Todos</option>
+            {% for a in actors %}
+              <option value="{{ a }}" {% if f_actor == a %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2 col-lg-2">
+          <label class="form-label small fw-semibold mb-1" for="f-date-from">Desde</label>
+          <input type="date" class="form-control form-control-sm" id="f-date-from"
+                 name="date_from" value="{{ f_date_from }}">
+        </div>
+        <div class="col-6 col-md-2 col-lg-1">
+          <label class="form-label small fw-semibold mb-1" for="f-date-to">Hasta</label>
+          <input type="date" class="form-control form-control-sm" id="f-date-to"
+                 name="date_to" value="{{ f_date_to }}">
+        </div>
+        <div class="col-12 col-lg-1 d-flex gap-1">
+          <button type="submit" class="btn btn-sm btn-success flex-grow-1" title="Aplicar filtros">
+            <i class="bi bi-funnel-fill"></i>
+          </button>
+          <a href="{{ url_for('audit.logs') }}"
+             class="btn btn-sm btn-outline-secondary"
+             title="Limpiar filtros">
+            <i class="bi bi-x-lg"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ── Tabla principal ────────────────────────────────────────────────── #}
   <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-      <span class="fw-semibold">
+    <div class="card-header bg-white border-bottom py-2 px-3
+                d-flex justify-content-between align-items-center">
+      <span class="fw-semibold small">
         <i class="bi bi-journal-text me-2 text-muted"></i>Eventos del sistema
       </span>
-      <span class="text-muted small">{{ pagination.total }} registros</span>
+      <span class="text-muted small">
+        {{ pagination.total }} resultado{{ 's' if pagination.total != 1 else '' }}
+      </span>
     </div>
     <div class="card-body p-0">
       {% if pagination.items %}
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0">
+        <table class="table table-sm table-hover align-middle mb-0 audit-table">
           <thead class="table-light">
             <tr>
-              <th class="ps-3">Fecha/Hora</th>
-              <th>Actor</th>
+              <th class="ps-3 text-nowrap">Fecha/Hora</th>
+              <th>Categoría</th>
               <th>Acción</th>
+              <th>Actor</th>
               <th>Nivel</th>
               <th>IP</th>
               <th>Detalle</th>
@@ -28,40 +150,80 @@
           </thead>
           <tbody>
             {% for entry in pagination.items %}
-            <tr>
-              <td class="ps-3 text-muted small text-nowrap">
-                {{ entry.created_at.strftime('%d/%m/%Y %H:%M:%S') if entry.created_at else '—' }}
-              </td>
-              <td class="small fw-medium">{{ entry.actor }}</td>
-              <td>
-                <code class="small">{{ entry.action }}</code>
-              </td>
-              <td>
-                {% if entry.level == 'error' %}
-                  <span class="badge bg-danger">Error</span>
-                {% elif entry.level == 'warning' %}
-                  <span class="badge bg-warning text-dark">Aviso</span>
-                {% else %}
-                  <span class="badge bg-secondary">Info</span>
-                {% endif %}
-              </td>
-              <td class="small text-muted">{{ entry.ip_address or '—' }}</td>
-              <td class="small text-muted" style="max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-                  title="{{ entry.detail or '' }}">
-                {{ entry.detail or '—' }}
-              </td>
-            </tr>
+              {% set cat_key = category_for_action(entry.action) %}
+              {% set cat     = categories.get(cat_key) if cat_key else None %}
+              <tr>
+                <td class="ps-3 text-muted small text-nowrap">
+                  {% if entry.created_at %}
+                    {{ entry.created_at.strftime('%d/%m/%Y') }}
+                    <div class="text-muted" style="font-size:.7rem;">
+                      {{ entry.created_at.strftime('%H:%M:%S') }}
+                    </div>
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if cat %}
+                    <span class="badge bg-{{ cat.color }}-subtle text-{{ cat.color }}
+                                 border border-{{ cat.color }}-subtle"
+                          style="font-size:.7rem;">
+                      <i class="bi {{ cat.icon }} me-1"></i>{{ cat.label }}
+                    </span>
+                  {% else %}
+                    <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
+                <td class="small">
+                  <span class="fw-medium">{{ label_for_action(entry.action) }}</span>
+                  <code class="text-muted d-block" style="font-size:.7rem;">{{ entry.action }}</code>
+                </td>
+                <td class="small fw-medium">
+                  <i class="bi bi-person-circle me-1 text-muted"></i>{{ entry.actor }}
+                </td>
+                <td>
+                  {% if entry.level == 'error' %}
+                    <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Error</span>
+                  {% elif entry.level == 'warning' %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Aviso</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary border">Info</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted text-nowrap">{{ entry.ip_address or '—' }}</td>
+                <td class="small text-muted" style="max-width:340px;"
+                    title="{{ entry.detail or '' }}">
+                  <div class="audit-detail">{{ entry.detail or '—' }}</div>
+                </td>
+              </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
 
-      {{ pagination_nav(pagination, url_for('audit.logs')) }}
+      {# Paginación que preserva el estado de los filtros #}
+      {% set _qs = {} %}
+      {% if f_search    %}{% set _ = _qs.update({'q': f_search})           %}{% endif %}
+      {% if f_level     %}{% set _ = _qs.update({'level': f_level})        %}{% endif %}
+      {% if f_category  %}{% set _ = _qs.update({'category': f_category})  %}{% endif %}
+      {% if f_actor     %}{% set _ = _qs.update({'actor': f_actor})        %}{% endif %}
+      {% if f_date_from %}{% set _ = _qs.update({'date_from': f_date_from})%}{% endif %}
+      {% if f_date_to   %}{% set _ = _qs.update({'date_to': f_date_to})    %}{% endif %}
+      {% if f_last_24h  %}{% set _ = _qs.update({'last_24h': 1})           %}{% endif %}
+      {{ pagination_nav(pagination, url_for('audit.logs', **_qs)) }}
 
       {% else %}
-      {{ empty_state('journal', 'No hay entradas en el registro de auditoría todavía.') }}
+        {% set has_filters = f_search or f_level or f_category or f_actor or f_date_from or f_date_to or f_last_24h %}
+        {% if has_filters %}
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-search d-block fs-3 mb-2 opacity-50"></i>
+            <div class="fw-semibold small">Ningún registro coincide con los filtros</div>
+            <a href="{{ url_for('audit.logs') }}" class="small">Limpiar filtros</a>
+          </div>
+        {% else %}
+          {{ empty_state('journal', 'No hay entradas en el registro de auditoría todavía.') }}
+        {% endif %}
       {% endif %}
     </div>
   </div>
+
 </div>
 {% endblock %}
