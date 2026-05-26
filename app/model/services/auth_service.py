@@ -12,8 +12,36 @@ from app.model.services.admin import admin_service as audit_service
 logger = logging.getLogger(__name__)
 
 
-def authenticate(username: str, password: str) -> AdminUser | None:
-    user = AdminUser.query.filter_by(username=username, is_active=True).first()
+def authenticate(login_identifier: str, password: str) -> AdminUser | None:
+    """Authenticate an admin by either username or email.
+
+    Acepta indistintamente `username` o `email` como identificador. Normaliza
+    espacios y compara el email en minúsculas (los emails se guardan así
+    también desde admins_service.create_admin).
+
+    Devuelve el AdminUser sólo si:
+      - existe (por username exacto o por email lower)
+      - la contraseña es correcta
+      - is_active es True
+    """
+    if not login_identifier or not password:
+        return None
+    ident = (login_identifier or "").strip()
+    if not ident:
+        return None
+
+    # Buscar por username exacto o por email (case-insensitive).
+    user = (
+        AdminUser.query
+        .filter(
+            db.or_(
+                AdminUser.username == ident,
+                AdminUser.email    == ident.lower(),
+            )
+        )
+        .filter(AdminUser.is_active.is_(True))
+        .first()
+    )
     if user and user.check_password(password):
         return user
     return None
