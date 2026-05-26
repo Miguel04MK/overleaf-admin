@@ -29,6 +29,8 @@
   const inpQUnit   = document.getElementById('inp-quota-unit');
   const inpProj    = document.getElementById('inp-max-projects');
   const inpDesc    = document.getElementById('inp-description');
+  const inpDefault = document.getElementById('inp-is-default');
+  const defWarning = document.getElementById('default-warning');
   const tbody      = document.getElementById('users-tbody');
   const pagDiv     = document.getElementById('users-pagination');
   const form       = document.getElementById('config-form');
@@ -42,19 +44,29 @@
 
   // ── Valores originales (detección robusta de cambios) ────────────────────
   const ORIG = {
-    qVal  : inpQVal  ? inpQVal.value  : '',
-    qUnit : inpQUnit ? inpQUnit.value : 'MB',
-    proj  : inpProj  ? inpProj.value  : '',
-    desc  : inpDesc  ? inpDesc.value  : '',
+    qVal   : inpQVal    ? inpQVal.value     : '',
+    qUnit  : inpQUnit   ? inpQUnit.value    : 'MB',
+    proj   : inpProj    ? inpProj.value     : '',
+    desc   : inpDesc    ? inpDesc.value     : '',
+    isDef  : inpDefault ? inpDefault.checked: false,
   };
 
   function hasChanges() {
     return (
-      (inpQVal  && inpQVal.value  !== ORIG.qVal)  ||
-      (inpQUnit && inpQUnit.value !== ORIG.qUnit) ||
-      (inpProj  && inpProj.value  !== ORIG.proj)  ||
-      (inpDesc  && inpDesc.value  !== ORIG.desc)
+      (inpQVal    && inpQVal.value    !== ORIG.qVal)  ||
+      (inpQUnit   && inpQUnit.value   !== ORIG.qUnit) ||
+      (inpProj    && inpProj.value    !== ORIG.proj)  ||
+      (inpDesc    && inpDesc.value    !== ORIG.desc)  ||
+      (inpDefault && inpDefault.checked !== ORIG.isDef)
     );
+  }
+
+  // Aviso visible cuando vas a marcar este rol como default (y no lo era)
+  if (inpDefault && defWarning) {
+    inpDefault.addEventListener('change', () => {
+      const willChange = inpDefault.checked && !ORIG.isDef;
+      defWarning.classList.toggle('d-none', !willChange);
+    });
   }
   function shouldIntercept() { return dirty || hasChanges(); }
 
@@ -440,7 +452,7 @@
   }
 
   // ── Listeners de inputs ───────────────────────────────────────────────────
-  [inpQVal, inpQUnit, inpProj, inpDesc].forEach(el => {
+  [inpQVal, inpQUnit, inpProj, inpDesc, inpDefault].forEach(el => {
     if (!el) return;
     el.addEventListener('input',  onInputChange);
     el.addEventListener('change', onInputChange);

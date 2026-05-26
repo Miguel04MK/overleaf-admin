@@ -6,20 +6,107 @@
 /* ── Chart wrapper (roles/list) ──────────────────────────────────────────── */
 .chart-wrap { position: relative; height: 300px; }
 
+/* ── Grid de roles (3 cols en desktop, 2 en tablet, 1 en móvil)
+       Última fila centrada cuando no está completa.                           */
+.roles-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+}
+.role-card-wrapper {
+  flex: 0 0 calc(33.333% - 0.7rem);
+  max-width: calc(33.333% - 0.7rem);
+  min-width: 0;
+}
+@media (max-width: 991.98px) {
+  .role-card-wrapper {
+    flex: 0 0 calc(50% - 0.5rem);
+    max-width: calc(50% - 0.5rem);
+  }
+}
+@media (max-width: 575.98px) {
+  .role-card-wrapper {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
 /* ── Role card (roles/list) ──────────────────────────────────────────────── */
 .role-card {
   border-radius: .65rem;
   transition: box-shadow .15s, transform .15s;
   overflow: hidden;
+  /* Altura mínima común a todas las cards (roles existentes + "Nuevo rol")
+     para que se vean iguales, estén en la misma fila o no. */
+  min-height: 11.5rem;
 }
 .role-card:hover {
   box-shadow: 0 4px 14px rgba(0,0,0,.08);
   transform: translateY(-1px);
 }
+/* Compactar el card-body: menos padding y menos gap entre bloques internos.
+   Esto sobreescribe las clases utility p-3 / gap-3 que vienen del template. */
+.role-card .card-body {
+  padding: .75rem !important;
+  gap: .55rem !important;
+}
 .role-icon {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 38px; height: 38px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.15rem; flex-shrink: 0;
+  font-size: 1rem; flex-shrink: 0;
+}
+
+/* ── Card "Nuevo rol": misma altura, borde punteado y fondo suave ────── */
+.new-role-card {
+  border: 2px dashed rgba(61, 139, 61, .35) !important;
+  background: rgba(61, 139, 61, .03);
+  box-shadow: none !important;
+}
+.new-role-card:hover {
+  background: rgba(61, 139, 61, .06);
+  border-color: rgba(61, 139, 61, .55) !important;
+  transform: none;
+}
+.role-icon-new {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(61, 139, 61, .1);
+  color: var(--ol-green, #3d8b3d);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.25rem; font-weight: 600;
+}
+
+/* Botón "Configurar" / "Crear" de las cards: mitad de ancho, centrado.
+   Sobreescribe el w-100 del template para que se vea compacto. */
+.role-card .btn-ol {
+  width: auto !important;
+  min-width: 50%;
+  max-width: 60%;
+  align-self: center;
+  /* Anula el mt-auto del template — el espacio sobrante ya no se acumula
+     entre las métricas y el botón. */
+  margin-top: 0 !important;
+}
+
+/* Mover el "espacio elástico" arriba del bloque de métricas: así los chips
+   bajan pegados al botón y todo el aire blanco se queda en la parte alta. */
+.role-card .card-body > .border-top {
+  margin-top: auto;
+}
+
+/* Descripción del rol: en vez de truncar a 1 línea, usamos line-clamp para
+   mostrar hasta 3 líneas (con elipsis si todavía sobra texto). Esto
+   aprovecha el espacio vertical libre arriba sin cambiar la altura total
+   de la card (el min-height de .role-card sigue siendo el mismo). */
+.role-card .card-body p.text-truncate {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 /* ── Metric chips inside role cards (roles/list) ─────────────────────────── */

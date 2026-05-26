@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'macros/ui.html' import empty_state, role_badge %}
+{% from 'macros/ui.html' import empty_state, role_badge, role_change_badge %}
 {% block title %}Roles{% endblock %}
 {% block page_title %}Gestión de roles{% endblock %}
 
@@ -13,10 +13,16 @@
 <div class="pt-2">
 
   {# ── Lookups y cálculos ─────────────────────────────────────────────────── #}
-  {% set ROLE_ORDER  = ['alumno', 'profesor', 'admin'] %}
-  {% set role_map    = {} %}
-  {% for r in roles %}{% set _ = role_map.update({r.name: r}) %}{% endfor %}
+  {# Ya no se hardcodea el orden de roles — iteramos lo que devuelve el servicio
+     (ordenado por is_default desc, name asc). Esto permite añadir roles
+     nuevos sin tocar el template. #}
   {% set total_users = stats.values() | sum %}
+  {# Iconos por nombre conocido — los roles custom usan el genérico bi-tag-fill. #}
+  {% set ROLE_ICONS = {
+    'admin':    'bi-shield-fill-check',
+    'profesor': 'bi-mortarboard-fill',
+    'alumno':   'bi-person-fill',
+  } %}
 
   {# ══ FILA SUPERIOR ═══════════════════════════════════════════════════════ #}
   <div class="row g-3 mb-3 align-items-stretch">
@@ -85,9 +91,9 @@
               {# Rol from → to + acción #}
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <div class="d-flex align-items-center gap-1">
-                  {{ role_badge(log.role_from) }}
+                  {{ role_change_badge(log, 'from') }}
                   <i class="bi bi-arrow-right text-muted" style="font-size:.6rem;"></i>
-                  {{ role_badge(log.role_to) }}
+                  {{ role_change_badge(log, 'to') }}
                 </div>
 
                 {% if log.action == 'assigned' %}
@@ -116,33 +122,26 @@
   </div>{# /fila superior #}
 
 
-  {# ══ CARDS DE ROLES ══════════════════════════════════════════════════════ #}
-  <div class="row g-3">
-    {% for rname in ROLE_ORDER %}
-    {% set role = role_map.get(rname) %}
-    {% if role %}
+  {# ══ CARDS DE ROLES ══════════════════════════════════════════════════════
+     Grid flexible: 3 cols en desktop, 2 en tablet, 1 en móvil.
+     Centrado de la última fila implementado en CSS (.roles-grid).            #}
+  <div class="roles-grid">
 
+    {% for role in roles %}
     {% set count    = stats.get(role.id, 0) %}
     {% set pct      = ((count / total_users * 100) | round(1)) if total_users > 0 else 0 %}
     {% set has_q    = role.storage_quota_bytes is not none %}
+    {% set icon_cls = ROLE_ICONS.get(role.name, 'bi-tag-fill') %}
 
-    <div class="col-md-4">
+    <div class="role-card-wrapper">
       <div class="card role-card border shadow-sm h-100">
         <div class="card-body p-3 d-flex flex-column gap-3" style="min-width:0;">
 
-          {# ── Cabecera: icono + nombre + badges ─────────────────────── #}
+          {# Cabecera: icono + nombre + badges #}
           <div class="d-flex align-items-center gap-3" style="min-width:0;">
-
             <div class="role-icon bg-{{ role.color }}-subtle flex-shrink-0">
-              {% if role.name == 'admin' %}
-                <i class="bi bi-shield-fill-check text-{{ role.color }}"></i>
-              {% elif role.name == 'profesor' %}
-                <i class="bi bi-mortarboard-fill text-{{ role.color }}"></i>
-              {% else %}
-                <i class="bi bi-person-fill text-{{ role.color }}"></i>
-              {% endif %}
+              <i class="bi {{ icon_cls }} text-{{ role.color }}"></i>
             </div>
-
             <div style="min-width:0; flex:1;">
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="fw-bold text-capitalize">{{ role.name }}</span>
@@ -161,46 +160,182 @@
                 {{ role.description or '—' }}
               </p>
             </div>
-
           </div>
 
-          {# ── Métricas ──────────────────────────────────────────────── #}
+          {# Métricas #}
           <div class="d-flex align-items-center gap-2 flex-wrap pt-2 border-top">
-
             <span class="mchip">
               <i class="bi bi-people-fill"></i>
               {{ count }} usuarios <span class="text-muted">({{ pct }}%)</span>
             </span>
-
             <span class="mchip">
               <i class="bi bi-hdd-fill"></i>
               {% if has_q %}{{ role.storage_quota_fmt }}
               {% else %}<i class="bi bi-infinity"></i> Ilimitada{% endif %}
             </span>
-
             <span class="mchip">
               <i class="bi bi-folder-fill"></i>
               {% if role.max_projects is not none %}{{ role.max_projects }} proyectos
               {% else %}<i class="bi bi-infinity"></i> Ilimitados{% endif %}
             </span>
-
           </div>
 
-          {# ── Botón ─────────────────────────────────────────────────── #}
+          {# Botón #}
           <a href="{{ url_for('roles.role_detail', role_id=role.id) }}"
              class="btn btn-sm btn-ol w-100 mt-auto">
             <i class="bi bi-gear me-1"></i>Configurar
           </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
 
+    {# ── Card "Nuevo rol" — integrada en la misma cuadrícula ─────────── #}
+    <div class="role-card-wrapper">
+      <div class="card role-card new-role-card h-100">
+        <div class="card-body p-3 d-flex flex-column gap-3 text-center align-items-center justify-content-center"
+             style="min-width:0;">
+
+          <div class="role-icon role-icon-new flex-shrink-0">
+            <i class="bi bi-plus-lg"></i>
+          </div>
+
+          <div>
+            <div class="fw-semibold">Nuevo rol</div>
+            <p class="text-muted small mb-0 px-2">
+              Crea un nuevo rol con cuota y límite de proyectos personalizados.
+            </p>
+          </div>
+
+          <button type="button"
+                  class="btn btn-sm btn-ol w-100 mt-auto"
+                  data-bs-toggle="modal"
+                  data-bs-target="#createRoleModal">
+            <i class="bi bi-plus-circle me-1"></i>Crear
+          </button>
         </div>
       </div>
     </div>
 
-    {% endif %}
-    {% endfor %}
-  </div>{# /cards #}
+  </div>{# /.roles-grid #}
 
 </div>{# /pt-2 #}
+
+{# ── Modal: crear rol ───────────────────────────────────────────────────── #}
+<div class="modal fade" id="createRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form method="POST" action="{{ url_for('roles.create_role') }}"
+          autocomplete="off" id="create-role-form">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-1">
+          <h6 class="modal-title fw-semibold">
+            <i class="bi bi-plus-circle me-2 text-success"></i>Crear nuevo rol
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body py-2">
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="cr-name">Nombre</label>
+              <input type="text" class="form-control form-control-sm"
+                     id="cr-name" name="name" required minlength="2" maxlength="64"
+                     placeholder="p. ej. doctorado">
+              <div class="form-text small">Se guarda en minúsculas.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="cr-color">Color</label>
+              <select class="form-select form-select-sm" id="cr-color" name="color">
+                <option value="primary">Azul</option>
+                <option value="info">Cian</option>
+                <option value="success">Verde</option>
+                <option value="warning">Amarillo</option>
+                <option value="danger">Rojo</option>
+                <option value="secondary" selected>Gris</option>
+                <option value="dark">Oscuro</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="cr-description">Descripción</label>
+              <input type="text" class="form-control form-control-sm"
+                     id="cr-description" name="description" maxlength="500"
+                     placeholder="Para qué se usa este rol (opcional)">
+            </div>
+
+            {# Cuota: ilimitada o valor + unidad #}
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1">Cuota de almacenamiento</label>
+              <div class="input-group input-group-sm mb-1">
+                <input type="number" class="form-control" id="cr-quota-value"
+                       name="quota_value" min="0" step="any" placeholder="p. ej. 500">
+                <select class="form-select" id="cr-quota-unit" name="quota_unit" style="max-width:5rem;">
+                  <option value="MB" selected>MB</option>
+                  <option value="GB">GB</option>
+                </select>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox"
+                       id="cr-quota-unlimited" name="quota_unlimited">
+                <label class="form-check-label small" for="cr-quota-unlimited">
+                  Cuota ilimitada
+                </label>
+              </div>
+            </div>
+
+            {# Proyectos: ilimitados o valor #}
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="cr-max-projects">
+                Límite de proyectos
+              </label>
+              <input type="number" class="form-control form-control-sm mb-1"
+                     id="cr-max-projects" name="max_projects" min="1" step="1"
+                     placeholder="p. ej. 20">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox"
+                       id="cr-projects-unlimited" name="projects_unlimited">
+                <label class="form-check-label small" for="cr-projects-unlimited">
+                  Proyectos ilimitados
+                </label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="cr-is-default" name="is_default">
+                <label class="form-check-label small" for="cr-is-default">
+                  Marcar como rol por defecto
+                </label>
+                <div id="cr-default-warning" class="form-text small text-warning d-none">
+                  <i class="bi bi-exclamation-triangle me-1"></i>
+                  Esto desmarcará el rol por defecto actual{% if default_role %} («{{ default_role.name }}»){% endif %}.
+                </div>
+              </div>
+            </div>
+
+            {# Aviso de validación: se rellena desde JS al pulsar "Crear rol". #}
+            <div class="col-12">
+              <div id="cr-error-box" class="alert alert-danger small mb-0 py-2 px-3 d-none">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                <span id="cr-error-msg"></span>
+                <ul id="cr-error-list" class="mb-0 mt-1 ps-3"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-success">
+            <i class="bi bi-check2-circle me-1"></i>Crear rol
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 
@@ -218,4 +353,130 @@ const ROLES_DATA = {
 };
 </script>
 <script src="{{ url_for('static', filename='js/roles-list.js') }}"></script>
+<script>
+  // Modal de crear rol — validación cliente
+  (function () {
+    const form = document.getElementById("create-role-form");
+    if (!form) return;
+
+    // ── Toggles "ilimitado" ───────────────────────────────────────────────
+    // Marcar/desmarcar la cuota o el límite de proyectos como ilimitado:
+    //   - vacía y deshabilita el input numérico
+    //   - también quita/añade el atributo `required` para que la validación
+    //     nativa del navegador y nuestro chequeo manual estén en sintonía.
+    function bindUnlimited(checkboxId, mainInputId, ...auxIds) {
+      const c   = document.getElementById(checkboxId);
+      const inp = document.getElementById(mainInputId);
+      if (!c || !inp) return;
+      const aux = auxIds.map((id) => document.getElementById(id)).filter(Boolean);
+      function apply() {
+        const unlimited = c.checked;
+        inp.disabled = unlimited;
+        if (unlimited) {
+          inp.value = "";
+          inp.removeAttribute("required");
+        } else {
+          inp.setAttribute("required", "");
+        }
+        aux.forEach((el) => { el.disabled = unlimited; });
+      }
+      c.addEventListener("change", apply);
+      apply();
+    }
+    bindUnlimited("cr-quota-unlimited",    "cr-quota-value", "cr-quota-unit");
+    bindUnlimited("cr-projects-unlimited", "cr-max-projects");
+
+    // ── Aviso "rol por defecto" ───────────────────────────────────────────
+    const isDefault = document.getElementById("cr-is-default");
+    const warning   = document.getElementById("cr-default-warning");
+    if (isDefault && warning) {
+      isDefault.addEventListener("change", () => {
+        warning.classList.toggle("d-none", !isDefault.checked);
+      });
+    }
+
+    // ── Validación al pulsar "Crear rol" ──────────────────────────────────
+    // Lista los campos obligatorios que faltan en un alert dentro del modal,
+    // además de disparar los tooltips nativos del navegador.
+    const errorBox  = document.getElementById("cr-error-box");
+    const errorMsg  = document.getElementById("cr-error-msg");
+    const errorList = document.getElementById("cr-error-list");
+
+    function showErrors(missing) {
+      errorMsg.textContent = missing.length === 1
+        ? "Falta rellenar un campo obligatorio:"
+        : `Faltan ${missing.length} campos obligatorios:`;
+      errorList.innerHTML = missing
+        .map((m) => `<li>${m}</li>`)
+        .join("");
+      errorBox.classList.remove("d-none");
+      // Marcar visualmente los inputs en rojo (Bootstrap is-invalid)
+      missing.forEach((m) => {
+        if (m._el) m._el.classList.add("is-invalid");
+      });
+    }
+
+    function clearErrors() {
+      errorBox.classList.add("d-none");
+      errorList.innerHTML = "";
+      form.querySelectorAll(".is-invalid").forEach((el) => el.classList.remove("is-invalid"));
+    }
+
+    // Limpia el aviso al editar un campo
+    form.querySelectorAll("input, select").forEach((el) => {
+      el.addEventListener("input",  () => el.classList.remove("is-invalid"));
+      el.addEventListener("change", () => el.classList.remove("is-invalid"));
+    });
+
+    form.addEventListener("submit", (ev) => {
+      clearErrors();
+      const missing = [];
+
+      const name = document.getElementById("cr-name");
+      if (!name.value.trim() || name.value.trim().length < 2) {
+        missing.push(Object.assign(["Nombre del rol (mínimo 2 caracteres)"], { _el: name })[0] ? "Nombre del rol (mínimo 2 caracteres)" : "");
+        // Truco para llevar el elemento aparte
+        missing[missing.length - 1] = "Nombre del rol (mínimo 2 caracteres)";
+        missing._els = missing._els || [];
+        missing._els.push(name);
+      }
+
+      const quotaUnlim = document.getElementById("cr-quota-unlimited").checked;
+      const quotaVal   = document.getElementById("cr-quota-value");
+      if (!quotaUnlim && !quotaVal.value.trim()) {
+        missing.push("Cuota de almacenamiento (o marca «Cuota ilimitada»)");
+        missing._els = missing._els || [];
+        missing._els.push(quotaVal);
+      }
+
+      const projUnlim = document.getElementById("cr-projects-unlimited").checked;
+      const projVal   = document.getElementById("cr-max-projects");
+      if (!projUnlim && !projVal.value.trim()) {
+        missing.push("Límite de proyectos (o marca «Proyectos ilimitados»)");
+        missing._els = missing._els || [];
+        missing._els.push(projVal);
+      }
+
+      if (missing.length) {
+        ev.preventDefault();
+        // Pinta los inputs en rojo
+        (missing._els || []).forEach((el) => el.classList.add("is-invalid"));
+        // Lista visible
+        errorMsg.textContent = missing.length === 1
+          ? "Falta rellenar un campo obligatorio:"
+          : `Faltan ${missing.length} campos obligatorios:`;
+        errorList.innerHTML = missing.map((m) => `<li>${m}</li>`).join("");
+        errorBox.classList.remove("d-none");
+        // Foco en el primero
+        if (missing._els && missing._els[0]) missing._els[0].focus();
+      }
+    });
+
+    // Si cierras el modal, limpia el aviso
+    const modalEl = document.getElementById("createRoleModal");
+    if (modalEl) {
+      modalEl.addEventListener("hidden.bs.modal", clearErrors);
+    }
+  })();
+</script>
 {% endblock %}

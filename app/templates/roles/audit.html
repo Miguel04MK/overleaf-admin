@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'macros/ui.html' import pagination_nav, empty_state, role_badge %}
+{% from 'macros/ui.html' import pagination_nav, empty_state, role_badge, role_change_badge %}
 {% block title %}Auditoría de roles{% endblock %}
 {% block page_title %}Auditoría de cambios de rol{% endblock %}
 
@@ -107,8 +107,8 @@
                 {% endif %}
               </td>
 
-              <td>{{ role_badge(log.role_from) }}</td>
-              <td>{{ role_badge(log.role_to) }}</td>
+              <td>{{ role_change_badge(log, 'from') }}</td>
+              <td>{{ role_change_badge(log, 'to') }}</td>
 
               <td class="small text-muted">
                 <i class="bi bi-person-circle me-1"></i>{{ log.changed_by }}

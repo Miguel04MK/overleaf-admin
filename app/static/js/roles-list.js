@@ -7,8 +7,10 @@
 (function () {
   'use strict';
 
-  const ROLE_ORDER  = ['alumno', 'profesor', 'admin'];
-  const ROLES       = ROLE_ORDER.map(n => ROLES_DATA[n]).filter(Boolean);
+  // Iteramos todos los roles que vengan de Python (ya ordenados por
+  // is_default desc + name asc). Esto permite añadir roles nuevos sin
+  // tocar la gráfica.
+  const ROLES       = Object.values(ROLES_DATA);
   const TOTAL_USERS = ROLES.reduce((s, r) => s + r.userCount, 0); // eslint-disable-line no-unused-vars
 
   /* ── Colores por métrica ─────────────────────────────────────────── */
