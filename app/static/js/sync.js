@@ -118,6 +118,18 @@
     return `<span class="text-muted ms-1" style="font-size:.7rem;"><span class="${cls}">${sign}${d}</span></span>`;
   }
 
+  // Renderiza la celda "después / antes +delta" para usuarios o proyectos.
+  // Para registros antiguos sin `after`/`before` cae al formato legacy.
+  function countCell(after, before, synced, found, delta) {
+    let main;
+    if (after != null && before != null) {
+      main = `<span class="fw-medium">${after}</span> <span class="text-muted">/ ${before}</span>`;
+    } else {
+      main = `<span class="fw-medium">${synced || 0}</span> <span class="text-muted">/ ${found || 0}</span>`;
+    }
+    return main + deltaSpan(delta);
+  }
+
   function renderHistory(data) {
     if (total) total.textContent = `${data.total} registros`;
     if (!data.items || !data.items.length) {
@@ -140,8 +152,8 @@
         <td><span class="badge bg-light text-dark border" style="font-size:.7rem;">${esc(r.sync_type_label)}</span></td>
         <td>${statusBadge(r.status)}</td>
         <td class="small text-muted">${triggered}</td>
-        <td class="small"><span class="fw-medium">${r.users_synced || 0}</span> <span class="text-muted">/ ${r.users_found || 0}</span>${deltaSpan(r.users_delta)}</td>
-        <td class="small"><span class="fw-medium">${r.projects_synced || 0}</span> <span class="text-muted">/ ${r.projects_found || 0}</span>${deltaSpan(r.projects_delta)}</td>
+        <td class="small">${countCell(r.users_after, r.users_before, r.users_synced, r.users_found, r.users_delta)}</td>
+        <td class="small">${countCell(r.projects_after, r.projects_before, r.projects_synced, r.projects_found, r.projects_delta)}</td>
         <td class="small text-muted">${dur}</td>
         <td class="small">${errCell}</td>
         <td class="text-end pe-3"><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-detail" data-id="${r.id}" title="Ver detalle"><i class="bi bi-search"></i></button></td>
@@ -321,17 +333,23 @@
     // ── Contadores compactos en una sola línea de chips ────────────────
     //   Ej.: 👥 0/0 (+0 nuevos, 0 actualizados) · 📁 0/0 (+0 nuevos, 0
     //   actualizados) · 👥 0 miembros sync.
+    const uCount = (r.users_after != null && r.users_before != null)
+      ? `<strong>${r.users_after}</strong>/<span class="text-muted">${r.users_before}</span>`
+      : `<strong>${r.users_synced || 0}</strong>/<span class="text-muted">${r.users_found || 0}</span>`;
     const usersChip = `
       <span class="sd-metric">
         <i class="bi bi-people"></i>
-        <strong>${r.users_synced || 0}</strong>/<span class="text-muted">${r.users_found || 0}</span>
+        ${uCount}
         <small class="text-muted ms-1">+${r.users_created || 0} nuevos · ${r.users_updated || 0} actualizados</small>
         ${deltaInline(r.users_delta)}
       </span>`;
+    const pCount = (r.projects_after != null && r.projects_before != null)
+      ? `<strong>${r.projects_after}</strong>/<span class="text-muted">${r.projects_before}</span>`
+      : `<strong>${r.projects_synced || 0}</strong>/<span class="text-muted">${r.projects_found || 0}</span>`;
     const projsChip = `
       <span class="sd-metric">
         <i class="bi bi-folder"></i>
-        <strong>${r.projects_synced || 0}</strong>/<span class="text-muted">${r.projects_found || 0}</span>
+        ${pCount}
         <small class="text-muted ms-1">+${r.projects_created || 0} nuevos · ${r.projects_updated || 0} actualizados</small>
         ${deltaInline(r.projects_delta)}
       </span>`;
