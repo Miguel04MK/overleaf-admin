@@ -9,16 +9,11 @@
  * Globales de utils.js disponibles: esc()
  */
 
-const IND_META = {
-  large:         { label: 'Grande',       icon: 'bi-hdd-fill',    color: 'warning'   },
-  inactive:      { label: 'Inactivo',     icon: 'bi-moon-fill',   color: 'secondary' },
-  collaborative: { label: 'Colaborativo', icon: 'bi-people-fill', color: 'primary'   },
-};
+const OP_LABEL = { gt: 'Más de', eq: 'Igual a', lt: 'Menos de' };
 
 // ── Estado central (seed desde template) ──────────────────────────────────────
 const state = {
   ...INITIAL_STATE,
-  indicators: new Set(INITIAL_STATE.indicators),
   page: 1,
 };
 
@@ -29,7 +24,14 @@ function buildParams() {
   if (state.owner_id)  p.set('owner_id',  state.owner_id);
   if (state.date_from) p.set('date_from', state.date_from);
   if (state.date_to)   p.set('date_to',   state.date_to);
-  state.indicators.forEach(ind => p.append('indicators', ind));
+  if (state.size_op && state.size_mb != null) {
+    p.set('size_op', state.size_op);
+    p.set('size_mb', state.size_mb);
+  }
+  if (state.members_op && state.members_val != null) {
+    p.set('members_op',  state.members_op);
+    p.set('members_val', state.members_val);
+  }
   p.set('sort',  state.sort);
   p.set('order', state.order);
   p.set('page',  state.page);
@@ -59,7 +61,7 @@ async function doFetch(page) {
     requestAnimationFrame(() => tbody.classList.remove('tbody-loading'));
   } catch (e) {
     tbody.innerHTML = `
-      <tr><td colspan="7" class="text-center py-4 text-danger">
+      <tr><td colspan="6" class="text-center py-4 text-danger">
         <i class="bi bi-exclamation-triangle me-2"></i>Error al cargar proyectos.
       </td></tr>`;
     requestAnimationFrame(() => tbody.classList.remove('tbody-loading'));
@@ -76,7 +78,7 @@ window.submitForm = submitForm;
 function renderTable(projects) {
   const tbody = document.getElementById('projects-tbody');
   if (!projects.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">
       <i class="bi bi-folder-x fs-1 d-block mb-3 opacity-50"></i>
       No hay proyectos que coincidan con los filtros aplicados.
     </td></tr>`;
@@ -114,16 +116,6 @@ function buildRow(p) {
 
   const sizeHtml = p.size_fmt ? esc(p.size_fmt) : `<span class="opacity-50">—</span>`;
 
-  const inds = p.indicators || [];
-  let indHtml = '<div class="d-flex flex-wrap gap-1">';
-  if (inds.includes('large'))
-    indHtml += `<span class="badge bg-warning text-dark" title="Ocupa más de 10 MB"><i class="bi bi-hdd-fill me-1"></i>Grande</span>`;
-  if (inds.includes('inactive'))
-    indHtml += `<span class="badge bg-secondary" title="Sin actividad en más de 90 días"><i class="bi bi-moon-fill me-1"></i>Inactivo</span>`;
-  if (inds.includes('collaborative'))
-    indHtml += `<span class="badge bg-primary bg-opacity-75" title="${p.member_count} colaboradores"><i class="bi bi-people-fill me-1"></i>Colaborativo</span>`;
-  indHtml += '</div>';
-
   return `<tr class="row-clickable" onclick="window.location='${url}'">
     <td class="ps-3 fw-medium small">
       <a href="${url}" class="text-decoration-none text-body" onclick="event.stopPropagation()">${esc(p.name) || '—'}</a>
@@ -133,7 +125,6 @@ function buildRow(p) {
     <td class="text-end small text-muted">${sizeHtml}</td>
     <td class="small text-muted">${p.last_updated_at || '—'}</td>
     <td class="small text-muted">${p.created_at || '—'}</td>
-    <td>${indHtml}</td>
   </tr>`;
 }
 
@@ -329,42 +320,43 @@ function clearDateFilter() {
 window.applyDateFilter  = applyDateFilter;
 window.clearDateFilter  = clearDateFilter;
 
-// ── Filtro: INDICADORES ───────────────────────────────────────────────────────
-document.querySelectorAll('.ind-toggle').forEach(el => {
-  el.addEventListener('click', () => {
-    const key = el.dataset.key;
-    if (state.indicators.has(key)) { state.indicators.delete(key); el.classList.remove('active'); }
-    else                           { state.indicators.add(key);    el.classList.add('active');    }
-    _syncIndBtn();
-  });
-});
-
-function _syncIndBtn() {
-  const btn   = document.getElementById('btn-f-indicators');
-  const icon  = btn.querySelector('i');
-  let   badge = btn.querySelector('.badge');
-  if (state.indicators.size > 0) {
-    btn.classList.add('has-filter');
-    icon.className = 'bi bi-flag-fill me-1';
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'badge bg-white text-success ms-1';
-      badge.style.fontSize = '.7rem';
-      btn.appendChild(badge);
-    }
-    badge.textContent = state.indicators.size;
+// ── Filtro: TAMAÑO ────────────────────────────────────────────────────────────
+function applySizeFilter() {
+  const op  = document.getElementById('f-size-op').value;
+  const raw = document.getElementById('f-size-val').value.trim();
+  const val = parseFloat(raw);
+  if (raw === '' || isNaN(val) || val < 0) {
+    state.size_op = null; state.size_mb = null;
   } else {
-    btn.classList.remove('has-filter');
-    icon.className = 'bi bi-flag me-1';
-    if (badge) badge.remove();
+    state.size_op = op; state.size_mb = val;
   }
-}
-
-function applyIndicators() {
-  closeDropdown('dd-indicators');
+  document.getElementById('btn-f-size').classList.toggle('has-filter', !!state.size_op);
+  closeDropdown('dd-size');
   doFetch(1);
 }
-window.applyIndicators = applyIndicators;
+document.getElementById('f-size-add').addEventListener('click', applySizeFilter);
+document.getElementById('f-size-val').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applySizeFilter(); }
+});
+
+// ── Filtro: COLABORADORES ─────────────────────────────────────────────────────
+function applyMembersFilter() {
+  const op  = document.getElementById('f-members-op').value;
+  const raw = document.getElementById('f-members-val').value.trim();
+  const val = parseInt(raw, 10);
+  if (raw === '' || isNaN(val) || val < 0) {
+    state.members_op = null; state.members_val = null;
+  } else {
+    state.members_op = op; state.members_val = val;
+  }
+  document.getElementById('btn-f-members').classList.toggle('has-filter', !!state.members_op);
+  closeDropdown('dd-members');
+  doFetch(1);
+}
+document.getElementById('f-members-add').addEventListener('click', applyMembersFilter);
+document.getElementById('f-members-val').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applyMembersFilter(); }
+});
 
 // ── Chips ─────────────────────────────────────────────────────────────────────
 function renderChips() {
@@ -393,44 +385,58 @@ function renderChips() {
     chipsData.push({ label, icon: 'bi-calendar3', clear: () => clearDateFilter() });
   }
 
-  state.indicators.forEach(key => {
-    const meta = IND_META[key] || { label: key, icon: 'bi-flag' };
+  if (state.size_op && state.size_mb != null) {
     chipsData.push({
-      label: meta.label, icon: meta.icon,
+      label: `Tamaño ${OP_LABEL[state.size_op]} ${state.size_mb} MB`,
+      icon: 'bi-hdd',
       clear: () => {
-        state.indicators.delete(key);
-        document.querySelector(`.ind-toggle[data-key="${key}"]`)?.classList.remove('active');
-        _syncIndBtn();
+        state.size_op = null; state.size_mb = null;
+        document.getElementById('btn-f-size').classList.remove('has-filter');
+        document.getElementById('f-size-val').value = '';
         doFetch(1);
       },
     });
-  });
+  }
+
+  if (state.members_op && state.members_val != null) {
+    chipsData.push({
+      label: `Colaboradores ${OP_LABEL[state.members_op]} ${state.members_val}`,
+      icon: 'bi-people',
+      clear: () => {
+        state.members_op = null; state.members_val = null;
+        document.getElementById('btn-f-members').classList.remove('has-filter');
+        document.getElementById('f-members-val').value = '';
+        doFetch(1);
+      },
+    });
+  }
 
   const row = document.getElementById('chips-row');
   if (!chipsData.length) { row.classList.add('d-none'); row.innerHTML = ''; return; }
   row.classList.remove('d-none');
 
+  // "Limpiar todo" se muestra siempre que haya al menos 1 filtro.
   row.innerHTML = chipsData.map((c, i) => `
     <span class="filter-chip" data-chip="${i}">
       <i class="bi ${esc(c.icon)} me-1"></i>${esc(c.label)}
       <button class="chip-remove" data-chip="${i}" title="Quitar">✕</button>
     </span>`
-  ).join('') + (chipsData.length > 1 ? `
+  ).join('') + `
     <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0 ms-1"
             id="btn-clear-all">
       <i class="bi bi-x-circle me-1"></i>Limpiar todo
-    </button>` : '');
+    </button>`;
 
   chipsData.forEach((c, i) => {
     row.querySelector(`[data-chip="${i}"].chip-remove`)
        .addEventListener('click', () => c.clear());
   });
 
-  const clearAllBtn = document.getElementById('btn-clear-all');
-  if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
-    state.owner_id   = null; state.owner_name = '';
-    state.date_from  = '';   state.date_to    = '';
-    state.indicators.clear();
+  document.getElementById('btn-clear-all').addEventListener('click', () => {
+    state.owner_id    = null; state.owner_name = '';
+    state.date_from   = '';   state.date_to    = '';
+    state.size_op     = null; state.size_mb    = null;
+    state.members_op  = null; state.members_val = null;
     state.q = '';
     document.getElementById('proj-search').value = '';
     document.getElementById('btn-f-owner').classList.remove('has-filter');
@@ -438,8 +444,10 @@ function renderChips() {
     document.getElementById('btn-f-owner').querySelector('i').className = 'bi bi-person me-1';
     document.getElementById('btn-f-date').classList.remove('has-filter');
     document.getElementById('btn-f-date').querySelector('i').className = 'bi bi-calendar3 me-1';
-    document.querySelectorAll('.ind-toggle').forEach(el => el.classList.remove('active'));
-    _syncIndBtn();
+    document.getElementById('btn-f-size').classList.remove('has-filter');
+    document.getElementById('f-size-val').value = '';
+    document.getElementById('btn-f-members').classList.remove('has-filter');
+    document.getElementById('f-members-val').value = '';
     doFetch(1);
   });
 }
