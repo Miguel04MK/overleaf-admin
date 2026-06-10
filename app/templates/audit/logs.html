@@ -62,65 +62,106 @@
   {# ── Filtros avanzados ───────────────────────────────────────────────── #}
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-body py-2 px-3">
-      <form method="GET" action="{{ url_for('audit.logs') }}" class="row g-2 align-items-end">
-        <div class="col-12 col-md-4 col-lg-3">
-          <label class="form-label small fw-semibold mb-1" for="f-q">Buscar</label>
-          <div class="input-group input-group-sm">
-            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-            <input type="text" class="form-control" id="f-q" name="q"
-                   value="{{ f_search }}" placeholder="Actor o detalle…" autocomplete="off">
+      <form method="GET" action="{{ url_for('audit.logs') }}" id="audit-filters-form"
+            class="d-flex flex-wrap align-items-center gap-2">
+
+        {# Buscador #}
+        <div class="input-group input-group-sm" style="width:260px;">
+          <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" class="form-control" id="f-q" name="q"
+                 value="{{ f_search }}" placeholder="Actor o detalle…" autocomplete="off">
+        </div>
+
+        {# Categoría — select plano #}
+        <select class="form-select form-select-sm filter-input audit-filter-select {{ 'has-filter' if f_category }}"
+                name="category" style="width:auto;min-width:170px;">
+          <option value="">Categoría: todas</option>
+          {% for cat_key, cat in categories.items() %}
+            <option value="{{ cat_key }}" {% if f_category == cat_key %}selected{% endif %}>{{ cat.label }}</option>
+          {% endfor %}
+        </select>
+
+        {# Nivel — select plano #}
+        <select class="form-select form-select-sm filter-input audit-filter-select {{ 'has-filter' if f_level }}"
+                name="level" style="width:auto;min-width:150px;">
+          <option value="">Nivel: todos</option>
+          <option value="info"    {% if f_level == 'info'    %}selected{% endif %}>Informativa</option>
+          <option value="warning" {% if f_level == 'warning' %}selected{% endif %}>Advertencia</option>
+          <option value="error"   {% if f_level == 'error'   %}selected{% endif %}>Crítica</option>
+        </select>
+
+        {# Actor — select plano #}
+        <select class="form-select form-select-sm filter-input audit-filter-select {{ 'has-filter' if f_actor }}"
+                name="actor" style="width:auto;min-width:170px;">
+          <option value="">Actor: todos</option>
+          {% for a in actors %}
+            <option value="{{ a }}" {% if f_actor == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+
+        {# Fecha — único dropdown porque agrupa dos date pickers #}
+        <div class="dropdown" id="dd-date">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if f_date_from or f_date_to }}"
+                  id="btn-f-date">
+            <i class="bi bi-calendar3 me-1"></i>Fecha
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:230px;">
+            <label class="form-label small text-muted mb-1">Desde</label>
+            <input type="date" class="form-control form-control-sm filter-input mb-2"
+                   name="date_from" value="{{ f_date_from }}">
+            <label class="form-label small text-muted mb-1">Hasta</label>
+            <input type="date" class="form-control form-control-sm filter-input"
+                   name="date_to" value="{{ f_date_to }}">
           </div>
         </div>
-        <div class="col-6 col-md-2 col-lg-2">
-          <label class="form-label small fw-semibold mb-1" for="f-category">Categoría</label>
-          <select class="form-select form-select-sm" id="f-category" name="category">
-            <option value="">Todas</option>
-            {% for cat_key, cat in categories.items() %}
-              <option value="{{ cat_key }}" {% if f_category == cat_key %}selected{% endif %}>{{ cat.label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-6 col-md-2 col-lg-1">
-          <label class="form-label small fw-semibold mb-1" for="f-level">Nivel</label>
-          <select class="form-select form-select-sm" id="f-level" name="level">
-            <option value="">Todos</option>
-            <option value="info"    {% if f_level == 'info'    %}selected{% endif %}>Info</option>
-            <option value="warning" {% if f_level == 'warning' %}selected{% endif %}>Aviso</option>
-            <option value="error"   {% if f_level == 'error'   %}selected{% endif %}>Error</option>
-          </select>
-        </div>
-        <div class="col-12 col-md-3 col-lg-2">
-          <label class="form-label small fw-semibold mb-1" for="f-actor">Actor</label>
-          <select class="form-select form-select-sm" id="f-actor" name="actor">
-            <option value="">Todos</option>
-            {% for a in actors %}
-              <option value="{{ a }}" {% if f_actor == a %}selected{% endif %}>{{ a }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-6 col-md-2 col-lg-2">
-          <label class="form-label small fw-semibold mb-1" for="f-date-from">Desde</label>
-          <input type="date" class="form-control form-control-sm" id="f-date-from"
-                 name="date_from" value="{{ f_date_from }}">
-        </div>
-        <div class="col-6 col-md-2 col-lg-1">
-          <label class="form-label small fw-semibold mb-1" for="f-date-to">Hasta</label>
-          <input type="date" class="form-control form-control-sm" id="f-date-to"
-                 name="date_to" value="{{ f_date_to }}">
-        </div>
-        <div class="col-12 col-lg-1 d-flex gap-1">
-          <button type="submit" class="btn btn-sm btn-success flex-grow-1" title="Aplicar filtros">
-            <i class="bi bi-funnel-fill"></i>
-          </button>
-          <a href="{{ url_for('audit.logs') }}"
-             class="btn btn-sm btn-outline-secondary"
-             title="Limpiar filtros">
-            <i class="bi bi-x-lg"></i>
-          </a>
-        </div>
+
+        {# Mantenemos last_24h como input oculto si ya estaba activo desde un chip superior #}
+        {% if f_last_24h %}<input type="hidden" name="last_24h" value="1">{% endif %}
+
       </form>
     </div>
   </div>
+
+  {# ── Chips de filtros activos ────────────────────────────────────────── #}
+  {% set CAT_LABELS = {} %}
+  {% for k, c in categories.items() %}{% set _ = CAT_LABELS.update({k: c.label}) %}{% endfor %}
+  {% set LEVEL_LABELS = {'info': 'Info', 'warning': 'Aviso', 'error': 'Error'} %}
+  {% set chips = [] %}
+  {% if f_search    %}{% set _ = chips.append(('Buscar: ' ~ f_search,                'q',         'bi-search'))      %}{% endif %}
+  {% if f_category  %}{% set _ = chips.append(('Categoría: ' ~ CAT_LABELS.get(f_category, f_category), 'category', 'bi-tag')) %}{% endif %}
+  {% if f_level     %}{% set _ = chips.append(('Nivel: ' ~ LEVEL_LABELS.get(f_level, f_level), 'level', 'bi-exclamation-triangle')) %}{% endif %}
+  {% if f_actor     %}{% set _ = chips.append(('Actor: ' ~ f_actor,                  'actor',     'bi-person'))       %}{% endif %}
+  {% if f_date_from %}{% set _ = chips.append(('Desde ' ~ f_date_from,               'date_from', 'bi-calendar3'))    %}{% endif %}
+  {% if f_date_to   %}{% set _ = chips.append(('Hasta ' ~ f_date_to,                 'date_to',   'bi-calendar3'))    %}{% endif %}
+  {% if f_last_24h  %}{% set _ = chips.append(('Últimas 24 h',                       'last_24h',  'bi-clock-history')) %}{% endif %}
+
+  {% macro chip_href(remove_key) %}
+    {%- set args = {} -%}
+    {%- if f_search    and remove_key != 'q'         %}{% set _ = args.update({'q':        f_search})   %}{% endif -%}
+    {%- if f_category  and remove_key != 'category'  %}{% set _ = args.update({'category': f_category}) %}{% endif -%}
+    {%- if f_level     and remove_key != 'level'     %}{% set _ = args.update({'level':    f_level})    %}{% endif -%}
+    {%- if f_actor     and remove_key != 'actor'     %}{% set _ = args.update({'actor':    f_actor})    %}{% endif -%}
+    {%- if f_date_from and remove_key != 'date_from' %}{% set _ = args.update({'date_from':f_date_from}) %}{% endif -%}
+    {%- if f_date_to   and remove_key != 'date_to'   %}{% set _ = args.update({'date_to':  f_date_to})   %}{% endif -%}
+    {%- if f_last_24h  and remove_key != 'last_24h'  %}{% set _ = args.update({'last_24h': 1})           %}{% endif -%}
+    {{ url_for('audit.logs', **args) }}
+  {%- endmacro %}
+
+  {% if chips %}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      {% for label, key, icon in chips %}
+        <span class="filter-chip">
+          <i class="bi {{ icon }} me-1"></i>{{ label }}
+          <a class="chip-remove" href="{{ chip_href(key) }}" title="Quitar">✕</a>
+        </span>
+      {% endfor %}
+      <a href="{{ url_for('audit.logs') }}"
+         class="btn btn-sm btn-link text-danger text-decoration-none p-0 ms-1">
+        <i class="bi bi-x-circle me-1"></i>Limpiar todo
+      </a>
+    </div>
+  {% endif %}
 
   {# ── Tabla principal ────────────────────────────────────────────────── #}
   <div class="card border-0 shadow-sm">
@@ -224,4 +265,56 @@
   </div>
 
 </div>
+
+{# Dropdowns vanilla + auto-submit en vivo. #}
+<script>
+(function () {
+  const form = document.getElementById('audit-filters-form');
+  if (!form) return;
+  const submit = () => form.submit();
+
+  // ── Dropdowns vanilla (mismo patrón que users-list / projects-list) ──
+  function closeAll(except) {
+    document.querySelectorAll('.dropdown').forEach(d => {
+      if (d === except) return;
+      d.classList.remove('show');
+      const m = d.querySelector('.dropdown-menu');
+      if (m) m.classList.remove('show');
+    });
+  }
+  document.querySelectorAll('.dropdown').forEach(dd => {
+    const btn  = dd.querySelector('.dropdown-toggle');
+    const menu = dd.querySelector('.dropdown-menu');
+    if (!btn || !menu) return;
+    menu.style.position = 'absolute';
+    menu.style.zIndex   = '1055';
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = dd.classList.contains('show');
+      closeAll();
+      if (!open) { dd.classList.add('show'); menu.classList.add('show'); }
+    });
+    menu.addEventListener('click', e => e.stopPropagation());
+  });
+  document.addEventListener('click', () => closeAll());
+
+  // ── Auto-submit: selects y fechas dentro de los dropdowns ──
+  form.querySelectorAll('.filter-input').forEach(el => {
+    el.addEventListener('change', submit);
+  });
+
+  // ── Buscador con debounce ──
+  const q = document.getElementById('f-q');
+  if (q) {
+    let t = null;
+    q.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(submit, 350);
+    });
+    q.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(t); submit(); }
+    });
+  }
+})();
+</script>
 {% endblock %}
