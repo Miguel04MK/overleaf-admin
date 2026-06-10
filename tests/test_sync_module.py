@@ -215,7 +215,7 @@ class TestSyncSchedules:
     def test_create_rejects_empty_name(self, app, db):
         with app.app_context():
             ok, msg, sch = sync_service.create_schedule(
-                name="", sync_type="full", interval_minutes=60, actor="a",
+                name="", sync_type="full", interval_minutes=720, actor="a",
             )
             assert ok is False
             assert sch is None
@@ -224,7 +224,7 @@ class TestSyncSchedules:
     def test_create_rejects_invalid_type(self, app, db):
         with app.app_context():
             ok, _, _ = sync_service.create_schedule(
-                name="x", sync_type="nope", interval_minutes=60, actor="a",
+                name="x", sync_type="nope", interval_minutes=720, actor="a",
             )
             assert ok is False
 
@@ -238,14 +238,14 @@ class TestSyncSchedules:
     def test_disabled_schedule_has_no_next_run(self, app, db):
         with app.app_context():
             _, _, sch = sync_service.create_schedule(
-                name="off", sync_type="full", interval_minutes=60, enabled=False, actor="a",
+                name="off", sync_type="full", interval_minutes=720, enabled=False, actor="a",
             )
             assert sch.next_run_at is None
 
     def test_toggle_schedule(self, app, db):
         with app.app_context():
             _, _, sch = sync_service.create_schedule(
-                name="t", sync_type="full", interval_minutes=60, enabled=True, actor="a",
+                name="t", sync_type="full", interval_minutes=720, enabled=True, actor="a",
             )
             sid = sch.id
             ok, _ = sync_service.toggle_schedule(sid, actor="a")
@@ -259,7 +259,7 @@ class TestSyncSchedules:
     def test_delete_schedule(self, app, db):
         with app.app_context():
             _, _, sch = sync_service.create_schedule(
-                name="bye", sync_type="full", interval_minutes=60, actor="a",
+                name="bye", sync_type="full", interval_minutes=720, actor="a",
             )
             sid = sch.id
             ok, _ = sync_service.delete_schedule(sid, actor="a")
@@ -274,7 +274,7 @@ class TestSyncSchedules:
     def test_create_writes_audit_log(self, app, db):
         with app.app_context():
             sync_service.create_schedule(
-                name="auditme", sync_type="full", interval_minutes=60, actor="admin",
+                name="auditme", sync_type="full", interval_minutes=720, actor="admin",
             )
             log = AuditLog.query.filter_by(action="sync_schedule_create").first()
             assert log is not None
@@ -286,7 +286,7 @@ class TestSyncSchedules:
                 name="weekly", sync_type="full", interval_minutes=10080, actor="a",
             )
             sync_service.create_schedule(
-                name="hourly", sync_type="users", interval_minutes=60, actor="a",
+                name="hourly", sync_type="users", interval_minutes=720, actor="a",
             )
             s = sync_service.get_sync_status()
             assert s["next_run_at"] is not None
@@ -381,7 +381,7 @@ class TestSyncController:
     def test_toggle_and_delete_schedule_endpoints(self, app, db, auth_client):
         with app.app_context():
             _, _, sch = sync_service.create_schedule(
-                name="x", sync_type="full", interval_minutes=60, actor="a",
+                name="x", sync_type="full", interval_minutes=720, actor="a",
             )
             sid = sch.id
         # Toggle
