@@ -50,7 +50,11 @@ class SyncRun(db.Model):
     projects_updated = db.Column(db.Integer, default=0, nullable=False)
     members_synced   = db.Column(db.Integer, default=0, nullable=False)
 
-    # Deltas respecto a la sync anterior con éxito (signed)
+    # Snapshot del total en BD justo antes de ejecutar la sync
+    users_before    = db.Column(db.Integer, nullable=True)
+    projects_before = db.Column(db.Integer, nullable=True)
+
+    # Deltas: registros nuevos creados en esta sync (usuarios_after - usuarios_before)
     users_delta    = db.Column(db.Integer, nullable=True)
     projects_delta = db.Column(db.Integer, nullable=True)
 
@@ -65,6 +69,21 @@ class SyncRun(db.Model):
     error_detail = db.Column(db.Text,    nullable=True)
 
     # ── Computed ──────────────────────────────────────────────────────────────
+
+    @property
+    def users_after(self) -> int | None:
+        """Total de usuarios en BD tras la sync (antes + nuevos creados)."""
+        if self.users_before is None:
+            return None
+        return self.users_before + (self.users_created or 0)
+
+    @property
+    def projects_after(self) -> int | None:
+        """Total de proyectos en BD tras la sync (antes + nuevos creados)."""
+        if self.projects_before is None:
+            return None
+        return self.projects_before + (self.projects_created or 0)
+
     @property
     def duration_seconds(self) -> float | None:
         if self.finished_at and self.started_at:

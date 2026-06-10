@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 
 from flask import Flask
 
+from sqlalchemy import func
+
 from app.config.extensions import db
 from app.model.entities.sync_run import SyncRun, SYNC_TYPES
 from app.model.services.admin import admin_service as audit_service
@@ -108,17 +110,14 @@ def _do_sync(
 
     adapter = make_adapter(app)
 
-    # Referencia para los deltas: la última sync correcta del MISMO tipo.
-    prev = (
-        SyncRun.query
-        .filter(SyncRun.id != sync_run.id,
-                SyncRun.status == "success",
-                SyncRun.sync_type.in_([sync_type, "full", "resync_total"]))
-        .order_by(SyncRun.started_at.desc())
-        .first()
-    )
-    prev_users_found = prev.users_found if prev else None
-    prev_projects_found = prev.projects_found if prev else None
+    # Snapshot del total en BD ANTES de la sync — base para calcular deltas reales.
+    from app.model.entities.overleaf_user import OverleafUser
+    from app.model.entities.overleaf_project import OverleafProject
+    users_before    = db.session.query(func.count(OverleafUser.id)).scalar() or 0
+    projects_before = db.session.query(func.count(OverleafProject.id)).scalar() or 0
+    sync_run.users_before    = users_before
+    sync_run.projects_before = projects_before
+    db.session.flush()
 
     try:
         adapter.connect()
@@ -171,22 +170,24 @@ def _do_sync(
 
         adapter.disconnect()
 
-        # Deltas vs. sync anterior
-        if prev_users_found is not None and (sync_type in ("full", "users", "resync_total", "scheduled")):
-            sync_run.users_delta = sync_run.users_found - prev_users_found
-        if prev_projects_found is not None and (sync_type in ("full", "projects", "resync_total", "scheduled")):
-            sync_run.projects_delta = sync_run.projects_found - prev_projects_found
+        # Deltas: registros realmente creados en esta sync (≠ comparar con sync anterior)
+        if sync_type in ("full", "users", "resync_total", "scheduled"):
+            sync_run.users_delta = sync_run.users_created or 0
+        if sync_type in ("full", "projects", "resync_total", "scheduled"):
+            sync_run.projects_delta = sync_run.projects_created or 0
 
         # Mensaje final compuesto según el alcance
         parts = []
         if sync_type in ("full", "users", "resync_total", "scheduled"):
+            u_after = (sync_run.users_before or 0) + (sync_run.users_created or 0)
             parts.append(
-                f"{sync_run.users_synced}/{sync_run.users_found} usuarios "
+                f"{u_after}/{sync_run.users_before or 0} usuarios "
                 f"({_fmt_delta(sync_run.users_delta)})"
             )
         if sync_type in ("full", "projects", "resync_total", "scheduled"):
+            p_after = (sync_run.projects_before or 0) + (sync_run.projects_created or 0)
             parts.append(
-                f"{sync_run.projects_synced}/{sync_run.projects_found} proyectos "
+                f"{p_after}/{sync_run.projects_before or 0} proyectos "
                 f"({_fmt_delta(sync_run.projects_delta)})"
             )
         message = f"Sincronización completada: {', '.join(parts)}."
