@@ -21,7 +21,7 @@ def index():
     overview            = account_service.get_account_overview(current_user.id)
     prefs               = account_service.get_notification_preferences(current_user.id)
     last_pw_change      = account_service.get_last_password_change(current_user.username)
-    recent_activity     = account_service.get_recent_activity(current_user.username, limit=5)
+    recent_activity     = account_service.get_recent_activity(current_user.username, limit=7)
     return render_template(
         "account/index.html",
         active_page="account",
