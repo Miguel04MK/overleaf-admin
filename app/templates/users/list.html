@@ -34,18 +34,18 @@
                   id="btn-f-projects" type="button">
             <i class="bi bi-folder2-open me-1"></i>Proyectos
           </button>
-          <div class="dropdown-menu shadow-sm p-3" style="min-width:210px">
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:280px">
             <p class="small fw-semibold text-muted mb-2">Nº de proyectos</p>
             <div class="d-flex gap-2 align-items-center">
-              <select class="form-select form-select-sm" id="f-projects-op" style="width:62px">
-                <option value="gte">≥</option>
-                <option value="eq">=</option>
-                <option value="lte">≤</option>
+              <select class="form-select form-select-sm" id="f-projects-op" style="width:110px;">
+                <option value="gte">Más de</option>
+                <option value="eq">Igual a</option>
+                <option value="lte">Menos de</option>
               </select>
               <input type="number" class="form-control form-control-sm" id="f-projects-val"
-                     min="0" max="9999" placeholder="nº" style="width:72px">
-              <button type="button" class="btn btn-ol-icon" id="f-projects-add" title="Añadir filtro">
-                <i class="bi bi-plus-lg"></i>
+                     min="0" max="9999" placeholder="nº" style="width:80px">
+              <button type="button" class="btn btn-ol-icon ms-auto" id="f-projects-add" title="Aplicar">
+                <i class="bi bi-check2-circle"></i>
               </button>
             </div>
           </div>
@@ -57,18 +57,18 @@
                   id="btn-f-quota" type="button">
             <i class="bi bi-hdd me-1"></i>Cuota
           </button>
-          <div class="dropdown-menu shadow-sm p-3" style="min-width:220px">
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:290px">
             <p class="small fw-semibold text-muted mb-2">Uso de almacenamiento</p>
             <div class="d-flex gap-2 align-items-center mb-3">
-              <select class="form-select form-select-sm" id="f-quota-op" style="width:62px">
-                <option value="gte">≥</option>
-                <option value="lte">≤</option>
+              <select class="form-select form-select-sm" id="f-quota-op" style="width:110px;">
+                <option value="gte">Más de</option>
+                <option value="lte">Menos de</option>
               </select>
               <input type="number" class="form-control form-control-sm" id="f-quota-val"
-                     min="0" max="200" placeholder="%" style="width:72px">
+                     min="0" max="200" placeholder="%" style="width:70px">
               <span class="text-muted small">%</span>
-              <button type="button" class="btn btn-ol-icon" id="f-quota-add" title="Añadir filtro">
-                <i class="bi bi-plus-lg"></i>
+              <button type="button" class="btn btn-ol-icon ms-auto" id="f-quota-add" title="Aplicar">
+                <i class="bi bi-check2-circle"></i>
               </button>
             </div>
             <div class="d-flex gap-1">
@@ -90,12 +90,27 @@
                   id="btn-f-role" type="button">
             <i class="bi bi-person-badge me-1"></i>Rol
           </button>
-          <div class="dropdown-menu shadow-sm p-3" style="min-width:170px">
-            <p class="small fw-semibold text-muted mb-1">Filtrar por rol</p>
-            <span class="text-muted small d-flex align-items-center gap-2">
-              <i class="bi bi-clock-history"></i>Próximamente
-            </span>
-          </div>
+          <ul class="dropdown-menu shadow-sm" style="min-width:180px">
+            <li><h6 class="dropdown-header">Filtrar por rol</h6></li>
+            {% for r in all_roles %}
+            <li>
+              <a class="dropdown-item d-flex align-items-center gap-2" href="#"
+                 data-role-id="{{ r.id }}" data-role-name="{{ r.name | capitalize }}">
+                <span class="badge bg-{{ r.color }} {% if r.color in ['info','warning','light'] %}text-dark{% endif %}"
+                      style="width:10px;height:10px;padding:0;border-radius:50%;"></span>
+                {{ r.name | capitalize }}
+                {% if r.is_default %}<span class="text-muted small">(defecto)</span>{% endif %}
+              </a>
+            </li>
+            {% endfor %}
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item text-muted" href="#"
+                 data-role-id="none" data-role-name="Sin rol">
+                <i class="bi bi-dash-circle me-1"></i>Sin rol asignado
+              </a>
+            </li>
+          </ul>
         </div>
 
         <!-- Filtro: Último acceso -->
@@ -145,9 +160,9 @@
                   <i class="sort-icon bi bi-chevron-expand"></i>
                 </div>
               </th>
-              <th class="sortable text-center" data-col="roles">
-                <div class="d-flex align-items-center justify-content-center gap-1">
-                  <span class="col-label">Roles</span>
+              <th class="sortable" data-col="roles">
+                <div class="d-flex align-items-center gap-1">
+                  <span class="col-label">Rol</span>
                   <i class="sort-icon bi bi-chevron-expand"></i>
                 </div>
               </th>
@@ -195,6 +210,7 @@
 <script>
 const SEARCH_URL = "{{ url_for('users.search') }}";
 const PER_PAGE   = 20;
+const ALL_ROLES  = {{ all_roles | map(attribute='id') | list | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/users-list.js') }}"></script>
 {% endblock %}

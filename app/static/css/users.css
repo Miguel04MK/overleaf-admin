@@ -7,3 +7,29 @@
 
 /* ── Quota divider (users/detail) ────────────────────────────────────────── */
 .quota-divider { width: 1px; background: #dee2e6; align-self: stretch; margin: 0 1.25rem; }
+
+/* ── Altura uniforme de filas en tablas de usuarios y proyectos ──────────── */
+/* La celda de cuota siempre ocupa dos líneas (barra + texto); las demás celdas
+   están centradas verticalmente → todas las filas tienen la misma altura. */
+#users-tbody td,
+#proj-tbody  td { vertical-align: middle; }
+
+/* ── Barra de cuota (lista de usuarios) ──────────────────────────────────── */
+/* Flex con el porcentaje a la derecha de ancho fijo → todas las barras
+   terminan en la misma posición horizontal. Por la izquierda la etiqueta
+   "Excedida" empuja la barra sólo cuando aparece. */
+.quota-bar-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.quota-bar-row .quota-pct {
+  flex: 0 0 38px;
+}
+
+/* ── Nº de proyectos en la columna "Proyectos" ───────────────────────────── */
+.projects-count {
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--bs-body-color);
+}

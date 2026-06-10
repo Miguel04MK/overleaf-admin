@@ -42,7 +42,8 @@ def search():
 @users_bp.route("/")
 @login_required
 def list_users():
-    return render_template("users/list.html", active_page="users")
+    all_roles = roles_service.get_all_roles()
+    return render_template("users/list.html", active_page="users", all_roles=all_roles)
 
 
 @users_bp.route("/<int:user_id>")
