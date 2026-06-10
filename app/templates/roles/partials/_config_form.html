@@ -38,12 +38,14 @@
                      else None %}
                   {% set quota_mb = (role.storage_quota_bytes / (1024**2))|round(0)|int
                      if role.storage_quota_bytes else '' %}
-                  <div class="input-group input-group-sm" style="width:170px;">
+                  <div style="display:flex;width:190px;">
                     <input type="number" name="quota_value" id="inp-quota-value"
-                           class="form-control" min="0" step="any" placeholder="∞"
+                           class="form-control form-control-sm" style="min-width:0;border-radius:var(--bs-border-radius-sm) 0 0 var(--bs-border-radius-sm);border-right:0;"
+                           min="0" step="any" placeholder="∞"
                            value="{{ quota_gb if quota_gb else quota_mb }}">
                     <select name="quota_unit" id="inp-quota-unit"
-                            class="form-select" style="max-width:68px;">
+                            class="form-select form-select-sm"
+                            style="width:90px;flex:0 0 90px;border-radius:0 var(--bs-border-radius-sm) var(--bs-border-radius-sm) 0;">
                       <option value="MB" {% if not quota_gb %}selected{% endif %}>MB</option>
                       <option value="GB" {% if quota_gb %}selected{% endif %}>GB</option>
                     </select>
