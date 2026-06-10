@@ -13,6 +13,7 @@ from app.config.extensions import db
 from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.overleaf_project import OverleafProject
 from app.model.entities.project_member import ProjectMember
+from app.model.entities.role import Role
 
 
 # ── Subqueries used for sorting / filtering without N+1 ──────────────────────
@@ -121,6 +122,16 @@ def search_users_paginated(
                     elif fop == "lte":
                         query = query.having(quota_pct <= v)
 
+            elif ftype == "role":
+                if fval == "none":
+                    query = query.filter(OverleafUser.role_id.is_(None))
+                else:
+                    try:
+                        rid = int(fval)
+                        query = query.filter(OverleafUser.role_id == rid)
+                    except (TypeError, ValueError):
+                        pass
+
             elif ftype == "access":
                 if fval == "never":
                     query = query.filter(OverleafUser.last_login_at.is_(None))
@@ -167,9 +178,17 @@ def search_users_paginated(
 
     rows = query.offset((page - 1) * per_page).limit(per_page).all()
 
+    # Batch-load roles para evitar N+1
+    role_ids = {u.role_id for u, *_ in rows if u.role_id}
+    roles_map: dict[int, Role] = (
+        {r.id: r for r in Role.query.filter(Role.id.in_(role_ids)).all()}
+        if role_ids else {}
+    )
+
     users = []
     for user, proj_count, q_used, q_pct in rows:
-        users.append(_serialize_row(user, proj_count, q_used, q_pct))
+        users.append(_serialize_row(user, proj_count, q_used, q_pct,
+                                    roles_map.get(user.role_id)))
 
     return {
         "total": total,
@@ -191,7 +210,7 @@ def _fmt_bytes(n) -> str:
     return f"{n:.1f} PB"
 
 
-def _serialize_row(u, projects_count, quota_used, quota_pct) -> dict:
+def _serialize_row(u, projects_count, quota_used, quota_pct, role: "Role | None" = None) -> dict:
     """Serialize a user row without N+1 queries — all aggregates pre-computed."""
     from flask import url_for
 
@@ -216,6 +235,9 @@ def _serialize_row(u, projects_count, quota_used, quota_pct) -> dict:
         "email": u.email or "",
         "display_name": u.display_name if u.display_name != u.email else "",
         "is_admin": u.is_admin,
+        "role_id":    role.id    if role else None,
+        "role_name":  role.name  if role else None,
+        "role_color": role.color if role else None,
         "projects_count": projects_count,
         "quota_percent": pct,
         "quota_status": q_status,
