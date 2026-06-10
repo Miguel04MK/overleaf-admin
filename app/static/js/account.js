@@ -14,8 +14,12 @@
   function checkMatch() {
     if (!np || !cp || !hint) return;
     const a = np.value, b = cp.value;
-    if (!a && !b) { hint.textContent = "";                            hint.className = "form-text small";     return; }
-    if (!b)       { hint.textContent = "Repite la nueva contraseña."; hint.className = "form-text small";     return; }
+    if (!a && !b) {
+      hint.innerHTML = "Mínimo 8 caracteres y distinta de la actual.<br>Las contraseñas deben coincidir.";
+      hint.className = "form-text small";
+      return;
+    }
+    if (!b)       { hint.textContent = "Repite la nueva contraseña.";      hint.className = "form-text small"; return; }
     if (a === b)  { hint.textContent = "Las contraseñas coinciden.";  hint.className = "form-text small ok";  return; }
     hint.textContent = "Las contraseñas no coinciden.";
     hint.className   = "form-text small bad";
