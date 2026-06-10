@@ -33,24 +33,34 @@
         {% endif %}
       </td>
       <td class="small">
-        <span class="fw-medium">{{ run.users_synced or 0 }}</span>
-        <span class="text-muted">/ {{ run.users_found or 0 }}</span>
+        {% if run.users_before is not none %}
+          <span class="fw-medium">{{ run.users_after }}</span>
+          <span class="text-muted">/ {{ run.users_before }}</span>
+        {% else %}
+          <span class="fw-medium">{{ run.users_synced or 0 }}</span>
+          <span class="text-muted">/ {{ run.users_found or 0 }}</span>
+        {% endif %}
         {% if run.users_delta is not none %}
-          <span class="text-muted ms-1" style="font-size:.7rem;">
+          <span class="ms-1" style="font-size:.7rem;">
             {% if run.users_delta > 0 %}<span class="text-success">+{{ run.users_delta }}</span>
             {% elif run.users_delta < 0 %}<span class="text-danger">{{ run.users_delta }}</span>
-            {% else %}<span>0</span>{% endif %}
+            {% else %}<span class="text-muted">0</span>{% endif %}
           </span>
         {% endif %}
       </td>
       <td class="small">
-        <span class="fw-medium">{{ run.projects_synced or 0 }}</span>
-        <span class="text-muted">/ {{ run.projects_found or 0 }}</span>
+        {% if run.projects_before is not none %}
+          <span class="fw-medium">{{ run.projects_after }}</span>
+          <span class="text-muted">/ {{ run.projects_before }}</span>
+        {% else %}
+          <span class="fw-medium">{{ run.projects_synced or 0 }}</span>
+          <span class="text-muted">/ {{ run.projects_found or 0 }}</span>
+        {% endif %}
         {% if run.projects_delta is not none %}
-          <span class="text-muted ms-1" style="font-size:.7rem;">
+          <span class="ms-1" style="font-size:.7rem;">
             {% if run.projects_delta > 0 %}<span class="text-success">+{{ run.projects_delta }}</span>
             {% elif run.projects_delta < 0 %}<span class="text-danger">{{ run.projects_delta }}</span>
-            {% else %}<span>0</span>{% endif %}
+            {% else %}<span class="text-muted">0</span>{% endif %}
           </span>
         {% endif %}
       </td>
