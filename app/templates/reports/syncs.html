@@ -153,10 +153,18 @@
                 {% endif %}
               </td>
               <td class="small text-center">
-                {{ r.users_synced }}<span class="text-muted">/{{ r.users_found }}</span>
+                {% if r.users_before is not none %}
+                  {{ r.users_after }}<span class="text-muted">/{{ r.users_before }}</span>
+                {% else %}
+                  {{ r.users_synced }}<span class="text-muted">/{{ r.users_found }}</span>
+                {% endif %}
               </td>
               <td class="small text-center">
-                {{ r.projects_synced }}<span class="text-muted">/{{ r.projects_found }}</span>
+                {% if r.projects_before is not none %}
+                  {{ r.projects_after }}<span class="text-muted">/{{ r.projects_before }}</span>
+                {% else %}
+                  {{ r.projects_synced }}<span class="text-muted">/{{ r.projects_found }}</span>
+                {% endif %}
               </td>
               <td class="small text-muted"
                   style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"

@@ -402,16 +402,24 @@
                         {% endif %}
                       </td>
                       <td>
-                        {{ r.users_synced|default(0) }}/{{ r.users_found|default(0) }}
-                        {% if r.users_delta and r.users_delta != 0 %}
+                        {% if r.users_before is not none %}
+                          {{ r.users_after }}<span class="text-muted">/{{ r.users_before }}</span>
+                        {% else %}
+                          {{ r.users_synced|default(0) }}<span class="text-muted">/{{ r.users_found|default(0) }}</span>
+                        {% endif %}
+                        {% if r.users_delta is not none and r.users_delta != 0 %}
                           <small class="{% if r.users_delta > 0 %}text-success{% else %}text-danger{% endif %}">
                             {{ '+' if r.users_delta > 0 else '' }}{{ r.users_delta }}
                           </small>
                         {% endif %}
                       </td>
                       <td>
-                        {{ r.projects_synced|default(0) }}/{{ r.projects_found|default(0) }}
-                        {% if r.projects_delta and r.projects_delta != 0 %}
+                        {% if r.projects_before is not none %}
+                          {{ r.projects_after }}<span class="text-muted">/{{ r.projects_before }}</span>
+                        {% else %}
+                          {{ r.projects_synced|default(0) }}<span class="text-muted">/{{ r.projects_found|default(0) }}</span>
+                        {% endif %}
+                        {% if r.projects_delta is not none and r.projects_delta != 0 %}
                           <small class="{% if r.projects_delta > 0 %}text-success{% else %}text-danger{% endif %}">
                             {{ '+' if r.projects_delta > 0 else '' }}{{ r.projects_delta }}
                           </small>

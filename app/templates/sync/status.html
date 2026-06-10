@@ -66,8 +66,16 @@
           <div id="last-sync-counts" class="small">
             {% set last = sync_status.last %}
             {% if last %}
-              <span class="me-3"><i class="bi bi-people me-1"></i>{{ last.users_synced or 0 }} usuarios</span>
-              <span><i class="bi bi-folder me-1"></i>{{ last.projects_synced or 0 }} proyectos</span>
+              <span class="me-3">
+                <i class="bi bi-people me-1"></i>
+                {% if last.users_after is not none %}{{ last.users_after }}{% else %}{{ last.users_synced or 0 }}{% endif %}
+                usuarios
+              </span>
+              <span>
+                <i class="bi bi-folder me-1"></i>
+                {% if last.projects_after is not none %}{{ last.projects_after }}{% else %}{{ last.projects_synced or 0 }}{% endif %}
+                proyectos
+              </span>
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}

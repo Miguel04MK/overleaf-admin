@@ -15,6 +15,7 @@ from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.overleaf_project import OverleafProject
 from app.model.entities.project_member import ProjectMember
 from app.model.entities.project_sync_log import ProjectSyncLog
+from app.model.entities.role import Role
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,10 @@ class OverleafLoader:
         """
         synced = created = updated = 0
         now = datetime.now(timezone.utc)
+
+        # Rol por defecto: se asigna a usuarios nuevos y a los que no tengan rol.
+        # Se obtiene una sola vez antes del bucle para no hacer N consultas.
+        default_role = Role.query.filter_by(is_default=True).first()
 
         for raw in raw_users:
             try:
@@ -68,6 +73,9 @@ class OverleafLoader:
                     existing.signup_date   = raw.get("signup_date") or existing.signup_date
                     existing.last_login_at = raw.get("last_login_at") or existing.last_login_at
                     existing.synced_at     = now
+                    # Retroalimentar rol por defecto si el usuario no tiene ninguno asignado
+                    if existing.role_id is None and default_role:
+                        existing.role_id = default_role.id
                     updated += 1
                 else:
                     user = OverleafUser(
@@ -79,6 +87,7 @@ class OverleafLoader:
                         signup_date=raw.get("signup_date"),
                         last_login_at=raw.get("last_login_at"),
                         synced_at=now,
+                        role_id=default_role.id if default_role else None,
                     )
                     db.session.add(user)
                     created += 1
