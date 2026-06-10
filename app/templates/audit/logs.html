@@ -144,7 +144,6 @@
               <th>Acción</th>
               <th>Actor</th>
               <th>Nivel</th>
-              <th>IP</th>
               <th>Detalle</th>
             </tr>
           </thead>
@@ -188,7 +187,6 @@
                     <span class="badge bg-secondary-subtle text-secondary border">Info</span>
                   {% endif %}
                 </td>
-                <td class="small text-muted text-nowrap">{{ entry.ip_address or '—' }}</td>
                 <td class="small text-muted" style="max-width:340px;"
                     title="{{ entry.detail or '' }}">
                   <div class="audit-detail">{{ entry.detail or '—' }}</div>

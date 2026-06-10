@@ -89,7 +89,6 @@
               <th>Actor</th>
               <th>Accion</th>
               <th>Detalle</th>
-              <th>IP</th>
             </tr>
           </thead>
           <tbody>
@@ -108,7 +107,6 @@
               <td class="small">{{ e.actor }}</td>
               <td class="small">{{ e.action }}</td>
               <td class="small text-truncate" style="max-width:250px;" title="{{ e.detail or '' }}">{{ e.detail or '—' }}</td>
-              <td class="small text-muted">{{ e.ip_address or '' }}</td>
             </tr>
             {% endfor %}
           </tbody>
