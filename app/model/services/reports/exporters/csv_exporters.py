@@ -101,7 +101,7 @@ def _build_activity_csv_rows(entries) -> list[list]:
     from app.model.services.admin import admin_service as _audit
 
     header = ["Fecha/Hora", "Categoría", "Acción", "Acción legible",
-              "Actor", "Nivel", "IP", "Detalle"]
+              "Actor", "Nivel", "Detalle"]
     rows = [header]
     for e in entries:
         cat_key = _audit.category_for_action(e.action)
@@ -109,16 +109,16 @@ def _build_activity_csv_rows(entries) -> list[list]:
         rows.append([
             _ts(e.created_at), cat_lbl,
             e.action, _audit.label_for_action(e.action),
-            e.actor, e.level, e.ip_address or "", e.detail or "",
+            e.actor, e.level, e.detail or "",
         ])
     return rows
 
 
 def _build_incidents_csv_rows(entries) -> list[list]:
-    header = ["Fecha/Hora", "Nivel", "Actor", "Acción", "Detalle", "IP"]
+    header = ["Fecha/Hora", "Nivel", "Actor", "Acción", "Detalle"]
     rows = [header]
     for e in entries:
-        rows.append([_ts(e.created_at), e.level, e.actor, e.action, e.detail or "", e.ip_address or ""])
+        rows.append([_ts(e.created_at), e.level, e.actor, e.action, e.detail or ""])
     return rows
 
 

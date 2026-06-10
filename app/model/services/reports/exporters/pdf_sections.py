@@ -208,7 +208,7 @@ def _activity_section(entries: list[AuditLog]) -> list:
         fl.append(Paragraph(" &nbsp;·&nbsp; ".join(breakdown_parts), styles["MetricValue"]))
         fl.append(Spacer(1, 8))
 
-    headers = ["Fecha", "Categoría", "Acción", "Actor", "Nivel", "IP", "Detalle"]
+    headers = ["Fecha", "Categoría", "Acción", "Actor", "Nivel", "Detalle"]
     rows = []
     for e in entries:
         cat_key = _audit.category_for_action(e.action)
@@ -218,12 +218,12 @@ def _activity_section(entries: list[AuditLog]) -> list:
             _ts_short(e.created_at), cat_lbl,
             _smart_truncate(action_txt, 36),
             e.actor or "",
-            e.level or "", e.ip_address or "",
+            e.level or "",
             _smart_truncate(e.detail or "", 50),
         ])
     fl.append(_make_table(
         headers, rows,
-        col_pcts=[0.12, 0.10, 0.18, 0.10, 0.07, 0.10, 0.33],
+        col_pcts=[0.14, 0.12, 0.22, 0.12, 0.08, 0.32],
     ))
     return fl
 
