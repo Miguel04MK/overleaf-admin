@@ -64,8 +64,7 @@
 
 /* ── Lista de actividad reciente ─────────────────────────────────────────── */
 .activity-list {
-  max-height: 18rem;
-  overflow-y: auto;
+  /* sin altura fija — la card se ajusta al contenido y no aparece scroll */
 }
 .activity-item {
   display: flex;

@@ -96,9 +96,11 @@
           <form method="POST"
                 action="{{ url_for('account.change_password') }}"
                 id="pw-form"
-                class="row g-2"
+                class="row g-3"
                 autocomplete="off">
-            <div class="col-12">
+
+            {# Fila 1: Contraseña actual · Nueva contraseña #}
+            <div class="col-12 col-md-6">
               <label class="form-label form-label-sm small fw-semibold mb-1" for="current_password">
                 Contraseña actual
               </label>
@@ -111,29 +113,30 @@
               </label>
               <input type="password" class="form-control form-control-sm" id="new_password"
                      name="new_password" required minlength="8" autocomplete="new-password">
-              <div class="form-text small">Mínimo 8 caracteres y distinta de la actual.</div>
             </div>
+
+            {# Fila 2: Repetir contraseña · Confirmación / requisitos #}
             <div class="col-12 col-md-6">
               <label class="form-label form-label-sm small fw-semibold mb-1" for="confirm_password">
                 Repetir contraseña
               </label>
               <input type="password" class="form-control form-control-sm" id="confirm_password"
                      name="confirm_password" required minlength="8" autocomplete="new-password">
-              <div id="pw-match-hint" class="form-text small"></div>
             </div>
-            <div class="col-12 d-flex justify-content-end pt-1">
+            <div class="col-12 col-md-6 d-flex align-items-end">
+              <div id="pw-match-hint" class="form-text small">
+                Mínimo 8 caracteres y distinta de la actual.<br>
+                Las contraseñas deben coincidir.
+              </div>
+            </div>
+
+            {# Fila 3: Botón actualizar #}
+            <div class="col-12 d-flex justify-content-end">
               <button type="button" class="btn btn-sm btn-success" id="pw-update-btn">
                 <i class="bi bi-check2-circle me-1"></i>Actualizar contraseña
               </button>
             </div>
           </form>
-
-          <div class="security-tip mt-3">
-            <i class="bi bi-info-circle me-1 text-primary"></i>
-            <span class="small text-muted">
-              Por seguridad, utiliza una contraseña diferente a la de otros servicios.
-            </span>
-          </div>
         </div>
       </div>
     </div>
@@ -341,9 +344,9 @@
       <div class="card border-0 shadow-sm h-100">
         <div class="card-header bg-white border-bottom fw-semibold py-2 d-flex align-items-center justify-content-between">
           <span><i class="bi bi-clock-history me-2 text-muted"></i>Actividad reciente</span>
-          <a href="{{ url_for('audit.logs') }}"
+          <a href="{{ url_for('audit.logs', actor=current_user.username) }}"
              class="small text-decoration-none"
-             title="Ver historial completo en Auditoría">
+             title="Ver toda mi actividad en Auditoría">
             Ver todo <i class="bi bi-arrow-up-right-square ms-1"></i>
           </a>
         </div>
