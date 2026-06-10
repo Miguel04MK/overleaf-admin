@@ -200,13 +200,16 @@ class TestAuditController:
             assert label.encode("utf-8") in resp.data
 
     def test_renders_filter_form(self, auth_client):
+        """El formulario expone los 6 controles de filtrado. Tras la refactor
+        Categoría/Nivel/Actor pasaron a ser `<select>` planos (sin id, basta con
+        que aparezca el `name=`), y Desde/Hasta están dentro de un dropdown."""
         resp = auth_client.get("/auditoria/")
         assert b'id="f-q"' in resp.data
-        assert b'id="f-category"' in resp.data
-        assert b'id="f-level"' in resp.data
-        assert b'id="f-actor"' in resp.data
-        assert b'id="f-date-from"' in resp.data
-        assert b'id="f-date-to"' in resp.data
+        assert b'name="category"' in resp.data
+        assert b'name="level"'    in resp.data
+        assert b'name="actor"'    in resp.data
+        assert b'name="date_from"' in resp.data
+        assert b'name="date_to"'   in resp.data
 
     def test_renders_humanized_actions(self, app, db, auth_client):
         with app.app_context():

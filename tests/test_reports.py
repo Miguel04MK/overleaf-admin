@@ -23,7 +23,9 @@ from tests.conftest import make_user, make_project
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def make_audit(db, actor="system", action="test", level="info", detail=None, ip=None):
-    entry = AuditLog(actor=actor, action=action, level=level, detail=detail, ip_address=ip)
+    # `ip` se mantiene en la firma por compatibilidad con tests viejos que lo
+    # pasaban; la columna `ip_address` se eliminó del modelo (ya no se persiste).
+    entry = AuditLog(actor=actor, action=action, level=level, detail=detail)
     db.session.add(entry)
     db.session.commit()
     return entry
