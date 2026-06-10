@@ -110,7 +110,6 @@
               <th>Actor</th>
               <th>Acción</th>
               <th>Nivel</th>
-              <th>IP</th>
               <th>Detalle</th>
             </tr>
           </thead>
@@ -131,7 +130,6 @@
                   <span class="badge bg-secondary">Info</span>
                 {% endif %}
               </td>
-              <td class="small text-muted">{{ e.ip_address or '—' }}</td>
               <td class="small text-muted"
                   style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
                   title="{{ e.detail or '' }}">

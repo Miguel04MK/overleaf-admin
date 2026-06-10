@@ -22,8 +22,6 @@ class AuditLog(db.Model):
     # "info" | "warning" | "error"
     level = db.Column(db.String(16), nullable=False, default="info")
 
-    ip_address = db.Column(db.String(45), nullable=True)
-
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
