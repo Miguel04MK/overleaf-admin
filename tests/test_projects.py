@@ -269,16 +269,18 @@ class TestProjectsService:
             )
             assert data["pagination"].total == 2
 
-    def test_get_projects_list_data_indicator_large(self, app, db):
+    def test_get_projects_list_data_size_filter_gt(self, app, db):
+        """Filtro: proyectos con tamaño > 10 MB (sustituye al antiguo indicador 'large')."""
         with app.app_context():
             make_project(db, "oid-large", size_bytes=20 * 1024 * 1024)
             make_project(db, "oid-small", size_bytes=100)
             data = projects_service.get_projects_list_data(
-                page=1, per_page=10, indicators=["large"]
+                page=1, per_page=10, size_op="gt", size_mb=10,
             )
             assert data["pagination"].total == 1
 
-    def test_get_projects_list_data_indicator_inactive(self, app, db):
+    def test_get_projects_list_data_date_from_filter(self, app, db):
+        """Filtro por fecha (sustituye al antiguo indicador 'inactive')."""
         with app.app_context():
             old_date = datetime.now(timezone.utc) - timedelta(days=120)
             p_old = make_project(db, "oid-inactive")
@@ -286,8 +288,10 @@ class TestProjectsService:
             p_recent = make_project(db, "oid-active")
             p_recent.last_updated_at = datetime.now(timezone.utc)
             db.session.commit()
+            # Solo los actualizados en los últimos 30 días → 1 proyecto
+            cutoff = datetime.now(timezone.utc) - timedelta(days=30)
             data = projects_service.get_projects_list_data(
-                page=1, per_page=10, indicators=["inactive"]
+                page=1, per_page=10, date_from=cutoff,
             )
             assert data["pagination"].total == 1
 
