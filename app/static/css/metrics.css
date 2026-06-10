@@ -80,12 +80,8 @@
 /* ── Tabs de métricas ────────────────────────────────────────────────────── */
 .metrics-tabs {
   border-bottom: 1px solid var(--bs-border-color);
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  flex-wrap: wrap;
 }
-.metrics-tabs::-webkit-scrollbar       { height: 4px; }
-.metrics-tabs::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 2px; }
 
 .metrics-tabs .nav-link {
   color: var(--bs-secondary);
