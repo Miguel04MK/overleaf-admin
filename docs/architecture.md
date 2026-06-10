@@ -68,11 +68,14 @@ project_members
   UNIQUE(project_id, user_id)
 
 sync_runs
-  id, started_at, finished_at, status, users_found, users_synced,
-  projects_found, projects_synced, triggered_by, message
+  id, started_at, finished_at, status, sync_type, triggered_by, triggered_by_user,
+  users_found, users_synced, users_created, users_updated,
+  projects_found, projects_synced, projects_created, projects_updated,
+  members_synced, users_before, projects_before, users_delta, projects_delta,
+  errors_count, error_detail, message
 
 audit_logs
-  id, actor, action, detail, level, ip_address, created_at
+  id, actor, action, detail, level, created_at
 ```
 
 ## Decisiones de diseño
