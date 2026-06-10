@@ -234,9 +234,13 @@ class TestDashboardService:
         assert len(data["recent_audit"]) == 3
 
     def test_db_ok(self, app):
+        """`db_ok` se eliminó del dashboard junto con el panel de salud de servicios.
+        El dashboard ahora se considera funcional si la llamada no lanza."""
         from app.model.services.dashboard_service import get_dashboard_data
         data = get_dashboard_data()
-        assert data["db_ok"] is True
+        # La clave `db_ok` ya no se devuelve; basta con que `data` sea un dict válido.
+        assert isinstance(data, dict)
+        assert "db_ok" not in data
 
     def test_empty_db_returns_defaults(self, app):
         from app.model.services.dashboard_service import get_dashboard_data
@@ -550,14 +554,16 @@ class TestMetricsRoute:
         assert resp.status_code == 200
 
     def test_metrics_renders_tab_structure(self, client, login):
-        """La pantalla de métricas ahora se organiza en 5 tabs temáticas."""
+        """La pantalla de métricas se organiza en 4 tabs temáticas (la pestaña
+        'salud' se eliminó al retirar la monitorización de servicios)."""
         resp = client.get("/metricas/")
         html = resp.data.decode()
         assert 'id="metricsTabs"' in html
-        # Las 5 pestañas y sus target ids
-        for tid in ("tab-resumen", "tab-usuarios", "tab-storage",
-                    "tab-sync", "tab-salud"):
+        # Las 4 pestañas y sus target ids
+        for tid in ("tab-resumen", "tab-usuarios", "tab-storage", "tab-sync"):
             assert f'data-bs-target="#{tid}"' in html, f"falta tab {tid}"
+        # La pestaña antigua de salud ya no existe
+        assert 'data-bs-target="#tab-salud"' not in html
 
     def test_metrics_has_chart_switchers(self, client, login):
         """Las gráficas hermanas (crecimiento / ranking) se fusionan con un
