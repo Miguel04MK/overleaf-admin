@@ -1,0 +1,41 @@
+# Control de versiones
+.git
+.gitignore
+.gitattributes
+
+# Entornos virtuales / cache de Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Cobertura
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Editores / IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Documentacion / artefactos locales
+docs/
+*.md
+!README.md
+
+# Tests (no se ejecutan en runtime; reducimos el tamaño de la imagen)
+tests/
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log

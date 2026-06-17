@@ -1,10 +1,14 @@
-version: "3.9"
-
 # =============================================================
 # Docker Compose para la plataforma overleaf-admin
-# Solo gestiona la base de datos PostgreSQL propia.
-# La app Flask puede correr en local (python run.py) o
-# descomentar el servicio 'web' si prefieres contenedorizarla.
+#
+# Servicios:
+#   - db     : PostgreSQL 16 con volumen persistente.
+#   - app    : Flask + gunicorn, conecta a `db` y a Overleaf MongoDB externo.
+#   - pgadmin: (opcional, perfil "tools") gestor visual de Postgres.
+#
+# MongoDB de Overleaf NO se incluye: la app se conecta a la instancia ya
+# existente del overleaf-toolkit a traves de `host.docker.internal:27017`
+# (configurable con la variable MONGO_URI del .env).
 # =============================================================
 
 services:
@@ -27,6 +31,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Aplicacion Flask + gunicorn ---
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: overleaf_admin_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Dentro del contenedor el host de Postgres es `db`, no `localhost`.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      DATABASE_URL: postgresql://${POSTGRES_USER:-overleaf_admin}:${POSTGRES_PASSWORD:-overleaf_admin_pass}@db:5432/${POSTGRES_DB:-overleaf_admin}
+      # Zona horaria del contenedor: afecta a `datetime.astimezone()` en los
+      # templates para mostrar las horas locales (UTC se sigue guardando en BD).
+      TZ: ${TZ:-Europe/Madrid}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    # `host.docker.internal` apunta al host. En Linux puro hay que añadir
+    # host-gateway; en Windows/Mac/WSL2 Docker Desktop ya lo resuelve.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   # --- pgAdmin (opcional, para explorar la BD visualmente) ---
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -41,28 +71,6 @@ services:
       - db
     profiles:
       - tools  # Activar con: docker compose --profile tools up
-
-  # --- Aplicación Flask (opcional) ---
-  # Descomenta si quieres correr la app también en Docker.
-  # Por defecto se recomienda correr la app en local (python run.py)
-  # para facilitar el desarrollo y depuración.
-  #
-  # web:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/Dockerfile
-  #   container_name: overleaf_admin_web
-  #   restart: unless-stopped
-  #   env_file: .env
-  #   environment:
-  #     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-  #   ports:
-  #     - "5000:5000"
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   volumes:
-  #     - .:/app
 
 volumes:
   pgdata:
