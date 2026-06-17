@@ -115,7 +115,7 @@ def is_running() -> bool:
 
 
 def _tick(app):
-    """Lógica de un tick: comprueba schedules vencidas y dispatcha.
+    """Lógica de un tick: procesa schedules vencidas y envía notificaciones.
 
     Se importa en runtime (no top-level) para evitar acoplamientos circulares
     con la app factory.
@@ -124,7 +124,37 @@ def _tick(app):
         with app.app_context():
             _process_due_schedules(app)
     except Exception as exc:
-        logger.error("Excepción en tick del scheduler: %s", exc, exc_info=True)
+        logger.error("Excepción en tick (schedules): %s", exc, exc_info=True)
+
+    # El envío de emails es independiente del estado de la sync: aunque haya
+    # una sync corriendo, las alertas pendientes deben notificarse.
+    try:
+        with app.app_context():
+            _process_email_notifications()
+    except Exception as exc:
+        logger.error("Excepción en tick (emails): %s", exc, exc_info=True)
+
+
+def _process_email_notifications():
+    """Dispara las notificaciones por email pendientes en cada tick:
+
+      1. Inmediatas: un correo «NUEVAS ALERTAS» por admin con las alertas
+         recién generadas que coincidan con su pestaña Inmediato.
+      2. Periódicas: el resumen (digest) para los admins cuyo intervalo
+         haya vencido.
+
+    Silencioso si no hay nada que enviar.
+    """
+    from app.model.services import notification_service
+
+    imm = notification_service.send_immediate_notifications(actor="scheduler")
+    if imm.get("sent"):
+        logger.info("Tick: %d correo(s) inmediato(s) enviados (%d alertas).",
+                    imm["sent"], imm.get("alerts_notified", 0))
+
+    dig = notification_service.send_periodic_digests(actor="scheduler")
+    if dig.get("sent"):
+        logger.info("Tick: %d resumen(es) periódico(s) enviados.", dig["sent"])
 
 
 def _process_due_schedules(app):

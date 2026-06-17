@@ -95,6 +95,17 @@ _TYPE_TO_PREF: dict[str, str] = {
 _DEFAULT_LEVELS = {"critical", "danger"}
 _DEFAULT_TYPES  = {"sync_failed", "quota_exceeded", "repeated_errors"}
 
+# Frecuencia del resumen periódico → minutos entre envíos.
+_DIGEST_FREQ_MINUTES: dict[str, int] = {
+    "12h":     720,
+    "daily":   1440,
+    "3days":   4320,
+    "5days":   7200,
+    "weekly":  10080,
+    "2weeks":  20160,
+    "monthly": 43200,   # ~30 días
+}
+
 _LEVEL_LABELS = {
     "critical": "Critico",
     "danger":   "Peligro",
@@ -340,7 +351,197 @@ def send_summary_emails(actor: str = "system") -> dict:
     return results
 
 
+# ── Notificación INMEDIATA (alertas nuevas) ───────────────────────────────────
+
+def send_immediate_notifications(actor: str = "scheduler") -> dict:
+    """Envía un correo «NUEVAS ALERTAS» con las alertas recién generadas.
+
+    A diferencia de `send_summary_emails` (resumen manual), esta función:
+      - Filtra por la pestaña *Inmediato* (`should_notify_now`).
+      - Agrupa TODAS las alertas nuevas de cada admin en un único correo
+        (evita mandar muchos correos seguidos si se generan varias de golpe).
+      - Marca `email_notified_at` para no volver a enviarlas como inmediatas.
+
+    Pensada para invocarse desde el tick del scheduler (~cada 60 s), de modo
+    que el correo llega en menos de un minuto desde que se crea la alerta.
+
+    Returns: {sent, errors, alerts_notified, details}.
+    """
+    from app.config.extensions import db
+    from app.model.entities.admin_user import AdminUser
+
+    pending = get_pending_alerts()
+    if not pending:
+        return {"sent": 0, "errors": 0, "alerts_notified": 0, "details": []}
+
+    admins = AdminUser.query.filter_by(is_active=True).all()
+    results = {"sent": 0, "errors": 0, "alerts_notified": 0, "details": []}
+    notified_ids: set[int] = set()
+
+    for admin in admins:
+        if not admin.email:
+            continue
+        pref = admin.notification_pref  # may be None → defaults conservadores
+
+        admin_alerts = [
+            a for a in pending
+            if should_notify_now(pref, a.type, a.level)
+        ]
+        if not admin_alerts:
+            continue
+
+        subject = _build_immediate_subject(admin_alerts)
+        body    = _build_immediate_body(admin_alerts, admin.username)
+        ok, msg = _smtp_send(admin.email, subject, body)
+        if ok:
+            results["sent"] += 1
+            results["details"].append(
+                f"{admin.username} ({admin.email}): {len(admin_alerts)} alertas nuevas"
+            )
+            for a in admin_alerts:
+                notified_ids.add(a.id)
+        else:
+            results["errors"] += 1
+            results["details"].append(f"{admin.username}: ERROR - {msg}")
+
+    if notified_ids:
+        now = datetime.now(timezone.utc)
+        for alert in pending:
+            if alert.id in notified_ids:
+                alert.email_notified_at = now
+        db.session.commit()
+        results["alerts_notified"] = len(notified_ids)
+        logger.info("[EMAIL INMEDIATO] %d alertas notificadas a %d admin(s).",
+                    len(notified_ids), results["sent"])
+
+    return results
+
+
+# ── Resumen PERIÓDICO (digest según frecuencia del admin) ─────────────────────
+
+def _digest_due(pref, now: datetime) -> bool:
+    """True si a este admin le toca recibir el resumen periódico ahora."""
+    if pref is None:
+        return False
+    freq = pref.digest_frequency
+    if freq not in _DIGEST_FREQ_MINUTES:
+        return False  # "disabled" u otro valor → nunca
+
+    freq_min = _DIGEST_FREQ_MINUTES[freq]
+    last = pref.last_digest_sent_at
+    hour = pref.digest_hour
+
+    if last is None:
+        # Primer envío: si hay hora fija, espera a esa hora; si no, ya toca.
+        return hour is None or now.hour == hour
+
+    # Asegurar tz-aware para restar.
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    elapsed_min = (now - last).total_seconds() / 60.0
+
+    if hour is None:
+        return elapsed_min >= freq_min
+    # Con hora fija: debe haber pasado casi todo el periodo y ser la hora.
+    return elapsed_min >= (freq_min - 90) and now.hour == hour
+
+
+def send_periodic_digests(actor: str = "scheduler") -> dict:
+    """Envía a cada admin cuyo digest esté vencido un resumen de las alertas
+    ACTIVAS que coincidan con su pestaña *Periódico*.
+
+    A diferencia del inmediato, el digest es una *foto* de las alertas activas
+    (no consume `email_notified_at`) y se gobierna por `digest_frequency`,
+    `digest_hour` y `last_digest_sent_at`.
+
+    Returns: {sent, errors, details}.
+    """
+    from app.config.extensions import db
+    from app.model.entities.admin_user import AdminUser
+    from app.model.entities.system_alert import SystemAlert
+
+    now = datetime.now(timezone.utc)
+    admins = AdminUser.query.filter_by(is_active=True).all()
+    results = {"sent": 0, "errors": 0, "details": []}
+
+    # Alertas activas (no resueltas) — base del snapshot del digest.
+    active_alerts = (
+        SystemAlert.query
+        .filter_by(is_resolved=False)
+        .order_by(SystemAlert.created_at.desc())
+        .all()
+    )
+
+    for admin in admins:
+        pref = admin.notification_pref
+        if not _digest_due(pref, now):
+            continue
+        if not admin.email:
+            continue
+
+        admin_alerts = [
+            a for a in active_alerts
+            if should_include_in_digest(pref, a.type, a.level)
+        ]
+
+        # Aunque no haya alertas, marcamos el envío como "hecho" para no
+        # acumular intentos cada minuto; pero solo enviamos correo si hay algo.
+        if admin_alerts:
+            subject = _build_summary_subject(admin_alerts)
+            body    = _build_summary_body(admin_alerts, admin.username)
+            ok, msg = _smtp_send(admin.email, subject, body)
+            if ok:
+                results["sent"] += 1
+                results["details"].append(
+                    f"{admin.username} ({admin.email}): digest con {len(admin_alerts)} alertas"
+                )
+            else:
+                results["errors"] += 1
+                results["details"].append(f"{admin.username}: ERROR - {msg}")
+                continue  # no marcar como enviado si falló
+
+        pref.last_digest_sent_at = now
+
+    db.session.commit()
+    return results
+
+
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _build_immediate_subject(alerts: list) -> str:
+    """Asunto del correo de alertas nuevas (inmediato)."""
+    n = len(alerts)
+    if n == 1:
+        return f"[Overleaf Admin] NUEVA ALERTA: {alerts[0].title}"
+    return f"[Overleaf Admin] {n} NUEVAS ALERTAS"
+
+
+def _build_immediate_body(alerts: list, admin_name: str) -> str:
+    """Cuerpo del correo de alertas nuevas (inmediato)."""
+    lines = [
+        f"Hola {admin_name},",
+        "",
+        f"Se han generado {len(alerts)} alerta(s) nueva(s) en Overleaf Admin:",
+        "",
+    ]
+    for i, a in enumerate(alerts, 1):
+        level_lbl = _LEVEL_LABELS.get(a.level, a.level)
+        type_lbl  = _TYPE_LABELS.get(a.type, a.type)
+        created   = a.created_at.strftime("%d/%m/%Y %H:%M") if a.created_at else "—"
+        entity    = f"{a.entity_type} {a.entity_id or ''}".strip() if a.entity_type else "—"
+        lines.append(f"  {i}. [{level_lbl.upper()}] {a.title}")
+        lines.append(f"     Tipo:    {type_lbl}")
+        lines.append(f"     Mensaje: {a.message}")
+        lines.append(f"     Entidad: {entity}")
+        lines.append(f"     Fecha:   {created}")
+        lines.append("")
+    lines.append("---")
+    lines.append(f"Accede a la plataforma: {_APP_BASE_URL}/alertas/")
+    lines.append("")
+    lines.append("Aviso automatico de Overleaf Admin (modo inmediato).")
+    lines.append("Puedes cambiar tus preferencias desde la pantalla de alertas.")
+    return "\n".join(lines)
+
 
 def _build_summary_subject(alerts: list) -> str:
     """Build a descriptive subject line grouping by severity."""
