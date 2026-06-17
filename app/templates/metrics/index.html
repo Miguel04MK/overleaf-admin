@@ -175,27 +175,39 @@
 
 
   {# ══════════════════════════════════════════════════════════════════════════
-     TAB 2 · USUARIOS Y PROYECTOS — rankings (con switch) y distribución
+     TAB 2 · USUARIOS Y PROYECTOS — analítica organizada en secciones
+       · Rankings        · Distribución
+       · Cuotas/actividad · Análisis avanzado
      ══════════════════════════════════════════════════════════════════════ #}
   <div class="tab-pane fade" id="tab-usuarios" role="tabpanel">
 
-    <div class="row g-3">
-      <div class="col-12 col-xl-8">
+    {# ─────────── SECCIÓN: RANKINGS ─────────── #}
+    <div class="metrics-section-label">
+      <i class="bi bi-trophy-fill"></i>Rankings
+    </div>
+    <div class="row g-3 mb-1">
+      {# Ranking de usuarios con 3 modos #}
+      <div class="col-12 col-xl-6">
         <div class="card m-card shadow-sm h-100" style="--accent:#0d6efd;">
           <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-trophy-fill"></i>
-                Ranking <span class="aside ms-1">Top 10</span></h6>
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-people-fill"></i>
+                Usuarios destacados <span class="aside ms-1">Top 10</span></h6>
             <div class="btn-group btn-group-sm chart-switch" role="group"
                  data-target=".ranking-panel">
               <input type="radio" class="btn-check" name="rank-switch"
                      id="rs-proj" data-show="projects" checked>
               <label class="btn btn-outline-success" for="rs-proj">
-                <i class="bi bi-folder me-1"></i>Más proyectos
+                <i class="bi bi-folder me-1"></i>Proyectos
               </label>
               <input type="radio" class="btn-check" name="rank-switch"
                      id="rs-storage" data-show="storage">
               <label class="btn btn-outline-success" for="rs-storage">
-                <i class="bi bi-hdd-stack me-1"></i>Más almacenamiento
+                <i class="bi bi-hdd-stack me-1"></i>Almacenamiento
+              </label>
+              <input type="radio" class="btn-check" name="rank-switch"
+                     id="rs-quota" data-show="quota">
+              <label class="btn btn-outline-success" for="rs-quota">
+                <i class="bi bi-speedometer2 me-1"></i>Cerca de cuota
               </label>
             </div>
           </div>
@@ -214,21 +226,58 @@
                 <div class="d-flex align-items-center justify-content-center h-100 text-muted small">Sin datos.</div>
               {% endif %}
             </div>
+            <div class="ranking-panel chart-box d-none" data-panel="quota">
+              {% if d.top_quota %}
+                <canvas id="chartTopQuota" class="chart-clickable"></canvas>
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center h-100 text-muted small">Sin usuarios con cuota asignada.</div>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="col-12 col-xl-4">
-        <div class="card m-card shadow-sm h-100" style="--accent:#6610f2;">
+      {# Ranking de proyectos por tamaño #}
+      <div class="col-12 col-xl-6">
+        <div class="card m-card shadow-sm h-100" style="--accent:#fd7e14;">
           <div class="card-header">
-            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-pie-chart-fill"></i>
-                Distribución por rol</h6>
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-folder-fill"></i>
+                Proyectos más grandes <span class="aside ms-1">Top 10</span></h6>
           </div>
           <div class="card-body p-3">
-            {% if d.role_distribution %}
-              <div class="chart-box chart-box--sm"><canvas id="chartRoles2"></canvas></div>
+            {% if d.top_projects_size %}
+              <div class="chart-box"><canvas id="chartTopProjectsSize"></canvas></div>
             {% else %}
-              <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+              <div class="chart-box d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ─────────── SECCIÓN: ANÁLISIS AVANZADO ─────────── #}
+    <div class="metrics-section-label">
+      <i class="bi bi-graph-up"></i>Análisis avanzado
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="card m-card shadow-sm" style="--accent:#6610f2;">
+          <div class="card-header">
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-asterisk"></i>
+                Proyectos vs almacenamiento por usuario
+                <span class="aside ms-1">detección de atípicos</span></h6>
+          </div>
+          <div class="card-body p-3">
+            {% if d.scatter_users %}
+              <div class="chart-box chart-box--lg"><canvas id="chartScatter" class="chart-clickable"></canvas></div>
+              <p class="text-muted small mb-0 mt-2">
+                <i class="bi bi-info-circle me-1"></i>
+                Cada punto es un usuario. Eje X: nº de proyectos · Eje Y: almacenamiento usado (MB).
+                Los puntos alejados de la nube indican usuarios atípicos (mucho espacio con pocos
+                proyectos, o muchos proyectos muy pequeños).
+              </p>
+            {% else %}
+              <div class="chart-box chart-box--lg d-flex align-items-center justify-content-center text-muted small">Sin datos suficientes.</div>
             {% endif %}
           </div>
         </div>
@@ -298,6 +347,103 @@
               </div>
             {% else %}
               <div class="py-4 text-center text-muted small">Sin datos de cuota.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ─────────── SECCIÓN: DISTRIBUCIÓN ─────────── #}
+    <div class="metrics-section-label">
+      <i class="bi bi-bar-chart-fill"></i>Distribución
+    </div>
+    <div class="row g-3 mb-1">
+      {# Usuarios por nº de proyectos #}
+      <div class="col-12">
+        <div class="card m-card shadow-sm h-100" style="--accent:#0d6efd;">
+          <div class="card-header">
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-diagram-3-fill"></i>
+                Usuarios por nº de proyectos</h6>
+          </div>
+          <div class="card-body p-3">
+            {% set _upc = d.users_by_proj_count|map(attribute='count')|sum %}
+            {% if _upc > 0 %}
+              <div class="chart-box chart-box--sm"><canvas id="chartUsersByProjCount"></canvas></div>
+            {% else %}
+              <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ─────────── SECCIÓN: CUOTAS Y ACTIVIDAD ─────────── #}
+    <div class="metrics-section-label">
+      <i class="bi bi-speedometer2"></i>Cuotas y actividad
+    </div>
+    <div class="row g-3 mb-1">
+      {# Estado de cuota #}
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card m-card shadow-sm h-100" style="--accent:#fd7e14;">
+          <div class="card-header">
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-hdd-fill"></i>
+                Estado de cuota</h6>
+          </div>
+          <div class="card-body p-3">
+            {% set _qs = d.quota_status|map(attribute='count')|sum %}
+            {% if _qs > 0 %}
+              <div class="chart-box chart-box--sm"><canvas id="chartQuotaStatus"></canvas></div>
+            {% else %}
+              <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {# Estado de actividad #}
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card m-card shadow-sm h-100" style="--accent:#198754;">
+          <div class="card-header">
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-clock-history"></i>
+                Estado de actividad</h6>
+          </div>
+          <div class="card-body p-3">
+            {% set _as = d.activity_status|map(attribute='count')|sum %}
+            {% if _as > 0 %}
+              <div class="chart-box chart-box--sm"><canvas id="chartActivityStatus"></canvas></div>
+            {% else %}
+              <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {# Almacenamiento por rol #}
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card m-card shadow-sm h-100" style="--accent:#0dcaf0;">
+          <div class="card-header">
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-hdd-stack-fill"></i>
+                Almacenamiento por rol</h6>
+          </div>
+          <div class="card-body p-3">
+            {% if d.storage_by_role %}
+              <div class="chart-box chart-box--sm"><canvas id="chartStorageByRole"></canvas></div>
+            {% else %}
+              <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {# Proyectos por rol #}
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card m-card shadow-sm h-100" style="--accent:#0d6efd;">
+          <div class="card-header">
+            <h6 class="mb-0"><span class="bar"></span><i class="bi bi-folder-fill"></i>
+                Proyectos por rol</h6>
+          </div>
+          <div class="card-body p-3">
+            {% if d.projects_by_role %}
+              <div class="chart-box chart-box--sm"><canvas id="chartProjectsByRole"></canvas></div>
+            {% else %}
+              <div class="chart-box chart-box--sm d-flex align-items-center justify-content-center text-muted small">Sin datos.</div>
             {% endif %}
           </div>
         </div>
@@ -463,8 +609,16 @@ const CHART_DATA = {
   growthProjects:   {{ d.growth_projects   | tojson }},
   topOwners:        {{ d.top_owners        | tojson }},
   topStorage:       {{ d.top_storage       | tojson }},
+  topQuota:         {{ d.top_quota         | tojson }},
+  topProjectsSize:  {{ d.top_projects_size | tojson }},
   sizeBuckets:      {{ d.size_buckets      | tojson }},
   roleDistribution: {{ d.role_distribution | tojson }},
+  usersByProjCount: {{ d.users_by_proj_count | tojson }},
+  quotaStatus:      {{ d.quota_status      | tojson }},
+  activityStatus:   {{ d.activity_status   | tojson }},
+  storageByRole:    {{ d.storage_by_role   | tojson }},
+  projectsByRole:   {{ d.projects_by_role  | tojson }},
+  scatterUsers:     {{ d.scatter_users     | tojson }},
   syncSuccessRate:  {{ d.sync_stats.get('success_rate', 0) | tojson }},
 };
 const USER_DETAIL_BASE = "{{ url_for('users.user_detail', user_id=0) }}".replace('/0', '/');
