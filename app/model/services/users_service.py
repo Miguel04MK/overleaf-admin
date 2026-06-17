@@ -152,6 +152,16 @@ def search_users_paginated(
     query = query.group_by(OverleafUser.id)
 
     # ── Sorting ───────────────────────────────────────────────────────────────
+    # Subquery escalar para que el ORDER BY de "roles" use el NOMBRE del rol
+    # (alfabético) en lugar de `is_admin` (booleano), que es el orden que el
+    # usuario espera al pulsar la cabecera de la columna.
+    from sqlalchemy import select as sa_select
+    role_name_for_user = (
+        sa_select(Role.name)
+        .where(Role.id == OverleafUser.role_id)
+        .correlate(OverleafUser)
+        .scalar_subquery()
+    )
     sort_map = {
         "email":     OverleafUser.email,
         "nombre":    func.concat(
@@ -159,7 +169,7 @@ def search_users_paginated(
                          ' ',
                          func.coalesce(OverleafUser.last_name, ''),
                      ),
-        "roles":     OverleafUser.is_admin,
+        "roles":     role_name_for_user,
         "proyectos": projects_count,
         "cuota":     quota_pct,
         "registro":  OverleafUser.signup_date,
