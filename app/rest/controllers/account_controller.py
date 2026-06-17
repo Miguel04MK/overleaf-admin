@@ -49,7 +49,6 @@ def change_password():
         current_password=form.current_password.data,
         new_password=form.new_password.data,
         confirm_password=form.confirm_password.data,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("account.index"))
@@ -66,7 +65,6 @@ def update_notifications():
     ok, msg = account_service.update_notification_preferences(
         admin_id=current_user.id,
         data=form.to_dict(),
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("account.index"))

@@ -138,7 +138,6 @@ def log_action(
     actor: str = "system",
     detail: str | None = None,
     level: str = "info",
-    ip_address: str | None = None,   # mantenido por compatibilidad, ignorado
 ) -> None:
     """Write a single audit log entry. Silently swallows errors to avoid
     cascading failures when the audit log itself has a problem."""

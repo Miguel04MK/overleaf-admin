@@ -401,7 +401,6 @@ def set_user_quota(
     max_bytes,
     *,
     actor: str = "system",
-    ip_address: str | None = None,
 ) -> tuple:
     user = OverleafUser.query.get(user_id)
     if not user:
@@ -434,7 +433,6 @@ def set_user_quota(
             actor=actor,
             detail=detail,
             level="info",
-            ip_address=ip_address,
         )
     except Exception as exc:
         logger.warning("AuditLog of quota_change failed for user %s: %s", user_id, exc)

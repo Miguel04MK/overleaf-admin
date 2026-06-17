@@ -69,7 +69,7 @@ def set_quota(user_id: int):
     max_bytes = form.to_bytes()
     ok, msg = users_service.set_user_quota(
         user_id, max_bytes,
-        actor=current_user.username, ip_address=request.remote_addr,
+        actor=current_user.username,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

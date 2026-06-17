@@ -71,7 +71,6 @@ def create_role():
         is_default=bool(form.is_default.data),
         color=form.color.data,
         actor=current_user.username,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.list_roles"))
@@ -85,7 +84,6 @@ def delete_role(role_id: int):
     ok, msg = roles_service.delete_role(
         role_id,
         actor=current_user.username,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     if ok:

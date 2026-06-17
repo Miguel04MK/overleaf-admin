@@ -188,11 +188,13 @@ def get_project_detail_data(project_id: int) -> dict | None:
 
 def get_owners_for_filter() -> list[OverleafUser]:
     """Users that own at least one project, for the filter dropdown."""
+    # `.scalar_subquery()` evita el SAWarning de SQLAlchemy 2.x al pasar el
+    # subquery a `IN()` (antes lo coercionaba implícitamente).
     owner_ids = (
         db.session.query(OverleafProject.owner_id)
         .filter(OverleafProject.owner_id.isnot(None))
         .distinct()
-        .subquery()
+        .scalar_subquery()
     )
     return (
         OverleafUser.query

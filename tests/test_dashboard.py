@@ -234,17 +234,9 @@ class TestDashboardService:
         assert len(data["recent_audit"]) == 3
 
     def test_db_ok(self, app):
-<<<<<<< Updated upstream
-        """`db_ok` se eliminó del dashboard junto con el panel de salud de servicios.
-        El dashboard ahora se considera funcional si la llamada no lanza."""
-        from app.model.services.dashboard_service import get_dashboard_data
-        data = get_dashboard_data()
-        # La clave `db_ok` ya no se devuelve; basta con que `data` sea un dict válido.
-=======
         """`db_ok` se retiró del dashboard junto al panel de salud de servicios."""
         from app.model.services.dashboard_service import get_dashboard_data
         data = get_dashboard_data()
->>>>>>> Stashed changes
         assert isinstance(data, dict)
         assert "db_ok" not in data
 
@@ -561,24 +553,12 @@ class TestMetricsRoute:
         assert resp.status_code == 200
 
     def test_metrics_renders_tab_structure(self, client, login):
-<<<<<<< Updated upstream
-        """La pantalla de métricas se organiza en 4 tabs temáticas (la pestaña
-        'salud' se eliminó al retirar la monitorización de servicios)."""
-        resp = client.get("/metricas/")
-        html = resp.data.decode()
-        assert 'id="metricsTabs"' in html
-        # Las 4 pestañas y sus target ids
-        for tid in ("tab-resumen", "tab-usuarios", "tab-storage", "tab-sync"):
-            assert f'data-bs-target="#{tid}"' in html, f"falta tab {tid}"
-        # La pestaña antigua de salud ya no existe
-=======
         """La pantalla de métricas se organiza en 4 tabs (se retiró 'salud')."""
         resp = client.get("/metricas/")
         html = resp.data.decode()
         assert 'id="metricsTabs"' in html
         for tid in ("tab-resumen", "tab-usuarios", "tab-storage", "tab-sync"):
             assert f'data-bs-target="#{tid}"' in html, f"falta tab {tid}"
->>>>>>> Stashed changes
         assert 'data-bs-target="#tab-salud"' not in html
 
     def test_metrics_has_chart_switchers(self, client, login):

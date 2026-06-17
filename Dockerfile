@@ -29,8 +29,7 @@ WORKDIR /app
 # Instalación de dependencias primero (capa cacheable)
 COPY requirements.txt .
 RUN pip install --upgrade pip \
-    && pip install -r requirements.txt \
-    && pip install gunicorn==23.0.0
+    && pip install -r requirements.txt
 
 # Código de la aplicación
 COPY . .
