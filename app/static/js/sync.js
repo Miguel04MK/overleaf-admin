@@ -35,12 +35,24 @@
     });
   });
 
+  // Modo del modal: "launch" para lanzar sync, "delete" para borrar.
+  let _pendingMode = "launch";
+
   const confirmBtn = document.getElementById("cs-confirm-btn");
   if (confirmBtn) {
     confirmBtn.addEventListener("click", () => {
       if (!_pendingForm) return;
 
-      // Marca el botón clicado con spinner y deshabilita los demás.
+      if (_pendingMode === "delete") {
+        // Marca el form como aprobado y deja que envíe sin volver a interceptar.
+        _pendingForm.dataset.approved = "1";
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando…';
+        _pendingForm.submit();
+        return;
+      }
+
+      // Modo "launch": pinta el botón con spinner y deshabilita los demás.
       const clickedBtn = _pendingForm.querySelector(".sync-action-btn");
       document.querySelectorAll(".sync-action-btn").forEach((b) => {
         b.disabled = true;
@@ -52,7 +64,6 @@
         clickedBtn.classList.add("sync-loading");
         const icon = clickedBtn.querySelector(".sync-action-icon");
         if (icon) {
-          // Conserva la clase del icono original para restaurarla si hace falta
           icon.dataset.origClass = icon.className;
           icon.className = "spinner-border spinner-border-sm sync-action-icon";
         }
@@ -64,15 +75,43 @@
     });
   }
 
-  // ── Confirmación simple (window.confirm) para borrar programaciones ─────
+  // ── Confirmación con modal Bootstrap para borrar programaciones ─────────
   document.querySelectorAll("form[data-confirm]").forEach((f) => {
-    // Evita doble vinculación con el modal: estos forms NO son sync-action-form
     if (f.classList.contains("sync-action-form")) return;
-    const msg = f.getAttribute("data-confirm");
     f.addEventListener("submit", (ev) => {
-      if (!window.confirm(msg)) ev.preventDefault();
+      if (f.dataset.approved === "1") return; // Aprobado desde el modal.
+      ev.preventDefault();
+      const msg = f.getAttribute("data-confirm") || "¿Confirmas la acción?";
+      if (!confirmModal) {
+        // Fallback si bootstrap no está disponible.
+        if (window.confirm(msg)) f.submit();
+        return;
+      }
+      _pendingForm = f;
+      _pendingMode = "delete";
+      document.getElementById("cs-title").innerHTML =
+        '<i class="bi bi-trash me-2 text-danger"></i>Confirmar eliminación';
+      document.getElementById("cs-message").textContent = msg;
+      // Estilo rojo para el botón de confirmar borrado.
+      confirmBtn.className = "btn btn-sm btn-danger";
+      confirmBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Sí, eliminar';
+      confirmBtn.disabled = false;
+      confirmModal.show();
     });
   });
+
+  // Cuando el modal se oculta sin confirmar, restablece el botón al estado
+  // verde por defecto para no contaminar la siguiente apertura.
+  if (confirmModalEl) {
+    confirmModalEl.addEventListener("hidden.bs.modal", () => {
+      _pendingMode = "launch";
+      if (confirmBtn) {
+        confirmBtn.className = "btn btn-sm btn-success";
+        confirmBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Sí, lanzar';
+        confirmBtn.disabled = false;
+      }
+    });
+  }
 
   // ── Filtros del historial ─────────────────────────────────────────────
   const form = document.getElementById("hist-filters");
