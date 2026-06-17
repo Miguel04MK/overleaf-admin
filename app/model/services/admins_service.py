@@ -148,7 +148,6 @@ def create_admin(
     confirm_password: str,
     is_active: bool = True,
     actor: str = "system",
-    ip_address: str | None = None,
 ) -> tuple[bool, str]:
     """Crea un AdminUser nuevo. Devuelve (ok, mensaje).
 
@@ -206,7 +205,6 @@ def create_admin(
         actor=actor,
         detail=f"Administrador '{u}' creado (activo={is_active})",
         level="info",
-        ip_address=ip_address,
     )
     logger.info("Admin '%s' creó al nuevo admin '%s'", actor, u)
     return True, f"Administrador '{u}' creado correctamente."
@@ -218,7 +216,6 @@ def set_admin_active(
     *,
     actor: str,
     actor_id: int | None = None,
-    ip_address: str | None = None,
 ) -> tuple[bool, str]:
     """Activa o desactiva un admin con guarda del último admin activo."""
     target = db.session.get(AdminUser, admin_id)
@@ -244,8 +241,7 @@ def set_admin_active(
     action = "admin_enable" if active else "admin_disable"
     detail = f"Administrador '{target.username}' { 'activado' if active else 'desactivado' }"
     audit_service.log_action(
-        action=action, actor=actor, detail=detail,
-        level="info", ip_address=ip_address,
+        action=action, actor=actor, detail=detail, level="info",
     )
     return True, detail + "."
 
@@ -256,7 +252,6 @@ def reset_admin_password(
     confirm_password: str,
     *,
     actor: str,
-    ip_address: str | None = None,
 ) -> tuple[bool, str]:
     """Resetea la contraseña de OTRO admin (no la propia)."""
     target = db.session.get(AdminUser, admin_id)
@@ -280,7 +275,6 @@ def reset_admin_password(
         actor=actor,
         detail=f"Contraseña reseteada para administrador '{target.username}'",
         level="info",
-        ip_address=ip_address,
     )
     logger.info("Admin '%s' reseteó la contraseña de '%s'", actor, target.username)
     return True, f"Contraseña de '{target.username}' actualizada correctamente."

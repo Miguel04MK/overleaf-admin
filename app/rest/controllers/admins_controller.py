@@ -55,7 +55,6 @@ def create():
         confirm_password=form.confirm_password.data,
         is_active=bool(form.is_active.data),
         actor=current_user.username,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("admins.index"))
@@ -70,7 +69,6 @@ def activate(admin_id: int):
         admin_id, True,
         actor=current_user.username,
         actor_id=current_user.id,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("admins.index"))
@@ -83,7 +81,6 @@ def deactivate(admin_id: int):
         admin_id, False,
         actor=current_user.username,
         actor_id=current_user.id,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("admins.index"))
@@ -108,7 +105,6 @@ def reset_password(admin_id: int):
         new_password=form.new_password.data,
         confirm_password=form.confirm_password.data,
         actor=current_user.username,
-        ip_address=request.remote_addr,
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("admins.index"))

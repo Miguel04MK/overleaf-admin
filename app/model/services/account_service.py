@@ -108,7 +108,6 @@ def change_password(
     current_password: str,
     new_password: str,
     confirm_password: str,
-    ip_address: str | None = None,
 ) -> tuple[bool, str]:
     """Cambia la contraseña del admin actual.
 
@@ -143,7 +142,6 @@ def change_password(
         actor=admin.username,
         detail="Cambio de contraseña del administrador",
         level="info",
-        ip_address=ip_address,
     )
     logger.info("Admin '%s' cambió su contraseña", admin.username)
 
@@ -165,7 +163,6 @@ def get_notification_preferences(admin_id: int) -> AdminNotificationPref:
 def update_notification_preferences(
     admin_id: int,
     data: dict,
-    ip_address: str | None = None,
 ) -> tuple[bool, str]:
     """Actualiza las preferencias de notificación del admin (crea fila si no existe).
 
@@ -188,7 +185,6 @@ def update_notification_preferences(
         actor=admin.username,
         detail="Actualización de preferencias de notificación",
         level="info",
-        ip_address=ip_address,
     )
 
     return True, "Preferencias guardadas correctamente."

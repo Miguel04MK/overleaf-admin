@@ -580,7 +580,6 @@ def create_role(
     is_default: bool = False,
     color: str = "secondary",
     actor: str = "system",
-    ip_address: str | None = None,
 ) -> tuple[bool, str, Role | None]:
     """Crea un Role nuevo. Devuelve (ok, mensaje, role|None).
 
@@ -643,7 +642,6 @@ def create_role(
             actor=actor,
             detail=f"Creado nuevo rol: {n}",
             level="info",
-            ip_address=ip_address,
         )
     except Exception as exc:
         logger.warning("Rol '%s' creado pero AuditLog falló: %s", n, exc)
@@ -658,7 +656,6 @@ def delete_role(
     role_id: int,
     *,
     actor: str = "system",
-    ip_address: str | None = None,
 ) -> tuple[bool, str]:
     """Elimina un rol.
 
@@ -743,7 +740,6 @@ def delete_role(
             actor=actor,
             detail=detail,
             level="info",
-            ip_address=ip_address,
         )
     except Exception as exc:
         logger.warning("Rol '%s' eliminado pero AuditLog falló: %s", role_name, exc)

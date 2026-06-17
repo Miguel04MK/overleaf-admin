@@ -56,7 +56,6 @@ def perform_login(user: AdminUser) -> None:
         actor=user.username,
         detail="Inicio de sesión exitoso",
         level="info",
-        ip_address=request.remote_addr,
     )
     logger.info("Admin '%s' logged in from %s", user.username, request.remote_addr)
 
@@ -68,6 +67,5 @@ def perform_logout(username: str) -> None:
         actor=username,
         detail="Cierre de sesión",
         level="info",
-        ip_address=request.remote_addr,
     )
     logger.info("Admin '%s' logged out", username)
