@@ -162,13 +162,22 @@ def search_users_for_role(role_id: int):
 @roles_bp.route("/<int:role_id>/gestionar-usuario", methods=["POST"])
 @login_required
 def manage_user_role(role_id: int):
-    """Assign or remove a user's role from the role detail page."""
+    """Assign or remove a user's role from the role detail page.
+
+    Si la peticion viene de un fetch (header `X-Requested-With: XMLHttpRequest`)
+    se devuelve JSON sin redirect ni flash, para que el cliente pueda batchear
+    multiples cambios sin acumular N flash messages.
+    """
     role = roles_service.get_role_by_id(role_id)
     if not role:
         abort(404)
 
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
     form = ManageUserRoleForm(request.form)
     if not form.validate():
+        if is_ajax:
+            return jsonify({"ok": False, "msg": "No se ha seleccionado ningún usuario."}), 400
         flash("No se ha seleccionado ningún usuario.", "danger")
         return redirect(url_for("roles.role_detail", role_id=role_id))
 
@@ -186,6 +195,9 @@ def manage_user_role(role_id: int):
             role_id=role_id,
             actor=current_user.username,
         )
+
+    if is_ajax:
+        return jsonify({"ok": ok, "msg": msg}), (200 if ok else 400)
 
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))

@@ -964,6 +964,36 @@ class TestRolesController:
         )
         assert resp.status_code == 302
 
+    def test_gestionar_usuario_ajax_returns_json(self, app, db, auth_client):
+        """Con X-Requested-With el endpoint devuelve JSON (sin redirect ni
+        flash), para que el modal pueda aplicar cambios en lote."""
+        with app.app_context():
+            profesor = roles_service.get_role_by_name("profesor")
+            u = make_user(db, "oid-ajax1")
+            rid, uid = profesor.id, u.id
+        resp = auth_client.post(
+            f"/roles/{rid}/gestionar-usuario",
+            data={"user_id": str(uid), "action": "assign"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["ok"] is True
+        with app.app_context():
+            from app.model.entities.overleaf_user import OverleafUser
+            assert db.session.get(OverleafUser, uid).role_id == rid
+
+    def test_gestionar_usuario_ajax_no_user_id_returns_400(self, app, db, auth_client):
+        with app.app_context():
+            rid = roles_service.get_role_by_name("alumno").id
+        resp = auth_client.post(
+            f"/roles/{rid}/gestionar-usuario",
+            data={"action": "assign"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["ok"] is False
+
     # ── POST /roles/asignar/<user_id> ─────────────────────────────────────────
 
     def test_asignar_redirects_to_user_detail(self, app, db, auth_client):
