@@ -22,6 +22,19 @@ def create_app(config_name: str | None = None) -> Flask:
     cfg = config_map.get(config_name, config_map["default"])
     app.config.from_object(cfg)
 
+    # Reverse proxy (despliegue institucional detrás de un proxy con HTTPS):
+    # confía en X-Forwarded-Proto/For/Host para que url_for(_external=True)
+    # genere https y request.remote_addr sea la IP real del cliente.
+    # Se activa con BEHIND_PROXY=true; en local queda desactivado.
+    if app.config.get("BEHIND_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1,
+        )
+        logging.getLogger(__name__).info(
+            "ProxyFix activado: confiando en cabeceras X-Forwarded-* del proxy."
+        )
+
     # Configure logging
     logging.basicConfig(
         level=logging.DEBUG if app.config["DEBUG"] else logging.INFO,
@@ -87,6 +100,27 @@ def create_app(config_name: str | None = None) -> Flask:
             seed_defaults()
         except Exception:
             pass  # DB might not be migrated yet
+
+    # ─── Filtros de Jinja ─────────────────────────────────────────────────
+    # `localtime` convierte un datetime aware (almacenado en UTC) a la zona
+    # horaria del sistema (configurada con la variable de entorno `TZ`).
+    # Si el datetime viene "naive" lo asume UTC.
+    @app.template_filter("localtime")
+    def _localtime(dt):
+        if dt is None:
+            return None
+        from datetime import timezone as _tz
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_tz.utc)
+        return dt.astimezone()  # zona del sistema (TZ del contenedor)
+
+    # `localdt` formatea un datetime aware ya en zona local con strftime.
+    # Uso: {{ dt | localdt('%d/%m %H:%M') }}
+    @app.template_filter("localdt")
+    def _localdt(dt, fmt="%d/%m/%Y %H:%M"):
+        if dt is None:
+            return ""
+        return _localtime(dt).strftime(fmt)
 
     # Context processor: inject ACTIVE alert count for sidebar badge.
     # Active = is_resolved == False. This is shown on every page so the badge
