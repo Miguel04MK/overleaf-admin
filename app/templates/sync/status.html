@@ -147,7 +147,7 @@
                       {% endif %}
                       {% if sch.next_run_at %}
                         <span class="mx-1">·</span>
-                        <i class="bi bi-arrow-right me-1"></i>{{ sch.next_run_at.strftime('%d/%m %H:%M') }}
+                        <i class="bi bi-arrow-right me-1"></i>{{ sch.next_run_at | localdt('%d/%m %H:%M') }}
                       {% endif %}
                     </div>
                   </div>

@@ -100,6 +100,16 @@ def get_project_logs_for_sync(sync_id: int, limit: int = 50) -> list:
 
 # ── Estado vivo ──────────────────────────────────────────────────────────────
 
+def _iso_local(dt: datetime | None) -> str | None:
+    """ISO formateado en la zona horaria del sistema (TZ del contenedor).
+    Los datetimes vienen aware en UTC desde la BD; `.astimezone()` los pasa
+    a la zona local antes de serializar, para que el frontend muestre la
+    hora correcta del operador."""
+    if not dt:
+        return None
+    return dt.astimezone().isoformat()
+
+
 def _abbr_run(s: SyncRun | None) -> dict | None:
     if not s:
         return None
@@ -110,8 +120,8 @@ def _abbr_run(s: SyncRun | None) -> dict | None:
         "sync_type_label":   s.sync_type_label,
         "triggered_by":      s.triggered_by,
         "triggered_by_user": s.triggered_by_user,
-        "started_at":        s.started_at.isoformat() if s.started_at else None,
-        "finished_at":       s.finished_at.isoformat() if s.finished_at else None,
+        "started_at":        _iso_local(s.started_at),
+        "finished_at":       _iso_local(s.finished_at),
         "duration_seconds":  s.duration_seconds,
         "users_synced":      s.users_synced,
         "projects_synced":   s.projects_synced,
@@ -304,30 +314,48 @@ def _earliest_next_run() -> str | None:
         .limit(1)
         .all()
     )
-    return rows[0].next_run_at.isoformat() if rows else None
+    return _iso_local(rows[0].next_run_at) if rows else None
 
 
 def _compute_next_run(
     interval_minutes: int,
     scheduled_hour: int | None,
     from_time: datetime,
+    *,
+    first: bool = False,
 ) -> datetime:
     """Calcula next_run_at respetando scheduled_hour si está definido.
 
-    - Sin hora fija: next = from_time + interval.
-    - Con hora fija e intervalo < 1 día (12 h): hay dos disparos diarios
-      en scheduled_hour y scheduled_hour+12; se elige el primero >= base.
-    - Con hora fija e intervalo >= 1 día: se snap al scheduled_hour del
-      día en que cae base, avanzando un día si ya pasó esa hora.
-    """
-    base = from_time + timedelta(minutes=interval_minutes)
-    if scheduled_hour is None:
-        return base
+    Parámetros:
+      - `first=True` significa "primera ejecución de la programación" (recién
+        creada o reactivada): la próxima ejecución debe ser **el primer
+        scheduled_hour que aún no haya pasado**, sin sumar el intervalo.
+        Ejemplo: a las 5 AM creo una sync semanal a las 7 AM → debe correr
+        hoy a las 7 AM, no la semana que viene.
 
+      - `first=False` (post-run): se respeta el intervalo. La siguiente
+        ejecución es el primer scheduled_hour >= (from_time + interval).
+
+    Comportamiento por intervalo:
+      - Sin hora fija: next = from_time + interval (ambos casos).
+      - Con hora fija e intervalo < 1 día (sub-diario): hay slots cada
+        scheduled_hour y scheduled_hour+12 (sólo si el intervalo es 12 h);
+        para intervalos menores caemos en buscar el siguiente scheduled_hour
+        diario, ya que aplicar dos slots no tiene sentido si el intervalo es
+        menor que el espacio entre slots.
+      - Con hora fija e intervalo >= 1 día: un disparo al día a scheduled_hour.
+    """
+    # `scheduled_hour` solo tiene sentido para >= 1 día o para 12 h exactos
+    # (dos slots diarios). Cualquier otro intervalo sub-diario (5 min, 30 min,
+    # 3 h…) lo ignora y se ejecuta exactamente cada `interval_minutes`.
+    if scheduled_hour is None or (interval_minutes != 720 and interval_minutes < 1440):
+        return from_time + timedelta(minutes=interval_minutes)
+
+    base = from_time if first else from_time + timedelta(minutes=interval_minutes)
     h = scheduled_hour % 24
 
-    if interval_minutes < 1440:
-        # Intervalo sub-diario (12 h): slots en h y h+12
+    if interval_minutes == 720:
+        # Intervalo de 12 h exactamente → dos slots diarios en h y h+12
         slots = sorted([h, (h + 12) % 24])
         for offset_days in range(3):
             ref = (base + timedelta(days=offset_days)).replace(
@@ -337,14 +365,14 @@ def _compute_next_run(
                 candidate = ref.replace(hour=slot)
                 if candidate >= base:
                     return candidate
+        return base  # fallback defensivo
     else:
-        # Intervalo >= 1 día: un disparo al día a scheduled_hour
+        # Intervalo >= 1 día (o sub-diario fino con hora fija): un disparo
+        # al día a scheduled_hour, avanzando si ya pasó.
         t = base.replace(hour=h, minute=0, second=0, microsecond=0)
         if t < base:
             t += timedelta(days=1)
         return t
-
-    return base  # fallback
 
 
 def create_schedule(
@@ -369,7 +397,9 @@ def create_schedule(
     except (TypeError, ValueError):
         return False, "Intervalo no válido.", None
     if interval_minutes < MIN_INTERVAL_MINUTES:
-        return False, f"El intervalo mínimo es de {MIN_INTERVAL_MINUTES // 60} horas.", None
+        unit = "horas" if MIN_INTERVAL_MINUTES >= 60 else "minutos"
+        value = MIN_INTERVAL_MINUTES // 60 if MIN_INTERVAL_MINUTES >= 60 else MIN_INTERVAL_MINUTES
+        return False, f"El intervalo mínimo es de {value} {unit}.", None
 
     parsed_hour: int | None = None
     if scheduled_hour is not None:
@@ -389,7 +419,9 @@ def create_schedule(
         created_by=actor,
     )
     if enabled:
-        sch.next_run_at = _compute_next_run(interval_minutes, parsed_hour, datetime.now(timezone.utc))
+        sch.next_run_at = _compute_next_run(
+            interval_minutes, parsed_hour, datetime.now(timezone.utc), first=True,
+        )
     db.session.add(sch)
     db.session.commit()
 
@@ -416,7 +448,8 @@ def toggle_schedule(schedule_id: int, *, actor: str = "system") -> tuple[bool, s
     sch.enabled = not sch.enabled
     if sch.enabled:
         sch.next_run_at = _compute_next_run(
-            sch.interval_minutes, sch.scheduled_hour, datetime.now(timezone.utc)
+            sch.interval_minutes, sch.scheduled_hour, datetime.now(timezone.utc),
+            first=True,
         )
     else:
         sch.next_run_at = None

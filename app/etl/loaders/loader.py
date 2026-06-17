@@ -73,9 +73,20 @@ class OverleafLoader:
                     existing.signup_date   = raw.get("signup_date") or existing.signup_date
                     existing.last_login_at = raw.get("last_login_at") or existing.last_login_at
                     existing.synced_at     = now
-                    # Retroalimentar rol por defecto si el usuario no tiene ninguno asignado
+                    # Retroalimentar rol por defecto si el usuario no tiene ninguno
+                    # asignado, aplicando también la cuota propia del rol (mismo
+                    # comportamiento que el cambio manual de rol desde la UI).
                     if existing.role_id is None and default_role:
                         existing.role_id = default_role.id
+                    # Si el usuario no tiene cuota propia, hereda la del rol
+                    # actual (sea el default recién asignado o uno preexistente).
+                    if existing.max_quota_bytes is None and existing.role_id is not None:
+                        role_for_quota = (
+                            default_role if existing.role_id == (default_role.id if default_role else None)
+                            else existing.role
+                        )
+                        if role_for_quota and role_for_quota.storage_quota_bytes:
+                            existing.max_quota_bytes = role_for_quota.storage_quota_bytes
                     updated += 1
                 else:
                     user = OverleafUser(
@@ -88,6 +99,9 @@ class OverleafLoader:
                         last_login_at=raw.get("last_login_at"),
                         synced_at=now,
                         role_id=default_role.id if default_role else None,
+                        # Cuota inicial igual a la del rol por defecto (si lo hay).
+                        max_quota_bytes=(default_role.storage_quota_bytes
+                                          if default_role else None),
                     )
                     db.session.add(user)
                     created += 1
