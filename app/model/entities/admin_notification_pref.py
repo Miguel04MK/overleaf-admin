@@ -61,6 +61,9 @@ class AdminNotificationPref(db.Model):
     # ── Frecuencia y hora del resumen ─────────────────────────────────────────
     digest_frequency = db.Column(db.String(16), nullable=False, default="disabled")
     digest_hour      = db.Column(db.Integer,    nullable=True)   # 0-23, None = sin hora fija
+    # Marca de la última vez que se envió el resumen periódico a este admin.
+    # El scheduler la usa para decidir si toca enviar el siguiente.
+    last_digest_sent_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     # ── By level ─────────────────────────────────────────────────────────────
     # notify_X        = True  → enviar email inmediato al generarse la alerta
