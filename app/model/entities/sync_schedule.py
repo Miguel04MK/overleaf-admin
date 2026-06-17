@@ -11,8 +11,9 @@ from datetime import datetime, timezone
 from app.config.extensions import db
 
 
-# Mínimo: 12 horas. Presets disponibles en la UI.
+# Presets disponibles en la UI. El de 5 minutos es para pruebas / debug.
 INTERVAL_PRESETS: list[tuple[int, str]] = [
+    (5,     "Cada 5 minutos (pruebas)"),
     (720,   "Cada 12 horas"),
     (1440,  "Cada día"),
     (4320,  "Cada 3 días"),
@@ -22,8 +23,8 @@ INTERVAL_PRESETS: list[tuple[int, str]] = [
     (43200, "Cada mes"),
 ]
 
-# Intervalo mínimo permitido (12 h)
-MIN_INTERVAL_MINUTES: int = 720
+# Intervalo mínimo permitido (5 min para poder probar la sync periódica).
+MIN_INTERVAL_MINUTES: int = 5
 
 SYNC_TYPE_CHOICES: list[str] = ["full", "users", "projects"]
 
