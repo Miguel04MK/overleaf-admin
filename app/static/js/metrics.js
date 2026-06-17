@@ -237,9 +237,240 @@
       },
     };
   }
-  // El gráfico de roles aparece en Resumen y en Usuarios y proyectos — dos canvases distintos.
-  mountChart('chartRoles',  rolesConfig);
-  mountChart('chartRoles2', rolesConfig);
+  // El gráfico de roles (donut) solo en Resumen.
+  mountChart('chartRoles', rolesConfig);
+
+  /* ── Ranking: más cerca de cuota (% usado) ─────────────────────── */
+  function topQuotaConfig(canvas) {
+    const { topQuota } = CHART_DATA;
+    const labels  = topQuota.map(r => r.label);
+    const values  = topQuota.map(r => Math.min(r.pct, 200));  // cap visual a 200%
+    const realPct = topQuota.map(r => r.pct);
+    const usedFmt = topQuota.map(r => r.used_fmt);
+    const quotaFmt= topQuota.map(r => r.quota_fmt);
+    const userIds = topQuota.map(r => r.user_id);
+    // Color según gravedad: >=100 rojo, >=80 ámbar, resto verde
+    const colors = realPct.map(p =>
+      p >= 100 ? 'rgba(220,53,69,.82)' : p >= 80 ? 'rgba(255,193,7,.88)' : 'rgba(61,139,61,.8)');
+    return {
+      type: 'bar',
+      data: { labels: labels.map(trunc), datasets: [{
+        data: values, backgroundColor: colors,
+        borderColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+        borderWidth: 1, borderRadius: 4, maxBarThickness: 20,
+      }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        onClick: userClick(userIds),
+        plugins: { legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: {
+              title: i => labels[i[0].dataIndex],
+              label: ctx => ` ${realPct[ctx.dataIndex]}% (${usedFmt[ctx.dataIndex]} / ${quotaFmt[ctx.dataIndex]})`,
+            } } },
+        scales: {
+          x: { beginAtZero: true,
+               ticks: { font: { size: 10 }, color: '#9ca3af', callback: v => v + '%' },
+               grid: { color: 'rgba(0,0,0,.05)' } },
+          y: { ticks: { font: { size: 10 }, color: '#495057', autoSkip: false }, grid: { display: false } },
+        },
+      },
+    };
+  }
+  mountChart('chartTopQuota', topQuotaConfig);
+
+  /* ── Ranking: proyectos más grandes ────────────────────────────── */
+  function topProjectsSizeConfig(canvas) {
+    const { topProjectsSize } = CHART_DATA;
+    const labels = topProjectsSize.map(r => r.label);
+    const fmts   = topProjectsSize.map(r => r.fmt);
+    const owners = topProjectsSize.map(r => r.owner);
+    const mbs    = topProjectsSize.map(r => +(r.bytes / (1024 * 1024)).toFixed(1));
+    return {
+      type: 'bar',
+      data: { labels: labels.map(trunc), datasets: [{
+        data: mbs,
+        backgroundColor: vGrad(canvas, 'rgba(253,126,20,1)', 'rgba(253,126,20,.7)'),
+        borderColor: 'rgba(253,126,20,1)', borderWidth: 1, borderRadius: 4, maxBarThickness: 20,
+      }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: {
+              title: i => labels[i[0].dataIndex],
+              label: ctx => ` ${fmts[ctx.dataIndex]}`,
+              afterLabel: ctx => `Propietario: ${owners[ctx.dataIndex]}`,
+            } } },
+        scales: {
+          x: { beginAtZero: true,
+               ticks: { font: { size: 10 }, color: '#9ca3af', callback: v => v + ' MB' },
+               grid: { color: 'rgba(0,0,0,.05)' } },
+          y: { ticks: { font: { size: 10 }, color: '#495057', autoSkip: false }, grid: { display: false } },
+        },
+      },
+    };
+  }
+  mountChart('chartTopProjectsSize', topProjectsSizeConfig);
+
+  /* ── Usuarios por nº de proyectos (barras verticales) ──────────── */
+  function usersByProjCountConfig(_canvas) {
+    const { usersByProjCount } = CHART_DATA;
+    const labels = usersByProjCount.map(r => r.label);
+    const values = usersByProjCount.map(r => r.count);
+    return {
+      type: 'bar',
+      data: { labels, datasets: [{
+        data: values, backgroundColor: 'rgba(13,110,253,.72)',
+        borderColor: 'rgba(13,110,253,1)', borderWidth: 1, borderRadius: 4, maxBarThickness: 46,
+      }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: { title: i => `${labels[i[0].dataIndex]} proyectos`, label: ctx => ` ${ctx.raw} usuarios` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#495057' } },
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,.05)' } },
+        },
+      },
+    };
+  }
+  mountChart('chartUsersByProjCount', usersByProjCountConfig);
+
+  /* ── Estado de cuota (donut) ───────────────────────────────────── */
+  function quotaStatusConfig(_canvas) {
+    const { quotaStatus } = CHART_DATA;
+    const labels = quotaStatus.map(r => r.label);
+    const values = quotaStatus.map(r => r.count);
+    // dentro=verde, cerca=ámbar, superada=rojo, sin cuota=gris
+    const bg = ['rgba(61,139,61,.8)', 'rgba(255,193,7,.88)', 'rgba(220,53,69,.82)', 'rgba(108,117,125,.6)'];
+    return {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: bg, borderColor: '#fff', borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '58%',
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 11, boxHeight: 11, padding: 8, font: { size: 9.5 } } },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: { label: ctx => ` ${ctx.raw} usuarios` } },
+        },
+      },
+    };
+  }
+  mountChart('chartQuotaStatus', quotaStatusConfig);
+
+  /* ── Estado de actividad (donut) ───────────────────────────────── */
+  function activityStatusConfig(_canvas) {
+    const { activityStatus } = CHART_DATA;
+    const labels = activityStatus.map(r => r.label);
+    const values = activityStatus.map(r => r.count);
+    // activos=verde, 30d=ámbar, 90d=naranja, nunca=gris
+    const bg = ['rgba(61,139,61,.8)', 'rgba(255,193,7,.88)', 'rgba(253,126,20,.82)', 'rgba(108,117,125,.6)'];
+    return {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: bg, borderColor: '#fff', borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '58%',
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 11, boxHeight: 11, padding: 8, font: { size: 9.5 } } },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: { label: ctx => ` ${ctx.raw} usuarios` } },
+        },
+      },
+    };
+  }
+  mountChart('chartActivityStatus', activityStatusConfig);
+
+  /* ── Almacenamiento por rol (barras) ───────────────────────────── */
+  function storageByRoleConfig(_canvas) {
+    const { storageByRole } = CHART_DATA;
+    const labels = storageByRole.map(r => r.name);
+    const fmts   = storageByRole.map(r => r.fmt);
+    const mbs    = storageByRole.map(r => +(r.bytes / (1024 * 1024)).toFixed(1));
+    const ROLE_COLORS = {
+      alumno: 'rgba(61,139,61,.78)', profesor: 'rgba(255,193,7,.85)', admin: 'rgba(13,110,253,.72)',
+    };
+    const bg = labels.map(n => ROLE_COLORS[n.toLowerCase()] || 'rgba(108,117,125,.6)');
+    return {
+      type: 'bar',
+      data: { labels, datasets: [{ data: mbs, backgroundColor: bg,
+        borderColor: bg.map(c => c.replace(/[\d.]+\)$/, '1)')), borderWidth: 1, borderRadius: 4, maxBarThickness: 40 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: { label: ctx => ` ${fmts[ctx.dataIndex]}` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#495057' } },
+          y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#9ca3af', callback: v => v + ' MB' }, grid: { color: 'rgba(0,0,0,.05)' } },
+        },
+      },
+    };
+  }
+  mountChart('chartStorageByRole', storageByRoleConfig);
+
+  /* ── Proyectos por rol (barras) ────────────────────────────────── */
+  function projectsByRoleConfig(_canvas) {
+    const { projectsByRole } = CHART_DATA;
+    const labels = projectsByRole.map(r => r.name);
+    const values = projectsByRole.map(r => r.count);
+    const ROLE_COLORS = {
+      alumno: 'rgba(61,139,61,.78)', profesor: 'rgba(255,193,7,.85)', admin: 'rgba(13,110,253,.72)',
+    };
+    const bg = labels.map(n => ROLE_COLORS[n.toLowerCase()] || 'rgba(108,117,125,.6)');
+    return {
+      type: 'bar',
+      data: { labels, datasets: [{ data: values, backgroundColor: bg,
+        borderColor: bg.map(c => c.replace(/[\d.]+\)$/, '1)')), borderWidth: 1, borderRadius: 4, maxBarThickness: 40 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: { label: ctx => ` ${ctx.raw} proyectos` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#495057' } },
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,.05)' } },
+        },
+      },
+    };
+  }
+  mountChart('chartProjectsByRole', projectsByRoleConfig);
+
+  /* ── Scatter: proyectos (X) vs almacenamiento MB (Y) ───────────── */
+  function scatterConfig(_canvas) {
+    const { scatterUsers } = CHART_DATA;
+    const points  = scatterUsers.map(r => ({ x: r.x, y: r.y }));
+    const labels  = scatterUsers.map(r => r.label);
+    const usedFmt = scatterUsers.map(r => r.used_fmt);
+    const userIds = scatterUsers.map(r => r.user_id);
+    return {
+      type: 'scatter',
+      data: { datasets: [{
+        data: points,
+        backgroundColor: 'rgba(61,139,61,.55)',
+        borderColor: 'rgba(61,139,61,.9)', borderWidth: 1,
+        pointRadius: 5, pointHoverRadius: 7,
+      }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        onClick: userClick(userIds),
+        plugins: { legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(33,37,41,.92)', padding: 10, cornerRadius: 6,
+            callbacks: {
+              title: i => labels[i[0].dataIndex],
+              label: ctx => ` ${ctx.raw.x} proyectos · ${usedFmt[ctx.dataIndex]}`,
+            } } },
+        scales: {
+          x: { beginAtZero: true, title: { display: true, text: 'Nº de proyectos', font: { size: 10 }, color: '#9ca3af' },
+               ticks: { precision: 0, font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,.05)' } },
+          y: { beginAtZero: true, title: { display: true, text: 'Almacenamiento (MB)', font: { size: 10 }, color: '#9ca3af' },
+               ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,.05)' } },
+        },
+      },
+    };
+  }
+  mountChart('chartScatter', scatterConfig);
 
   /* ── Tasa de éxito de sync (donut) ─────────────────────────────── */
   mountChart('chartSyncRate', () => {
