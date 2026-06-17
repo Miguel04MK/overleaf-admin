@@ -331,14 +331,33 @@
 
   // ── Modal: Administrar usuarios del rol ───────────────────────────────────
   const manageModal  = document.getElementById('manageUsersModal');
-  const confirmModal = document.getElementById('confirmRoleModal');
   const searchInput  = document.getElementById('manage-user-search');
   const resultsDiv   = document.getElementById('manage-user-results');
+  const counterEl    = document.getElementById('manage-pending-counter');
+  const applyBtn     = document.getElementById('manage-apply-btn');
+  const applyCount   = document.getElementById('manage-apply-count');
+  const discardBtn   = document.getElementById('manage-discard-btn');
 
-  const _bsManage  = _bsAvail && manageModal  ? new bootstrap.Modal(manageModal)  : null;
-  const _bsConfirm = _bsAvail && confirmModal ? new bootstrap.Modal(confirmModal) : null;
+  const _bsManage = _bsAvail && manageModal ? new bootstrap.Modal(manageModal) : null;
 
+  // pendingChanges: uid → { action: 'assign'|'remove', name, email }
+  const pendingChanges = new Map();
   let searchTimer = null;
+
+  function updatePendingUI() {
+    const n = pendingChanges.size;
+    if (n === 0) {
+      counterEl.textContent = 'Sin cambios pendientes.';
+      applyBtn.disabled = true;
+      discardBtn.disabled = true;
+      applyCount.textContent = '';
+    } else {
+      counterEl.innerHTML = `<strong>${n}</strong> cambio${n !== 1 ? 's' : ''} pendiente${n !== 1 ? 's' : ''}.`;
+      applyBtn.disabled = false;
+      discardBtn.disabled = false;
+      applyCount.textContent = ` (${n})`;
+    }
+  }
 
   if (searchInput) {
     searchInput.addEventListener('input', function () {
@@ -355,41 +374,67 @@
     });
   }
 
+  function rowHtml(u) {
+    const isPending  = pendingChanges.has(String(u.id));
+    const pending    = isPending ? pendingChanges.get(String(u.id)) : null;
+    // Estado efectivo si la operación pendiente se aplicara:
+    const effectiveHasRole = pending
+      ? (pending.action === 'assign')
+      : u.has_role;
+
+    let btnCls, btnIcon, btnText, badgeCls, badgeText, rowCls;
+    if (isPending) {
+      // Muestra el cambio pendiente y permite deshacer.
+      rowCls    = pending.action === 'assign' ? 'bg-success-subtle' : 'bg-danger-subtle';
+      btnCls    = 'btn-outline-secondary';
+      btnIcon   = 'bi-arrow-counterclockwise';
+      btnText   = 'Deshacer';
+      badgeCls  = pending.action === 'assign'
+        ? 'bg-success-subtle text-success border border-success-subtle'
+        : 'bg-danger-subtle text-danger border border-danger-subtle';
+      badgeText = pending.action === 'assign'
+        ? '+ ' + ROLE_NAME + ' (pendiente)'
+        : '- ' + ROLE_NAME + ' (pendiente)';
+    } else {
+      rowCls    = '';
+      btnCls    = u.has_role ? 'btn-outline-danger'  : 'btn-outline-success';
+      btnIcon   = u.has_role ? 'bi-person-dash'      : 'bi-person-plus';
+      btnText   = u.has_role ? 'Quitar'              : 'Añadir';
+      badgeCls  = u.has_role ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary';
+      badgeText = u.current_role;
+    }
+
+    return `<div class="list-group-item d-flex justify-content-between align-items-center py-2 ${rowCls}">
+      <div class="flex-grow-1 min-width-0">
+        <div class="fw-medium small">${esc(u.name)}</div>
+        <div class="text-muted" style="font-size:.72rem;">${esc(u.email)}</div>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        <span class="badge ${badgeCls}" style="font-size:.68rem;">${esc(badgeText)}</span>
+        <button type="button" class="btn btn-sm ${btnCls} py-0 px-2"
+                data-uid="${u.id}" data-name="${esc(u.name)}"
+                data-email="${esc(u.email)}" data-role="${esc(u.current_role)}"
+                data-has-role="${u.has_role}" style="font-size:.75rem;">
+          <i class="bi ${btnIcon} me-1"></i>${btnText}
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // Cache del último resultado para que togglePending pueda re-renderizar sin re-fetch.
+  let lastUsers = [];
+
   function fetchUsers(q) {
     fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
       .then(r => r.json())
       .then(users => {
+        lastUsers = users;
         if (!users.length) {
           resultsDiv.innerHTML =
             '<div class="text-center text-muted small py-3">No se encontraron usuarios.</div>';
           return;
         }
-        resultsDiv.innerHTML = users.map(u => {
-          const hasRole    = u.has_role;
-          const btnCls     = hasRole ? 'btn-outline-danger'  : 'btn-outline-success';
-          const btnIcon    = hasRole ? 'bi-person-dash'      : 'bi-person-plus';
-          const btnText    = hasRole ? 'Quitar'              : 'Añadir';
-          const badgeCls   = hasRole ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary';
-          return `<div class="list-group-item d-flex justify-content-between align-items-center py-2">
-            <div class="flex-grow-1 min-width-0">
-              <div class="fw-medium small">${esc(u.name)}</div>
-              <div class="text-muted" style="font-size:.72rem;">${esc(u.email)}</div>
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-              <span class="badge ${badgeCls}" style="font-size:.68rem;">${esc(u.current_role)}</span>
-              <button type="button" class="btn btn-sm ${btnCls} py-0 px-2"
-                      data-uid="${u.id}" data-name="${esc(u.name)}"
-                      data-email="${esc(u.email)}" data-role="${esc(u.current_role)}"
-                      data-has-role="${hasRole}" style="font-size:.75rem;">
-                <i class="bi ${btnIcon} me-1"></i>${btnText}
-              </button>
-            </div>
-          </div>`;
-        }).join('');
-
-        resultsDiv.querySelectorAll('[data-uid]').forEach(btn => {
-          btn.addEventListener('click', () => openConfirm(btn));
-        });
+        renderUsers();
       })
       .catch(() => {
         resultsDiv.innerHTML =
@@ -397,54 +442,91 @@
       });
   }
 
-  function openConfirm(btn) {
-    const uid     = btn.dataset.uid;
-    const name    = btn.dataset.name;
-    const email   = btn.dataset.email;
-    const curRole = btn.dataset.role;
-    const hasRole = btn.dataset.hasRole === 'true';
-    const action  = hasRole ? 'remove' : 'assign';
-
-    document.getElementById('confirm-user-name').textContent  = name;
-    document.getElementById('confirm-user-email').textContent = email;
-    document.getElementById('action-user-id').value = uid;
-    document.getElementById('action-type').value    = action;
-
-    const titleEl   = document.getElementById('confirm-title');
-    const descEl    = document.getElementById('confirm-description');
-    const detailEl  = document.getElementById('confirm-detail-text');
-    const actionBtn = document.getElementById('confirm-action-btn');
-
-    if (hasRole) {
-      titleEl.innerHTML   = '<i class="bi bi-person-dash me-2 text-danger"></i>Confirmar retirada';
-      descEl.innerHTML    = '¿Quitar el rol <strong>' + esc(ROLE_NAME) + '</strong> a:';
-      detailEl.textContent = 'Se le asignará el rol por defecto de forma inmediata.';
-      actionBtn.className  = 'btn btn-sm btn-danger';
-      actionBtn.innerHTML  = '<i class="bi bi-person-dash me-1"></i>Quitar rol';
-    } else {
-      titleEl.innerHTML   = '<i class="bi bi-person-plus me-2 text-success"></i>Confirmar asignación';
-      descEl.innerHTML    = '¿Asignar el rol <strong>' + esc(ROLE_NAME) + '</strong> a:';
-      detailEl.textContent = 'Rol actual: ' + curRole + '. Se cambiará de forma inmediata.';
-      actionBtn.className  = 'btn btn-sm btn-ol';
-      actionBtn.innerHTML  = '<i class="bi bi-check2 me-1"></i>Confirmar';
-    }
-
-    if (_bsManage) _bsManage.hide();
-    manageModal.addEventListener('hidden.bs.modal', () => {
-      if (_bsConfirm) _bsConfirm.show();
-    }, { once: true });
+  function renderUsers() {
+    resultsDiv.innerHTML = lastUsers.map(rowHtml).join('');
+    resultsDiv.querySelectorAll('[data-uid]').forEach(btn => {
+      btn.addEventListener('click', () => togglePending(btn));
+    });
   }
 
-  document.getElementById('confirm-action-back').addEventListener('click', () => {
-    if (_bsConfirm) _bsConfirm.hide();
-    confirmModal.addEventListener('hidden.bs.modal', () => {
-      if (_bsManage) _bsManage.show();
-    }, { once: true });
-  });
+  function togglePending(btn) {
+    const uid     = String(btn.dataset.uid);
+    const name    = btn.dataset.name;
+    const email   = btn.dataset.email;
+    const hasRole = btn.dataset.hasRole === 'true';
+
+    if (pendingChanges.has(uid)) {
+      // Deshacer: el usuario vuelve a su estado original.
+      pendingChanges.delete(uid);
+    } else {
+      pendingChanges.set(uid, {
+        action: hasRole ? 'remove' : 'assign',
+        name, email,
+      });
+    }
+    renderUsers();
+    updatePendingUI();
+  }
+
+  if (discardBtn) {
+    discardBtn.addEventListener('click', () => {
+      if (pendingChanges.size === 0) return;
+      // Descarte directo, sin diálogo del navegador.
+      pendingChanges.clear();
+      renderUsers();
+      updatePendingUI();
+    });
+  }
+
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      if (pendingChanges.size === 0) return;
+      applyBtn.disabled = true;
+      const original = applyBtn.innerHTML;
+      applyBtn.innerHTML =
+        '<span class="spinner-border spinner-border-sm me-1"></span>Aplicando…';
+
+      const entries = Array.from(pendingChanges.entries());
+      let okCount = 0, errCount = 0;
+
+      for (const [uid, change] of entries) {
+        const fd = new FormData();
+        fd.append('user_id', uid);
+        fd.append('action', change.action);
+        try {
+          const resp = await fetch(MANAGE_USER_URL, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          });
+          if (resp.ok) okCount++; else errCount++;
+        } catch (e) {
+          errCount++;
+        }
+      }
+
+      if (errCount === 0) {
+        // Recargar la página para reflejar los cambios (re-renderiza tabla,
+        // contadores, impacto, etc.).
+        window.location.reload();
+      } else {
+        // Mostrar el resultado en el propio contador del footer y recargar
+        // tras un breve delay para que se vean los cambios efectivos.
+        counterEl.innerHTML =
+          `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>` +
+          `Aplicados ${okCount}, fallaron ${errCount}. Recargando…</span>`;
+        applyBtn.innerHTML = original;
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    });
+  }
 
   if (manageModal) {
     manageModal.addEventListener('shown.bs.modal', () => {
       searchInput.value = '';
+      lastUsers = [];
+      pendingChanges.clear();
+      updatePendingUI();
       resultsDiv.innerHTML =
         '<div class="text-center text-muted small py-3">Escribe al menos 2 caracteres para buscar.</div>';
       searchInput.focus();

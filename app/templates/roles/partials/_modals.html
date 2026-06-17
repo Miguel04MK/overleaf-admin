@@ -128,9 +128,23 @@
         </div>
       </div>
 
-      <div class="modal-footer border-0 pt-1">
-        <button type="button" class="btn btn-sm btn-outline-secondary"
-                data-bs-dismiss="modal">Cerrar</button>
+      <div class="modal-footer border-0 pt-1 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span id="manage-pending-counter" class="small text-muted">
+          Sin cambios pendientes.
+        </span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+                  id="manage-discard-btn" disabled>
+            <i class="bi bi-x-lg me-1"></i>Descartar
+          </button>
+          <button type="button" class="btn btn-sm btn-ol"
+                  id="manage-apply-btn" disabled>
+            <i class="bi bi-check2-circle me-1"></i>Aplicar
+            <span id="manage-apply-count"></span>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+                  data-bs-dismiss="modal">Cerrar</button>
+        </div>
       </div>
 
     </div>
