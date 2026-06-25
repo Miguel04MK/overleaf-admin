@@ -90,18 +90,35 @@ def _build_quotas_csv_rows(rows_data) -> list[list]:
 
 
 def _build_activity_csv_rows(entries) -> list[list]:
-    header = ["Fecha/Hora", "Actor", "Acción", "Nivel", "IP", "Detalle"]
+    """Construye filas CSV del informe de actividad.
+
+    Incluye dos columnas extra respecto al diseño antiguo para reflejar la
+    categorización añadida a /auditoria/:
+      - "Categoría" → auth/admin/quota/sync/role (texto legible)
+      - "Acción legible" → ACTION_LABELS desde admin_service
+    El código técnico de la acción se mantiene en su columna propia.
+    """
+    from app.model.services.admin import admin_service as _audit
+
+    header = ["Fecha/Hora", "Categoría", "Acción", "Acción legible",
+              "Actor", "Nivel", "Detalle"]
     rows = [header]
     for e in entries:
-        rows.append([_ts(e.created_at), e.actor, e.action, e.level, e.ip_address or "", e.detail or ""])
+        cat_key = _audit.category_for_action(e.action)
+        cat_lbl = _audit.CATEGORIES[cat_key]["label"] if cat_key else ""
+        rows.append([
+            _ts(e.created_at), cat_lbl,
+            e.action, _audit.label_for_action(e.action),
+            e.actor, e.level, e.detail or "",
+        ])
     return rows
 
 
 def _build_incidents_csv_rows(entries) -> list[list]:
-    header = ["Fecha/Hora", "Nivel", "Actor", "Acción", "Detalle", "IP"]
+    header = ["Fecha/Hora", "Nivel", "Actor", "Acción", "Detalle"]
     rows = [header]
     for e in entries:
-        rows.append([_ts(e.created_at), e.level, e.actor, e.action, e.detail or "", e.ip_address or ""])
+        rows.append([_ts(e.created_at), e.level, e.actor, e.action, e.detail or ""])
     return rows
 
 
@@ -195,7 +212,7 @@ def _build_incidents_alerts_csv_rows(incidents, alerts) -> list[list]:
 
 
 def _build_general_csv_rows(data) -> list[list]:
-    return [
+    rows = [
         ["Sección", "Métrica", "Valor"],
         ["Usuarios", "Total usuarios sincronizados", data["total_users"]],
         ["Usuarios", "Administradores internos", data["total_admins_internal"]],
@@ -215,6 +232,10 @@ def _build_general_csv_rows(data) -> list[list]:
         ["Sincronización", "Duración media (s)", data["avg_sync_duration"] or "N/A"],
         ["Auditoría", "Alertas activas (24 h)", data["active_alerts_count"]],
     ]
+    # Desglose de auditoría por categoría (acceso/admin/cuotas/sync/rol).
+    for c in data.get("audit_by_category", []):
+        rows.append(["Auditoría", f"Eventos · {c['label']}", c["count"]])
+    return rows
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

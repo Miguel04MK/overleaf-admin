@@ -14,7 +14,8 @@
   /* ── 1. Role distribution doughnut ──────────────────────────────────────── */
   const rlCanvas = document.getElementById('chartRoles');
   if (rlCanvas && window.Chart) {
-    Chart.defaults.font.family = "system-ui, -apple-system, sans-serif";
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || "system-ui, -apple-system, sans-serif";
+    Chart.defaults.font.weight = "400";
     Chart.defaults.color = '#495057';
 
     const ROLE_COLORS = {
@@ -39,7 +40,7 @@
         plugins: {
           legend: { position: 'bottom',
             labels: {
-              boxWidth: 10, boxHeight: 10, padding: 7, font: { size: 11, weight: '500' },
+              boxWidth: 10, boxHeight: 10, padding: 7, font: { size: 11, weight: '400' },
               generateLabels(chart) {
                 const ds = chart.data.datasets[0];
                 return chart.data.labels.map((lbl, i) => ({

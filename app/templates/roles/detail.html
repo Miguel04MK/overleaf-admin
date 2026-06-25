@@ -45,6 +45,7 @@ const ROLE_MAX_PROJECTS = {{ role.max_projects | tojson }};
 const ALL_USERS         = {{ users_stats | tojson }};
 const ROLE_NAME         = {{ role.name | tojson }};
 const SEARCH_URL        = {{ url_for('roles.search_users_for_role', role_id=role.id) | tojson }};
+const MANAGE_USER_URL   = {{ url_for('roles.manage_user_role', role_id=role.id) | tojson }};
 const ROLES_LIST_URL    = {{ url_for('roles.list_roles') | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/roles-detail.js') }}"></script>

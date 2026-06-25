@@ -20,7 +20,7 @@ def _fmt_size(size_bytes: int | None) -> str | None:
     return f"{size_bytes} B"
 
 
-def _serialize_project(proj, member_counts, member_names, indicators_map) -> dict:
+def _serialize_project(proj, member_counts, member_names) -> dict:
     cnt = member_counts.get(proj.id, 0)
     return {
         "id":             proj.id,
@@ -33,9 +33,12 @@ def _serialize_project(proj, member_counts, member_names, indicators_map) -> dic
         "size_fmt":       _fmt_size(proj.size_bytes),
         "last_updated_at": proj.last_updated_at.strftime("%d/%m/%Y") if proj.last_updated_at else None,
         "created_at":     proj.created_at.strftime("%d/%m/%Y") if proj.created_at else None,
-        "indicators":     indicators_map.get(proj.id, []),
         "detail_url":     url_for("projects.project_detail", project_id=proj.id),
     }
+
+
+def _parse_op(raw: str | None) -> str | None:
+    return raw if raw in ("gt", "eq", "lt") else None
 
 
 def _get_list_params():
@@ -46,7 +49,10 @@ def _get_list_params():
     owner_id   = request.args.get("owner_id", None, type=int)
     date_from  = request.args.get("date_from", "")
     date_to    = request.args.get("date_to", "")
-    indicators = request.args.getlist("indicators")
+    size_op    = _parse_op(request.args.get("size_op"))
+    size_mb    = request.args.get("size_mb", type=float)
+    members_op = _parse_op(request.args.get("members_op"))
+    members_v  = request.args.get("members_val", type=int)
     sort_col   = request.args.get("sort", "updated")
     sort_order = request.args.get("order", "desc")
     per_page   = current_app.config.get("ITEMS_PER_PAGE", 20)
@@ -57,7 +63,8 @@ def _get_list_params():
     return dict(
         page=page, search=search, owner_id=owner_id,
         date_from_str=date_from, date_to_str=date_to,
-        indicators_filter=indicators,
+        size_op=size_op, size_mb=size_mb,
+        members_op=members_op, members_val=members_v,
         sort_col=sort_col, sort_order=sort_order,
         per_page=per_page,
     )
@@ -73,7 +80,8 @@ def list_projects():
         search=p["search"], owner_id=p["owner_id"],
         date_from=parse_date(p["date_from_str"]),
         date_to=parse_date(p["date_to_str"]),
-        indicators=p["indicators_filter"] or None,
+        size_op=p["size_op"], size_mb=p["size_mb"],
+        members_op=p["members_op"], members_val=p["members_val"],
         sort=p["sort_col"], order=p["sort_order"],
     )
     owners = projects_service.get_owners_for_filter()
@@ -90,7 +98,8 @@ def list_projects():
         owner_id=p["owner_id"],
         date_from=p["date_from_str"],
         date_to=p["date_to_str"],
-        indicators_filter=p["indicators_filter"],
+        size_op=p["size_op"], size_mb=p["size_mb"],
+        members_op=p["members_op"], members_val=p["members_val"],
         sort_col=p["sort_col"],
         sort_order=p["sort_order"],
         **data,
@@ -108,13 +117,13 @@ def search_projects():
         search=p["search"], owner_id=p["owner_id"],
         date_from=parse_date(p["date_from_str"]),
         date_to=parse_date(p["date_to_str"]),
-        indicators=p["indicators_filter"] or None,
+        size_op=p["size_op"], size_mb=p["size_mb"],
+        members_op=p["members_op"], members_val=p["members_val"],
         sort=p["sort_col"], order=p["sort_order"],
     )
     pagination     = data["pagination"]
     member_counts  = data["member_counts"]
     member_names   = data["member_names"]
-    indicators_map = data["indicators"]
 
     return jsonify({
         "total":    pagination.total,
@@ -126,7 +135,7 @@ def search_projects():
         "prev_num": pagination.prev_num,
         "next_num": pagination.next_num,
         "projects": [
-            _serialize_project(proj, member_counts, member_names, indicators_map)
+            _serialize_project(proj, member_counts, member_names)
             for proj in pagination.items
         ],
     })

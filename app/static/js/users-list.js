@@ -124,22 +124,25 @@ function syncChips() {
 
 function syncFilterBtns() {
   const active = new Set(activeFilters.map(f => f.type));
-  [['projects', 'btn-f-projects'], ['quota', 'btn-f-quota'], ['access', 'btn-f-access']].forEach(([type, id]) => {
+  [['projects', 'btn-f-projects'], ['quota', 'btn-f-quota'],
+   ['access', 'btn-f-access'], ['role', 'btn-f-role']].forEach(([type, id]) => {
     const btn = document.getElementById(id);
-    const on  = active.has(type);
+    if (!btn) return;
+    const on = active.has(type);
     btn.classList.toggle('has-filter', on);
     btn.classList.toggle('btn-outline-secondary', !on);
   });
 }
 
 // ── Filtro PROYECTOS ──────────────────────────────────────────────────────────
+const OP_LABEL = { gte: 'Más de', eq: 'Igual a', lte: 'Menos de' };
+
 function addProjectsFilter() {
   const raw = document.getElementById('f-projects-val').value.trim();
   const val = parseInt(raw, 10);
   if (raw === '' || isNaN(val) || val < 0) return;
-  const op    = document.getElementById('f-projects-op').value;
-  const opSym = { gte: '≥', eq: '=', lte: '≤' }[op];
-  addFilter('projects', op, val, `Proyectos ${opSym} ${val}`);
+  const op = document.getElementById('f-projects-op').value;
+  addFilter('projects', op, val, `Proyectos ${OP_LABEL[op]} ${val}`);
   document.getElementById('f-projects-val').value = '';
   closeDropdown('btn-f-projects');
 }
@@ -153,9 +156,8 @@ function addQuotaFilter() {
   const raw = document.getElementById('f-quota-val').value.trim();
   const val = parseFloat(raw);
   if (raw === '' || isNaN(val) || val < 0) return;
-  const op    = document.getElementById('f-quota-op').value;
-  const opSym = { gte: '≥', lte: '≤' }[op];
-  addFilter('quota', op, val, `Cuota ${opSym} ${val}%`);
+  const op = document.getElementById('f-quota-op').value;
+  addFilter('quota', op, val, `Cuota ${OP_LABEL[op]} ${val}%`);
   document.getElementById('f-quota-val').value = '';
   closeDropdown('btn-f-quota');
 }
@@ -177,6 +179,16 @@ document.getElementById('btn-f-access').closest('.dropdown').querySelectorAll('[
     activeFilters = activeFilters.filter(f => f.type !== 'access');
     addFilter('access', null, item.dataset.val, item.dataset.label);
     closeDropdown('btn-f-access');
+  });
+});
+
+// ── Filtro ROL ────────────────────────────────────────────────────────────────
+document.getElementById('btn-f-role').closest('.dropdown').querySelectorAll('[data-role-id]').forEach(item => {
+  item.addEventListener('click', e => {
+    e.preventDefault();
+    activeFilters = activeFilters.filter(f => f.type !== 'role');
+    addFilter('role', 'eq', item.dataset.roleId, `Rol: ${item.dataset.roleName}`);
+    closeDropdown('btn-f-role');
   });
 });
 
@@ -229,11 +241,11 @@ function renderRows(users) {
   }
 
   tbody.innerHTML = users.map(u => `
-    <tr data-href="${esc(u.detail_url)}">
+    <tr class="row-clickable" data-href="${esc(u.detail_url)}">
       <td class="ps-3 small"><span class="fw-medium">${esc(u.email) || '—'}</span></td>
       <td class="text-muted small">${esc(u.display_name) || '—'}</td>
-      <td class="text-center small">${roleBadgeHtml(u)}</td>
-      <td class="text-center small"><span class="badge bg-secondary">${u.projects_count}</span></td>
+      <td class="small">${roleBadgeHtml(u)}</td>
+      <td class="text-center"><span class="projects-count">${u.projects_count}</span></td>
       <td class="small">${quotaCell(u)}</td>
       <td class="small text-muted">${u.signup_date || '—'}</td>
     </tr>`).join('');
@@ -293,27 +305,47 @@ function renderPagination() {
 
 // ── Helpers de celda ──────────────────────────────────────────────────────────
 function roleBadgeHtml(u) {
-  return u.is_admin
-    ? `<span class="badge bg-warning text-dark"><i class="bi bi-shield-fill-check me-1"></i>Admin</span>`
-    : `<span class="text-muted small">Usuario</span>`;
+  if (!u.role_name) {
+    return `<span class="text-muted small fst-italic">Sin rol</span>`;
+  }
+  const color = u.role_color || 'secondary';
+  const name  = u.role_name.charAt(0).toUpperCase() + u.role_name.slice(1);
+  return `<span class="d-inline-flex align-items-center gap-2 small">
+    <span class="rounded-circle bg-${esc(color)} flex-shrink-0"
+          style="width:9px;height:9px;display:inline-block;"></span>${esc(name)}
+  </span>`;
 }
 
 function quotaCell(u) {
+  // Línea 1: flex con porcentaje a la derecha de ancho fijo → todas las barras
+  // terminan en la misma X. Por la izquierda, "Excedida" empuja la barra solo
+  // cuando aparece (las normales empiezan desde el principio de la celda).
+  let barRow;
   if (u.quota_percent === null) {
-    return `<span class="small text-muted">${esc(u.quota_used_fmt)} <span class="opacity-50">/ sin límite</span></span>`;
-  }
-  const pct      = Math.min(u.quota_percent, 100);
-  const exceeded = u.quota_exceeded
-    ? `<span class="badge bg-danger mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Excedida</span><br>`
-    : '';
-  return `${exceeded}
-    <div class="d-flex align-items-center gap-2">
-      <div class="progress flex-grow-1" style="height:7px">
+    barRow = `<div class="quota-bar-row">
+      <span class="text-muted opacity-50 small"><i class="bi bi-infinity"></i></span>
+      <span class="quota-pct"></span>
+    </div>`;
+  } else {
+    const pct = Math.min(u.quota_percent, 100);
+    const exceededTag = u.quota_exceeded
+      ? `<span class="text-danger text-nowrap fw-semibold me-2" style="font-size:.68rem;">
+           <i class="bi bi-exclamation-triangle-fill me-1"></i>Excedida
+         </span>`
+      : '';
+    barRow = `<div class="quota-bar-row">
+      ${exceededTag}
+      <div class="progress flex-grow-1" style="height:6px;min-width:24px;">
         <div class="progress-bar bg-${esc(u.quota_status)}" style="width:${pct}%"></div>
       </div>
-      <span class="small text-muted text-nowrap">${pct}%</span>
-    </div>
-    <div class="small text-muted">${esc(u.quota_used_fmt)} / ${esc(u.quota_max_fmt)}</div>`;
+      <span class="quota-pct small text-muted text-nowrap text-end">${pct}%</span>
+    </div>`;
+  }
+  // Línea 2: texto de uso / límite
+  const limitText = u.quota_percent === null
+    ? `${esc(u.quota_used_fmt)} <span class="opacity-50">/ sin límite</span>`
+    : `${esc(u.quota_used_fmt)} / ${esc(u.quota_max_fmt)}`;
+  return `${barRow}<div class="small text-muted mt-1">${limitText}</div>`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

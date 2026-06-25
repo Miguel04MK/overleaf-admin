@@ -12,11 +12,6 @@
           <div class="flex-grow-1">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
               <h5 class="fw-bold mb-0">{{ user.display_name }}</h5>
-              {% if user.is_admin %}
-                <span class="badge bg-warning text-dark">
-                  <i class="bi bi-shield-fill-check me-1"></i>Admin Overleaf
-                </span>
-              {% endif %}
               <span class="badge bg-{{ 'success' if is_active else 'secondary' }}">
                 <i class="bi bi-circle-fill me-1" style="font-size:.45rem;vertical-align:middle;"></i>
                 {{ 'Activo' if is_active else 'Inactivo' }}
@@ -94,16 +89,19 @@
 
           <div id="quotaForm" style="display:none;" class="mt-3 pt-3 border-top">
             <form method="POST" action="{{ url_for('users.set_quota', user_id=user.id) }}">
-              <div class="input-group input-group-sm">
-                <input type="number" name="quota_value" class="form-control"
+              <div style="display:flex;">
+                <input type="number" name="quota_value" class="form-control form-control-sm"
+                       style="width:70px;min-width:0;border-radius:var(--bs-border-radius-sm) 0 0 var(--bs-border-radius-sm);border-right:0;"
                        placeholder="Ej: 500" min="0" step="any"
                        value="{{ '%.0f'|format(user.max_quota_bytes / (1024**2)) if user.max_quota_bytes else '' }}">
-                <select name="quota_unit" class="form-select" style="max-width:68px;">
+                <select name="quota_unit" class="form-select form-select-sm"
+                        style="width:78px;flex:0 0 78px;border-radius:0;">
                   <option value="MB" {% if not user.max_quota_bytes or user.max_quota_bytes < 1024**3 %}selected{% endif %}>MB</option>
                   <option value="GB" {% if user.max_quota_bytes and user.max_quota_bytes >= 1024**3 %}selected{% endif %}>GB</option>
                   <option value="KB">KB</option>
                 </select>
-                <button type="submit" class="btn btn-primary btn-sm">
+                <button type="submit" class="btn btn-primary btn-sm"
+                        style="border-radius:0 var(--bs-border-radius-sm) var(--bs-border-radius-sm) 0;">
                   <i class="bi bi-check2"></i>
                 </button>
               </div>

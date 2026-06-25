@@ -38,12 +38,14 @@
                      else None %}
                   {% set quota_mb = (role.storage_quota_bytes / (1024**2))|round(0)|int
                      if role.storage_quota_bytes else '' %}
-                  <div class="input-group input-group-sm" style="width:170px;">
+                  <div style="display:flex;width:190px;">
                     <input type="number" name="quota_value" id="inp-quota-value"
-                           class="form-control" min="0" step="any" placeholder="∞"
+                           class="form-control form-control-sm" style="min-width:0;border-radius:var(--bs-border-radius-sm) 0 0 var(--bs-border-radius-sm);border-right:0;"
+                           min="0" step="any" placeholder="∞"
                            value="{{ quota_gb if quota_gb else quota_mb }}">
                     <select name="quota_unit" id="inp-quota-unit"
-                            class="form-select" style="max-width:68px;">
+                            class="form-select form-select-sm"
+                            style="width:90px;flex:0 0 90px;border-radius:0 var(--bs-border-radius-sm) var(--bs-border-radius-sm) 0;">
                       <option value="MB" {% if not quota_gb %}selected{% endif %}>MB</option>
                       <option value="GB" {% if quota_gb %}selected{% endif %}>GB</option>
                     </select>
@@ -67,6 +69,33 @@
                 </div>
 
               </div>
+            </div>
+
+            {# ── Rol por defecto ────────────────────────────────────────── #}
+            <div class="mt-3 pt-3 border-top">
+              <label class="form-label fw-semibold small mb-2">
+                <i class="bi bi-star me-1 text-muted"></i>Rol por defecto
+              </label>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="inp-is-default" name="is_default"
+                       {% if role.is_default %}checked{% endif %}>
+                <label class="form-check-label small" for="inp-is-default">
+                  Asignar este rol a los usuarios nuevos por defecto
+                </label>
+              </div>
+              {% if role.is_default %}
+                <div class="form-text small text-muted">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Para cambiar el rol por defecto, marca otro rol como predeterminado
+                  desde su pantalla de configuración.
+                </div>
+              {% else %}
+                <div class="form-text small text-warning d-none" id="default-warning">
+                  <i class="bi bi-exclamation-triangle me-1"></i>
+                  El rol por defecto actual dejará de serlo al guardar.
+                </div>
+              {% endif %}
             </div>
 
             {# ── Impacto estimado ──────────────────────────────────────── #}

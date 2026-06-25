@@ -38,22 +38,35 @@
   </div>
 
   <a href="{{ url_for('alerts.list_alerts') }}" class="kpi-link" title="Ver alertas">
-    <div class="kpi kpi--alerts {% if not d.alerts_active %}is-quiet{% endif %}">
-      <div class="kpi__icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    {% set _no_alerts = not d.alerts_active %}
+    <div class="kpi kpi--alerts {% if _no_alerts %}is-ok{% endif %}">
+      <div class="kpi__icon">
+        {% if _no_alerts %}
+          <i class="bi bi-shield-check"></i>
+        {% else %}
+          <i class="bi bi-exclamation-triangle-fill"></i>
+        {% endif %}
+      </div>
       <div class="kpi__body">
-        <div class="kpi__num">{{ d.alerts_active|default(0) }}</div>
-        <div class="kpi__label">Alertas activas</div>
-        {% if d.alerts_by_level %}
-          <div class="mt-1 truncate">
-            {% for lvl in ['critical','danger','warning','info'] %}
-              {% if d.alerts_by_level.get(lvl) %}
-                <span class="kpi__pill
-                  {% if lvl in ['critical','danger'] %}is-danger
-                  {% elif lvl == 'warning' %}is-warning
-                  {% else %}is-info{% endif %}">{{ d.alerts_by_level[lvl] }} {{ lvl }}</span>
-              {% endif %}
-            {% endfor %}
-          </div>
+        {% if _no_alerts %}
+          <div class="kpi__num kpi__num--sm">Sin alertas</div>
+          <div class="kpi__label">Estado</div>
+          <div class="kpi__sub text-success">Todo correcto</div>
+        {% else %}
+          <div class="kpi__num">{{ d.alerts_active }}</div>
+          <div class="kpi__label">Alertas activas</div>
+          {% if d.alerts_by_level %}
+            <div class="mt-1 truncate">
+              {% for lvl in ['critical','danger','warning','info'] %}
+                {% if d.alerts_by_level.get(lvl) %}
+                  <span class="kpi__pill
+                    {% if lvl in ['critical','danger'] %}is-danger
+                    {% elif lvl == 'warning' %}is-warning
+                    {% else %}is-info{% endif %}">{{ d.alerts_by_level[lvl] }} {{ lvl }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
         {% endif %}
       </div>
     </div>

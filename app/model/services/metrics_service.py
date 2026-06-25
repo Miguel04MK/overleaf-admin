@@ -103,11 +103,15 @@ def get_metrics_data() -> dict:
         # Sync history
         "sync_history": [],
         "sync_stats": {},
-        # System
-        "services": [],
-        "db_ok": False,
-        "alerts_summary": {},
-        "recent_errors": [],
+        # ── Analítica avanzada de usuarios y proyectos ───────────────────
+        "top_quota": [],            # ranking por % de cuota usado
+        "quota_status": [],         # dentro / cerca / superada / sin cuota
+        "users_by_proj_count": [],  # buckets 0, 1-2, 3-5, 6-10, >10
+        "storage_by_role": [],      # almacenamiento por rol del propietario
+        "projects_by_role": [],     # nº de proyectos por rol del propietario
+        "activity_status": [],      # activos / inactivos 30d / 90d / nunca
+        "top_projects_size": [],    # ranking de proyectos por tamaño
+        "scatter_users": [],        # {x: proyectos, y: MB} por usuario
     }
 
     # ── 1. Totals ────────────────────────────────────────────────────────
@@ -375,51 +379,242 @@ def get_metrics_data() -> dict:
         db.session.rollback()
         logger.error("Metrics: error fetching sync history: %s", exc)
 
-    # ── 8. Alerts summary ────────────────────────────────────────────────
+    # ── 8. Ranking por % de cuota usado (3er modo del ranking) ───────────
     try:
-        from app.model.services import alerts_service
-        alert_counts = dict(
-            db.session.query(SystemAlert.level, func.count())
-            .filter(SystemAlert.is_resolved == False)  # noqa: E712
-            .group_by(SystemAlert.level)
+        storage_sq = _storage_by_owner_sq()
+        rows = (
+            db.session.query(
+                OverleafUser.id, OverleafUser.email,
+                OverleafUser.first_name, OverleafUser.last_name,
+                OverleafUser.max_quota_bytes,
+                func.coalesce(storage_sq.c.used_bytes, 0).label("used"),
+            )
+            .outerjoin(storage_sq, storage_sq.c.uid == OverleafUser.id)
+            .filter(OverleafUser.max_quota_bytes.isnot(None))
+            .filter(OverleafUser.max_quota_bytes > 0)
             .all()
         )
-        data["alerts_summary"] = {
-            "active": alerts_service.get_active_count(),
-            "by_level": alert_counts,
-            "resolved": alerts_service.get_resolved_count(),
-        }
+        ranked = []
+        for r in rows:
+            used = int(r.used or 0)
+            quota = int(r.max_quota_bytes)
+            pct = round(used / quota * 100, 1) if quota else 0
+            ranked.append({
+                "label": _label(r.email, r.first_name, r.last_name),
+                "pct": pct,
+                "used_fmt": _fmt_bytes(used),
+                "quota_fmt": _fmt_bytes(quota),
+                "user_id": int(r.id),
+            })
+        ranked.sort(key=lambda x: x["pct"], reverse=True)
+        data["top_quota"] = ranked[:10]
     except Exception as exc:
         db.session.rollback()
-        logger.error("Metrics: error fetching alerts summary: %s", exc)
+        logger.error("Metrics: error fetching quota ranking: %s", exc)
 
-    # ── 9. Recent error audit logs ───────────────────────────────────────
+    # ── 9. Estado de cuota (dentro / cerca / superada / sin cuota) ────────
     try:
-        data["recent_errors"] = (
-            AuditLog.query
-            .filter(AuditLog.level.in_(["error", "warning"]))
-            .order_by(AuditLog.created_at.desc())
+        storage_sq = _storage_by_owner_sq()
+        rows = (
+            db.session.query(
+                OverleafUser.max_quota_bytes,
+                func.coalesce(storage_sq.c.used_bytes, 0).label("used"),
+            )
+            .outerjoin(storage_sq, storage_sq.c.uid == OverleafUser.id)
+            .all()
+        )
+        within = near = exceeded = no_quota = 0
+        for r in rows:
+            q = r.max_quota_bytes
+            if not q or q <= 0:
+                no_quota += 1
+                continue
+            pct = (int(r.used or 0) / int(q)) * 100
+            if pct >= 100:
+                exceeded += 1
+            elif pct >= 80:
+                near += 1
+            else:
+                within += 1
+        data["quota_status"] = [
+            {"label": "Dentro de cuota",   "count": within,    "key": "within"},
+            {"label": "Cerca del límite",  "count": near,      "key": "near"},
+            {"label": "Cuota superada",    "count": exceeded,  "key": "exceeded"},
+            {"label": "Sin cuota asignada","count": no_quota,  "key": "none"},
+        ]
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Metrics: error fetching quota status: %s", exc)
+
+    # ── 10. Distribución de usuarios por nº de proyectos ─────────────────
+    try:
+        proj_count_sq = (
+            db.session.query(
+                OverleafProject.owner_id.label("uid"),
+                func.count(OverleafProject.id).label("pc"),
+            )
+            .filter(OverleafProject.owner_id.isnot(None))
+            .group_by(OverleafProject.owner_id)
+            .subquery()
+        )
+        rows = (
+            db.session.query(func.coalesce(proj_count_sq.c.pc, 0))
+            .select_from(OverleafUser)
+            .outerjoin(proj_count_sq, proj_count_sq.c.uid == OverleafUser.id)
+            .all()
+        )
+        b0 = b12 = b35 = b610 = b10p = 0
+        for (pc,) in rows:
+            pc = int(pc or 0)
+            if pc == 0:        b0 += 1
+            elif pc <= 2:      b12 += 1
+            elif pc <= 5:      b35 += 1
+            elif pc <= 10:     b610 += 1
+            else:              b10p += 1
+        data["users_by_proj_count"] = [
+            {"label": "0",        "count": b0},
+            {"label": "1–2",      "count": b12},
+            {"label": "3–5",      "count": b35},
+            {"label": "6–10",     "count": b610},
+            {"label": "Más de 10","count": b10p},
+        ]
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Metrics: error fetching users by project count: %s", exc)
+
+    # ── 11. Estado de actividad (último acceso) ──────────────────────────
+    try:
+        now = datetime.now(timezone.utc)
+        c30 = now - timedelta(days=30)
+        c90 = now - timedelta(days=90)
+        active = (
+            OverleafUser.query.filter(OverleafUser.last_login_at >= c30).count()
+        )
+        inactive30 = (
+            OverleafUser.query
+            .filter(OverleafUser.last_login_at < c30)
+            .filter(OverleafUser.last_login_at >= c90)
+            .count()
+        )
+        inactive90 = (
+            OverleafUser.query.filter(OverleafUser.last_login_at < c90).count()
+        )
+        never = (
+            OverleafUser.query.filter(OverleafUser.last_login_at.is_(None)).count()
+        )
+        data["activity_status"] = [
+            {"label": "Activos (< 30 d)",    "count": active,     "key": "active"},
+            {"label": "Inactivos 30 d",      "count": inactive30, "key": "inact30"},
+            {"label": "Inactivos 90 d",      "count": inactive90, "key": "inact90"},
+            {"label": "Sin actividad",       "count": never,      "key": "never"},
+        ]
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Metrics: error fetching activity status: %s", exc)
+
+    # ── 12. Almacenamiento y proyectos por rol del propietario ───────────
+    try:
+        rows = (
+            db.session.query(
+                Role.name,
+                func.count(OverleafProject.id),
+                func.coalesce(func.sum(OverleafProject.size_bytes), 0),
+            )
+            .select_from(OverleafProject)
+            .join(OverleafUser, OverleafUser.id == OverleafProject.owner_id)
+            .outerjoin(Role, Role.id == OverleafUser.role_id)
+            .group_by(Role.name)
+            .all()
+        )
+        storage_by_role, projects_by_role = [], []
+        for name, pcount, sbytes in rows:
+            rname = name or "Sin rol"
+            storage_by_role.append({
+                "name": rname,
+                "bytes": int(sbytes or 0),
+                "fmt": _fmt_bytes(int(sbytes or 0)),
+            })
+            projects_by_role.append({"name": rname, "count": int(pcount or 0)})
+        storage_by_role.sort(key=lambda x: x["bytes"], reverse=True)
+        projects_by_role.sort(key=lambda x: x["count"], reverse=True)
+        data["storage_by_role"] = storage_by_role
+        data["projects_by_role"] = projects_by_role
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Metrics: error fetching per-role aggregates: %s", exc)
+
+    # ── 13. Ranking de proyectos por tamaño ──────────────────────────────
+    try:
+        rows = (
+            db.session.query(
+                OverleafProject.id,
+                OverleafProject.name,
+                OverleafProject.size_bytes,
+                OverleafUser.email,
+                OverleafUser.first_name,
+                OverleafUser.last_name,
+            )
+            .outerjoin(OverleafUser, OverleafUser.id == OverleafProject.owner_id)
+            .filter(OverleafProject.size_bytes.isnot(None))
+            .filter(OverleafProject.size_bytes > 0)
+            .order_by(OverleafProject.size_bytes.desc())
             .limit(10)
             .all()
         )
+        data["top_projects_size"] = [
+            {
+                "label": r.name or "(sin nombre)",
+                "bytes": int(r.size_bytes or 0),
+                "fmt": _fmt_bytes(int(r.size_bytes or 0)),
+                "owner": _label(r.email, r.first_name, r.last_name) if r.email else "—",
+                "project_id": int(r.id),
+            }
+            for r in rows
+        ]
     except Exception as exc:
         db.session.rollback()
-        logger.error("Metrics: error fetching recent errors: %s", exc)
+        logger.error("Metrics: error fetching top projects by size: %s", exc)
 
-    # ── 10. System status ────────────────────────────────────────────────
+    # ── 14. Scatter: proyectos (X) vs almacenamiento MB (Y) por usuario ──
     try:
-        import concurrent.futures
-        from app.model.services.admin.admin_service import get_service_statuses
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(get_service_statuses)
-            data["services"] = future.result(timeout=3)
-    except Exception:
-        pass
-
-    try:
-        db.session.execute(db.text("SELECT 1"))
-        data["db_ok"] = True
-    except Exception:
-        data["db_ok"] = False
+        storage_sq = _storage_by_owner_sq()
+        proj_count_sq = (
+            db.session.query(
+                OverleafProject.owner_id.label("uid"),
+                func.count(OverleafProject.id).label("pc"),
+            )
+            .filter(OverleafProject.owner_id.isnot(None))
+            .group_by(OverleafProject.owner_id)
+            .subquery()
+        )
+        rows = (
+            db.session.query(
+                OverleafUser.id, OverleafUser.email,
+                OverleafUser.first_name, OverleafUser.last_name,
+                func.coalesce(proj_count_sq.c.pc, 0).label("pc"),
+                func.coalesce(storage_sq.c.used_bytes, 0).label("used"),
+            )
+            .outerjoin(proj_count_sq, proj_count_sq.c.uid == OverleafUser.id)
+            .outerjoin(storage_sq, storage_sq.c.uid == OverleafUser.id)
+            .all()
+        )
+        scatter = []
+        for r in rows:
+            pc = int(r.pc or 0)
+            used = int(r.used or 0)
+            # Solo incluir usuarios con algo de actividad (proyectos o storage)
+            if pc == 0 and used == 0:
+                continue
+            scatter.append({
+                "x": pc,
+                "y": round(used / (1024 * 1024), 2),
+                "label": _label(r.email, r.first_name, r.last_name),
+                "used_fmt": _fmt_bytes(used),
+                "user_id": int(r.id),
+            })
+        data["scatter_users"] = scatter
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Metrics: error building scatter data: %s", exc)
 
     return data

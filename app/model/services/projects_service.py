@@ -13,18 +13,6 @@ from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.project_member import ProjectMember
 from app.model.entities.project_sync_log import ProjectSyncLog
 
-# ── Visual indicator thresholds ───────────────────────────────────────────────
-SIZE_LARGE_BYTES = 10 * 1024 * 1024   # ≥ 10 MB  → badge "Grande"
-INACTIVE_DAYS    = 90                  # ≥ 90 días → badge "Inactivo"
-COLLAB_MANY      = 3                   # ≥ 3 miembros → badge "Colaborativo"
-
-
-def _aware(dt):
-    if dt is None:
-        return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-
-
 def get_projects_list_data(
     page: int,
     per_page: int,
@@ -32,13 +20,16 @@ def get_projects_list_data(
     owner_id: int | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    indicators: list[str] | None = None,
+    size_op: str | None = None,         # 'gt' | 'eq' | 'lt'
+    size_mb: float | None = None,       # umbral en MB
+    members_op: str | None = None,      # 'gt' | 'eq' | 'lt'
+    members_val: int | None = None,     # umbral entero
     sort: str = "last_updated_at",
     order: str = "desc",
 ) -> dict:
     """
-    Returns paginated projects + pre-computed member counts, member names
-    (for tooltips) and visual indicator flags — O(1) extra queries.
+    Returns paginated projects + pre-computed member counts and member names
+    (for tooltips) — O(1) extra queries.
     """
     query = (
         OverleafProject.query
@@ -60,23 +51,38 @@ def get_projects_list_data(
 
     from sqlalchemy import select as sa_select, func as sa_func
 
-    if indicators:
-        from datetime import timedelta
-        _now = datetime.now(timezone.utc)
-        for ind in indicators:
-            if ind == "large":
-                query = query.filter(OverleafProject.size_bytes >= SIZE_LARGE_BYTES)
-            elif ind == "inactive":
-                cutoff = _now - timedelta(days=INACTIVE_DAYS)
-                query = query.filter(OverleafProject.last_updated_at <= cutoff)
-            elif ind == "collaborative":
-                collab_sq = (
-                    sa_select(sa_func.count(ProjectMember.id))
-                    .where(ProjectMember.project_id == OverleafProject.id)
-                    .correlate(OverleafProject)
-                    .scalar_subquery()
-                )
-                query = query.filter(collab_sq >= COLLAB_MANY)
+    # ── Filtro: TAMAÑO (size_bytes en MB) ─────────────────────────────────────
+    if size_op in ("gt", "eq", "lt") and size_mb is not None:
+        threshold = int(size_mb * 1024 * 1024)
+        if size_op == "gt":
+            query = query.filter(OverleafProject.size_bytes > threshold)
+        elif size_op == "eq":
+            # rango ±1 MB para "igual a" (la precisión exacta no tiene sentido en MB)
+            lo, hi = max(0, threshold - 1_048_576), threshold + 1_048_576
+            query = query.filter(
+                OverleafProject.size_bytes >= lo,
+                OverleafProject.size_bytes <= hi,
+            )
+        elif size_op == "lt":
+            query = query.filter(
+                OverleafProject.size_bytes.isnot(None),
+                OverleafProject.size_bytes < threshold,
+            )
+
+    # ── Filtro: COLABORADORES ─────────────────────────────────────────────────
+    if members_op in ("gt", "eq", "lt") and members_val is not None:
+        collab_sq = (
+            sa_select(sa_func.count(ProjectMember.id))
+            .where(ProjectMember.project_id == OverleafProject.id)
+            .correlate(OverleafProject)
+            .scalar_subquery()
+        )
+        if members_op == "gt":
+            query = query.filter(collab_sq > members_val)
+        elif members_op == "eq":
+            query = query.filter(collab_sq == members_val)
+        elif members_op == "lt":
+            query = query.filter(collab_sq < members_val)
 
     # ── Ordenación ────────────────────────────────────────────────────────────
     _SORT_COLS = {
@@ -135,25 +141,10 @@ def get_projects_list_data(
                     f"{pm.user.display_name} ({label})"
                 )
 
-    # Visual indicator flags per project
-    now = datetime.now(timezone.utc)
-    indicators: dict[int, list[str]] = {}
-    for proj in pagination.items:
-        flags: list[str] = []
-        if proj.size_bytes and proj.size_bytes >= SIZE_LARGE_BYTES:
-            flags.append("large")
-        lu = _aware(proj.last_updated_at)
-        if lu and (now - lu).days >= INACTIVE_DAYS:
-            flags.append("inactive")
-        if member_counts.get(proj.id, 0) >= COLLAB_MANY:
-            flags.append("collaborative")
-        indicators[proj.id] = flags
-
     return {
         "pagination": pagination,
         "member_counts": member_counts,
         "member_names": member_names,
-        "indicators": indicators,
     }
 
 
@@ -197,11 +188,13 @@ def get_project_detail_data(project_id: int) -> dict | None:
 
 def get_owners_for_filter() -> list[OverleafUser]:
     """Users that own at least one project, for the filter dropdown."""
+    # `.scalar_subquery()` evita el SAWarning de SQLAlchemy 2.x al pasar el
+    # subquery a `IN()` (antes lo coercionaba implícitamente).
     owner_ids = (
         db.session.query(OverleafProject.owner_id)
         .filter(OverleafProject.owner_id.isnot(None))
         .distinct()
-        .subquery()
+        .scalar_subquery()
     )
     return (
         OverleafUser.query

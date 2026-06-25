@@ -1,82 +1,141 @@
 {% extends "base_login.html" %}
 {% block title %}Iniciar sesión{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+<div class="login-split">
 
-    <div class="text-center mb-4">
-      <i class="bi bi-journal-code text-success" style="font-size: 3rem;"></i>
-      <h2 class="fw-bold mt-2">Overleaf Admin</h2>
-      <p class="text-muted small">Panel de administración &mdash; acceso restringido</p>
+  {# ── Lado izquierdo: oscuro, institucional ───────────────────────── #}
+  <aside class="login-left">
+    <div class="login-left-inner">
+
+      <div class="brand mb-4">
+        <i class="bi bi-journal-code brand-icon"></i>
+        <span class="brand-name">Overleaf Admin</span>
+      </div>
+
+      <h1 class="login-title">
+        Herramienta de administración<br>de Overleaf
+      </h1>
+
+      <p class="login-lead">
+        Panel administrativo para la gestión de usuarios, proyectos, roles,
+        cuotas, sincronización e informes de Overleaf Community.
+      </p>
+
+      <ul class="feature-list">
+        <li><i class="bi bi-people-fill"></i>Gestión de usuarios y roles</li>
+        <li><i class="bi bi-hdd-fill"></i>Cuotas y límites por rol</li>
+        <li><i class="bi bi-arrow-repeat"></i>Sincronización automática</li>
+        <li><i class="bi bi-clipboard2-data"></i>Auditoría e informes</li>
+      </ul>
+
+
     </div>
+  </aside>
 
-    <div class="card shadow-sm border-0">
-      <div class="card-body p-4">
-        <h5 class="card-title mb-4 text-center text-muted">Iniciar sesión</h5>
+  {# ── Lado derecho: claro, formulario ──────────────────────────────── #}
+  <main class="login-right">
+    <div class="login-form-wrap">
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
+      <div class="text-center mb-4 d-md-none">
+        {# Marca compacta sólo en móvil (en desktop la enseña el lado izquierdo) #}
+        <i class="bi bi-journal-code text-success" style="font-size:2.2rem;"></i>
+        <h5 class="fw-bold mt-1 mb-0">Overleaf Admin</h5>
+      </div>
 
-        <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
-          <div class="mb-3">
-            <label for="username" class="form-label fw-medium">Usuario</label>
-            <div class="input-group">
-              <span class="input-group-text bg-white">
-                <i class="bi bi-person text-muted"></i>
-              </span>
-              <input
-                type="text"
-                class="form-control"
-                id="username"
-                name="username"
-                placeholder="admin"
-                autocomplete="username"
-                autofocus
-                required
-              />
+      <h2 class="login-heading">Iniciar sesión</h2>
+      <p class="login-sub text-muted">
+        Introduce tus credenciales de administrador para acceder.
+      </p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show py-2 small" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
-          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
 
-          <div class="mb-4">
-            <label for="password" class="form-label fw-medium">Contraseña</label>
-            <div class="input-group">
-              <span class="input-group-text bg-white">
-                <i class="bi bi-lock text-muted"></i>
-              </span>
-              <input
-                type="password"
-                class="form-control"
-                id="password"
-                name="password"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                required
-              />
-            </div>
+      <form method="POST" action="{{ url_for('auth.login') }}" novalidate autocomplete="off">
+        <div class="mb-3">
+          <label for="username" class="form-label fw-semibold small">Usuario o email</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white">
+              <i class="bi bi-person text-muted"></i>
+            </span>
+            <input type="text"
+                   class="form-control"
+                   id="username"
+                   name="username"
+                   value="{{ username_value|default('', true) }}"
+                   placeholder="Usuario o correo electrónico"
+                   autocomplete="username"
+                   autofocus
+                   required>
           </div>
+        </div>
 
-          <div class="d-grid">
-            <button type="submit" class="btn btn-success btn-lg">
-              <i class="bi bi-box-arrow-in-right me-2"></i>Entrar
+        <div class="mb-4">
+          <label for="password" class="form-label fw-semibold small">Contraseña</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white">
+              <i class="bi bi-lock text-muted"></i>
+            </span>
+            <input type="password"
+                   class="form-control"
+                   id="password"
+                   name="password"
+                   placeholder="••••••••"
+                   autocomplete="current-password"
+                   required>
+            <button type="button" class="btn btn-outline-secondary toggle-pw"
+                    id="toggle-pw"
+                    aria-label="Mostrar contraseña" title="Mostrar / ocultar contraseña">
+              <i class="bi bi-eye" id="toggle-pw-icon"></i>
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+
+        <div class="d-grid mb-3">
+          <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Acceder
+          </button>
+        </div>
+
+        <p class="text-muted small text-center mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Las cuentas de acceso son gestionadas por la administración del sistema.
+        </p>
+      </form>
+
     </div>
+  </main>
 
-    <p class="text-center text-muted small mt-3">
-      Credenciales por defecto: <code>admin</code> / <code>admin</code>
-    </p>
-
-  </div>
 </div>
+
+<script>
+  // Toggle mostrar/ocultar contraseña — JS inline mínimo, sin frameworks.
+  (function () {
+    const btn   = document.getElementById("toggle-pw");
+    const icon  = document.getElementById("toggle-pw-icon");
+    const input = document.getElementById("password");
+    if (!btn || !input) return;
+    btn.addEventListener("click", () => {
+      const showing = input.type === "text";
+      input.type    = showing ? "password" : "text";
+      icon.className = showing ? "bi bi-eye" : "bi bi-eye-slash";
+      btn.setAttribute(
+        "aria-label",
+        showing ? "Mostrar contraseña" : "Ocultar contraseña",
+      );
+    });
+  })();
+</script>
 {% endblock %}

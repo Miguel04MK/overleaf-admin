@@ -1,0 +1,100 @@
+/* account.css — estilos para la pantalla "Mi cuenta".
+ *
+ * Diseño 2x2: perfil + seguridad arriba, notificaciones + actividad abajo.
+ * Sigue la estética del resto de la plataforma (verde Overleaf, sombras
+ * suaves, bordes 0.55-0.6rem).
+ */
+
+.account-page .card {
+  border-radius: 0.55rem;
+}
+.account-page .card-header {
+  border-radius: 0.55rem 0.55rem 0 0 !important;
+  font-size: 0.85rem;
+}
+
+/* ── Avatar circular del admin ──────────────────────────────────────────── */
+.account-avatar {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  background: var(--ol-green, #3d8b3d);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+  user-select: none;
+}
+
+/* ── Definition list de la card "Perfil" ────────────────────────────────── */
+.account-dl {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.4rem 0.85rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.account-dl dt {
+  color: var(--bs-secondary);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  align-self: center;
+  margin: 0;
+}
+.account-dl dd {
+  margin: 0;
+  align-self: center;
+  word-break: break-word;
+}
+
+/* ── Tip de seguridad ───────────────────────────────────────────────────── */
+.security-tip {
+  background: rgba(13, 110, 253, .06);
+  border-left: 3px solid var(--bs-primary);
+  padding: .45rem .65rem;
+  border-radius: .25rem;
+  line-height: 1.35;
+}
+
+/* ── Lista de actividad reciente ─────────────────────────────────────────── */
+.activity-list {
+  /* sin altura fija — la card se ajusta al contenido y no aparece scroll */
+}
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  padding: .55rem .9rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+.activity-item:last-child {
+  border-bottom: none;
+}
+.activity-body {
+  flex: 1;
+  min-width: 0;
+}
+.activity-dot {
+  display: inline-block;
+  width: .55rem;
+  height: .55rem;
+  border-radius: 50%;
+  margin-top: .45rem;
+  background: var(--bs-secondary);
+  flex-shrink: 0;
+}
+.activity-dot.level-info     { background: var(--bs-primary); }
+.activity-dot.level-warning  { background: var(--bs-warning); }
+.activity-dot.level-error,
+.activity-dot.level-danger,
+.activity-dot.level-critical { background: var(--bs-danger); }
+
+/* ── Hint dinámico de coincidencia de contraseña ────────────────────────── */
+#pw-match-hint.ok  { color: var(--bs-success); }
+#pw-match-hint.bad { color: var(--bs-danger); }

@@ -3,7 +3,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 from app.model.services import roles_service
-from app.rest.dtos.forms import UpdateRoleForm, ManageUserRoleForm, AssignRoleForm
+from app.rest.dtos.forms import (
+    UpdateRoleForm, ManageUserRoleForm, AssignRoleForm, CreateRoleForm,
+)
 
 roles_bp = Blueprint("roles", __name__, url_prefix="/roles")
 
@@ -35,15 +37,58 @@ def role_detail(role_id: int):
     role = roles_service.get_role_by_id(role_id)
     if not role:
         abort(404)
-    recent_logs = roles_service.get_role_change_logs(role_id=role_id, per_page=10)
-    users_stats = roles_service.get_users_stats_for_role(role_id)   # all users, for JS
+    recent_logs  = roles_service.get_role_change_logs(role_id=role_id, per_page=10)
+    users_stats  = roles_service.get_users_stats_for_role(role_id)   # all users, for JS
+    default_role = roles_service.get_default_role()                  # para el modal de borrado
     return render_template(
         "roles/detail.html",
         active_page="roles",
         role=role,
         users_stats=users_stats,
         recent_logs=recent_logs,
+        default_role=default_role,
     )
+
+
+@roles_bp.route("/crear", methods=["POST"])
+@login_required
+def create_role():
+    """Crea un nuevo rol desde el modal de /roles/."""
+    form = CreateRoleForm(request.form)
+    if not form.validate():
+        first_error = next(
+            (errs[0] for errs in form.errors.values() if errs),
+            "Datos del rol no válidos.",
+        )
+        flash(first_error, "danger")
+        return redirect(url_for("roles.list_roles"))
+
+    ok, msg, _role = roles_service.create_role(
+        name=form.name.data,
+        description=form.description.data,
+        storage_quota_bytes=form.to_quota_bytes(),
+        max_projects=form.to_max_projects(),
+        is_default=bool(form.is_default.data),
+        color=form.color.data,
+        actor=current_user.username,
+    )
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for("roles.list_roles"))
+
+
+@roles_bp.route("/<int:role_id>/eliminar", methods=["POST"])
+@login_required
+def delete_role(role_id: int):
+    """Elimina un rol. Si falla un guard de seguridad, redirige al detalle
+    con flash; si tiene éxito, vuelve al listado."""
+    ok, msg = roles_service.delete_role(
+        role_id,
+        actor=current_user.username,
+    )
+    flash(msg, "success" if ok else "danger")
+    if ok:
+        return redirect(url_for("roles.list_roles"))
+    return redirect(url_for("roles.role_detail", role_id=role_id))
 
 
 @roles_bp.route("/<int:role_id>/editar", methods=["POST"])
@@ -63,6 +108,7 @@ def update_role(role_id: int):
         description=form.description.data.strip() or None,
         storage_quota_bytes=form.to_quota_bytes(),
         max_projects=form.to_max_projects(),
+        is_default=bool(form.is_default.data),
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))
@@ -114,13 +160,22 @@ def search_users_for_role(role_id: int):
 @roles_bp.route("/<int:role_id>/gestionar-usuario", methods=["POST"])
 @login_required
 def manage_user_role(role_id: int):
-    """Assign or remove a user's role from the role detail page."""
+    """Assign or remove a user's role from the role detail page.
+
+    Si la peticion viene de un fetch (header `X-Requested-With: XMLHttpRequest`)
+    se devuelve JSON sin redirect ni flash, para que el cliente pueda batchear
+    multiples cambios sin acumular N flash messages.
+    """
     role = roles_service.get_role_by_id(role_id)
     if not role:
         abort(404)
 
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
     form = ManageUserRoleForm(request.form)
     if not form.validate():
+        if is_ajax:
+            return jsonify({"ok": False, "msg": "No se ha seleccionado ningún usuario."}), 400
         flash("No se ha seleccionado ningún usuario.", "danger")
         return redirect(url_for("roles.role_detail", role_id=role_id))
 
@@ -138,6 +193,9 @@ def manage_user_role(role_id: int):
             role_id=role_id,
             actor=current_user.username,
         )
+
+    if is_ajax:
+        return jsonify({"ok": ok, "msg": msg}), (200 if ok else 400)
 
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("roles.role_detail", role_id=role_id))

@@ -2,7 +2,7 @@
 import json
 
 from flask import Blueprint, render_template, request, abort, redirect, url_for, flash, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from app.model.services import users_service
 from app.model.services import roles_service
@@ -42,7 +42,8 @@ def search():
 @users_bp.route("/")
 @login_required
 def list_users():
-    return render_template("users/list.html", active_page="users")
+    all_roles = roles_service.get_all_roles()
+    return render_template("users/list.html", active_page="users", all_roles=all_roles)
 
 
 @users_bp.route("/<int:user_id>")
@@ -66,6 +67,9 @@ def set_quota(user_id: int):
         return redirect(url_for("users.user_detail", user_id=user_id))
 
     max_bytes = form.to_bytes()
-    ok, msg = users_service.set_user_quota(user_id, max_bytes)
+    ok, msg = users_service.set_user_quota(
+        user_id, max_bytes,
+        actor=current_user.username,
+    )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("users.user_detail", user_id=user_id))

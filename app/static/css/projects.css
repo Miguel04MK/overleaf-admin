@@ -23,3 +23,32 @@
 
 /* ── Search bar width (projects/list) ───────────────────────────────────── */
 #search-wrapper .input-group { width: 400px; }
+
+/* ── Pill clickable del propietario en la tabla de proyectos ──────────────
+   Delimita visualmente el área que lleva a /usuarios/<id>. El resto de la
+   fila lleva al detalle del proyecto, así que es importante que se note
+   dónde acaba el área "ir al usuario". */
+.owner-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .2rem .55rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 999px;
+  background: #f8f9fa;
+  color: var(--bs-body-color);
+  font-size: .78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.owner-pill i {
+  font-size: .72rem;
+  color: var(--bs-secondary);
+}
+.owner-pill:hover {
+  background: var(--ol-green-subtle, rgba(61, 139, 61, .08));
+  border-color: var(--ol-green, #3d8b3d);
+  color: var(--ol-green-dark, #2d6a2d);
+}
+.owner-pill:hover i { color: var(--ol-green, #3d8b3d); }

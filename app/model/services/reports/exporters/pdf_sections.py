@@ -180,20 +180,50 @@ def export_quotas_pdf(
 # ─── Activity ────────────────────────────────────────────────────────────────
 
 def _activity_section(entries: list[AuditLog]) -> list:
+    """Sección PDF del informe de actividad.
+
+    Igual que la vista web `/auditoria/`, mostramos categoría + acción
+    legible. Mantengo el código técnico debajo (entre paréntesis) para
+    que sea trazable.
+    """
+    from app.model.services.admin import admin_service as _audit
+
     styles = _pdf_styles()
     fl = [
         Paragraph(f"Total entradas: <b>{len(entries)}</b>", styles["MetricValue"]),
         Spacer(1, 8),
     ]
-    headers = ["Fecha", "Actor", "Acción", "Nivel", "IP", "Detalle"]
-    rows = [[
-        _ts_short(e.created_at), e.actor or "", e.action or "",
-        e.level or "", e.ip_address or "",
-        _smart_truncate(e.detail or "", 60),
-    ] for e in entries]
+
+    # Desglose por categoría (igual que en /auditoria/).
+    cat_counts: dict[str, int] = {k: 0 for k in _audit.CATEGORIES}
+    for e in entries:
+        ck = _audit.category_for_action(e.action)
+        if ck in cat_counts:
+            cat_counts[ck] += 1
+    breakdown_parts = []
+    for ck, cnt in cat_counts.items():
+        if cnt > 0:
+            breakdown_parts.append(f"{_audit.CATEGORIES[ck]['label']}: <b>{cnt}</b>")
+    if breakdown_parts:
+        fl.append(Paragraph(" &nbsp;·&nbsp; ".join(breakdown_parts), styles["MetricValue"]))
+        fl.append(Spacer(1, 8))
+
+    headers = ["Fecha", "Categoría", "Acción", "Actor", "Nivel", "Detalle"]
+    rows = []
+    for e in entries:
+        cat_key = _audit.category_for_action(e.action)
+        cat_lbl = _audit.CATEGORIES[cat_key]["label"] if cat_key else ""
+        action_txt = f"{_audit.label_for_action(e.action)} ({e.action})"
+        rows.append([
+            _ts_short(e.created_at), cat_lbl,
+            _smart_truncate(action_txt, 36),
+            e.actor or "",
+            e.level or "",
+            _smart_truncate(e.detail or "", 50),
+        ])
     fl.append(_make_table(
         headers, rows,
-        col_pcts=[0.15, 0.12, 0.13, 0.08, 0.12, 0.40],
+        col_pcts=[0.14, 0.12, 0.22, 0.12, 0.08, 0.32],
     ))
     return fl
 

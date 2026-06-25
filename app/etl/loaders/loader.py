@@ -15,35 +15,79 @@ from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.overleaf_project import OverleafProject
 from app.model.entities.project_member import ProjectMember
 from app.model.entities.project_sync_log import ProjectSyncLog
+from app.model.entities.role import Role
 
 logger = logging.getLogger(__name__)
 
 
 class OverleafLoader:
 
-    def upsert_users(self, raw_users: list[dict[str, Any]]) -> tuple[int, int]:
+    def upsert_users(self, raw_users: list[dict[str, Any]]):
         """
         Upsert a list of raw user dicts.
-        Returns (total_found, total_synced).
+
+        Returns (total_found, total_synced, created, updated).
+        Para compatibilidad hacia atrás, los callers viejos pueden seguir haciendo
+        `found, synced = loader.upsert_users(...)` desempaquetando los dos primeros
+        (en cuyo caso ValueError sólo si usan dos asignaciones rígidas — esos sitios
+        se actualizan también en este cambio).
         """
-        synced = 0
+        synced = created = updated = 0
         now = datetime.now(timezone.utc)
+
+        # Rol por defecto: se asigna a usuarios nuevos y a los que no tengan rol.
+        # Se obtiene una sola vez antes del bucle para no hacer N consultas.
+        default_role = Role.query.filter_by(is_default=True).first()
 
         for raw in raw_users:
             try:
+                # Búsqueda primaria por overleaf_id (clave canónica de Overleaf).
                 existing = OverleafUser.query.filter_by(
                     overleaf_id=raw["overleaf_id"]
                 ).first()
 
+                # Segunda barrera: si no existe por overleaf_id, buscar por email
+                # para evitar insertar un duplicado cuando el mismo usuario llegó
+                # con un _id diferente (p.ej. cuentas recreadas en Overleaf CE).
+                if not existing and raw.get("email"):
+                    by_email = OverleafUser.query.filter_by(
+                        email=raw["email"]
+                    ).first()
+                    if by_email:
+                        logger.warning(
+                            "Usuario con email '%s' ya existe "
+                            "(overleaf_id BD: %s, overleaf_id entrante: %s). "
+                            "Se actualiza el registro existente.",
+                            raw["email"],
+                            by_email.overleaf_id,
+                            raw["overleaf_id"],
+                        )
+                        existing = by_email
+
                 if existing:
-                    # Update fields
-                    existing.email = raw.get("email", existing.email)
-                    existing.first_name = raw.get("first_name", existing.first_name)
-                    existing.last_name = raw.get("last_name", existing.last_name)
-                    existing.is_admin = bool(raw.get("is_admin", existing.is_admin))
-                    existing.signup_date = raw.get("signup_date") or existing.signup_date
+                    existing.overleaf_id   = raw["overleaf_id"]   # reconcilia si difería
+                    existing.email         = raw.get("email", existing.email)
+                    existing.first_name    = raw.get("first_name", existing.first_name)
+                    existing.last_name     = raw.get("last_name", existing.last_name)
+                    existing.is_admin      = bool(raw.get("is_admin", existing.is_admin))
+                    existing.signup_date   = raw.get("signup_date") or existing.signup_date
                     existing.last_login_at = raw.get("last_login_at") or existing.last_login_at
-                    existing.synced_at = now
+                    existing.synced_at     = now
+                    # Retroalimentar rol por defecto si el usuario no tiene ninguno
+                    # asignado, aplicando también la cuota propia del rol (mismo
+                    # comportamiento que el cambio manual de rol desde la UI).
+                    if existing.role_id is None and default_role:
+                        existing.role_id = default_role.id
+                    # Si el usuario no tiene cuota propia, hereda la del rol
+                    # actual (sea el default recién asignado o uno preexistente).
+                    if existing.max_quota_bytes is None and existing.role_id is not None:
+                        role_for_quota = (
+                            default_role if existing.role_id == (default_role.id if default_role else None)
+                            else existing.role
+                        )
+                        if role_for_quota and role_for_quota.storage_quota_bytes:
+                            existing.max_quota_bytes = role_for_quota.storage_quota_bytes
+                    updated += 1
                 else:
                     user = OverleafUser(
                         overleaf_id=raw["overleaf_id"],
@@ -54,8 +98,13 @@ class OverleafLoader:
                         signup_date=raw.get("signup_date"),
                         last_login_at=raw.get("last_login_at"),
                         synced_at=now,
+                        role_id=default_role.id if default_role else None,
+                        # Cuota inicial igual a la del rol por defecto (si lo hay).
+                        max_quota_bytes=(default_role.storage_quota_bytes
+                                          if default_role else None),
                     )
                     db.session.add(user)
+                    created += 1
 
                 synced += 1
             except Exception as exc:
@@ -65,8 +114,8 @@ class OverleafLoader:
                     exc,
                 )
 
-        db.session.flush()  # Get IDs before committing
-        return len(raw_users), synced
+        db.session.flush()
+        return len(raw_users), synced, created, updated
 
     def build_user_map(self) -> dict[str, int]:
         """Return mapping of overleaf_id → internal DB id for all users."""
@@ -84,7 +133,7 @@ class OverleafLoader:
         Upsert projects and their memberships.
         Returns (total_found, total_synced).
         """
-        synced = 0
+        synced = created = updated = 0
         now = datetime.now(timezone.utc)
 
         # Collect (project_ref, event, size_bytes) tuples so we can do a
@@ -113,6 +162,7 @@ class OverleafLoader:
                     existing.synced_at = now
                     event = "updated"
                     project_ref = existing
+                    updated += 1
                 else:
                     project_ref = OverleafProject(
                         overleaf_id=raw["overleaf_id"],
@@ -127,6 +177,7 @@ class OverleafLoader:
                     )
                     db.session.add(project_ref)
                     event = "created"
+                    created += 1
 
                 pending_logs.append((project_ref, event, raw.get("size_bytes")))
                 synced += 1
@@ -151,9 +202,10 @@ class OverleafLoader:
             )
             db.session.add(sync_log)
 
-        # Upsert memberships
+        # Upsert memberships y contar cuántos quedaron registrados
+        members_synced = 0
         try:
-            self._upsert_memberships(memberships_data, user_map)
+            members_synced = self._upsert_memberships(memberships_data, user_map)
         except Exception as exc:
             logger.error("Error upserting memberships: %s", exc)
 
@@ -176,14 +228,16 @@ class OverleafLoader:
             for log in logs:
                 log.member_count = counts.get(log.project_id, 0)
 
-        return len(raw_projects), synced
+        return len(raw_projects), synced, created, updated, members_synced
 
     def _upsert_memberships(
         self,
         memberships_data: list[tuple[str, list[dict]]],
         user_map: dict[str, int],
-    ) -> None:
-        """Upsert project membership records."""
+    ) -> int:
+        """Upsert project membership records. Returns the number of (project, user)
+        relationships processed (new or updated)."""
+        total = 0
         for project_overleaf_id, members in memberships_data:
             project = OverleafProject.query.filter_by(
                 overleaf_id=project_overleaf_id
@@ -210,3 +264,5 @@ class OverleafLoader:
                         role=m["role"],
                     )
                     db.session.add(member)
+                total += 1
+        return total

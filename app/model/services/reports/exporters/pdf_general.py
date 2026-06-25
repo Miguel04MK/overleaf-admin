@@ -32,30 +32,34 @@ from .pdf_sections import (
 )
 
 
-# ─── Action translation ───────────────────────────────────────────────────────
-
-_ACTION_TRANSLATIONS: dict[str, str] = {
-    "changed":     "Cambio de rol",
-    "role_change": "Cambio de rol",
-    "quota_change":"Cambio de cuota",
-    "sync_error":  "Error de sincronización",
-    "sync_start":  "Inicio de sincronización",
-    "sync_ok":     "Sincronización correcta",
-    "login":       "Inicio de sesión",
-    "logout":      "Cierre de sesión",
-    "export":      "Exportación",
-    "create":      "Creación",
-    "delete":      "Eliminación",
-    "update":      "Actualización",
-}
-
 _RANKING_NOTE_TEXT = "Se muestran los 5 registros más relevantes."
 
 
 def _translate_action(action: str | None) -> str:
+    """Etiqueta legible para una acción. Reutiliza el mapeo canónico de
+    admin_service.ACTION_LABELS (incluye los 28 actions: login/logout,
+    cambios admin, quota_change, sync_*, role_*, etc.). Si no encaja,
+    devuelve la acción tal cual.
+    """
     if not action:
         return ""
-    return _ACTION_TRANSLATIONS.get(action, action)
+    from app.model.services.admin import admin_service as _audit
+    return _audit.label_for_action(action)
+
+
+def _action_translations_view() -> dict[str, str]:
+    """Snapshot del mapeo de acciones → etiqueta legible. Se construye al
+    importar el módulo y se exporta como `_ACTION_TRANSLATIONS` para
+    compatibilidad con código que ya lo importaba (ver exporters/__init__.py).
+    """
+    from app.model.services.admin import admin_service as _audit
+    return dict(_audit.ACTION_LABELS)
+
+
+# Compatibilidad hacia atrás: el módulo solía exponer un dict literal con las
+# traducciones de actions. Ahora delegamos en admin_service.ACTION_LABELS, que
+# es la fuente única (idéntico al usado en /auditoria/).
+_ACTION_TRANSLATIONS: dict[str, str] = _action_translations_view()
 
 
 def _smart_truncate(text: str, max_len: int = 60) -> str:
@@ -579,8 +583,18 @@ def export_general_pdf(data: dict, generated_by: str = "system") -> tuple[bytes,
             ))
             _after_table()
 
+    # 6.3 Desglose de auditoría por categoría
+    if data.get("audit_by_category"):
+        _subheading("6.3 Eventos de auditoría por categoría")
+        cat_rows = [[c["label"], c["count"]] for c in data["audit_by_category"]]
+        flowables.append(_gen_table(
+            ["Categoría", "Eventos"], cat_rows,
+            col_pcts=[0.60, 0.40],
+        ))
+        _after_table()
+
     if data["recent_errors"]:
-        _subheading("6.3 Errores y avisos recientes en auditoría")
+        _subheading("6.4 Errores y avisos recientes en auditoría")
         err_rows = [
             [_ts_short(e.created_at), e.level, e.actor,
              _translate_action(e.action),
@@ -594,7 +608,7 @@ def export_general_pdf(data: dict, generated_by: str = "system") -> tuple[bytes,
         _after_table()
 
     if data["recent_role_changes"]:
-        _subheading("6.4 Cambios de rol/cuota recientes")
+        _subheading("6.5 Cambios de rol/cuota recientes")
         rc_rows = []
         for rc in data["recent_role_changes"][:5]:
             rc_rows.append([

@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+{% block title %}Administradores{% endblock %}
+{% block page_title %}Administradores de la plataforma{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admins.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pt-2 admins-page">
+
+  {# ── Fila superior: stats compactos + buscador+botón pegados ───────── #}
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+
+    <div class="d-flex gap-2 flex-wrap">
+      <div class="stat-chip">
+        <div class="stat-icon-sm bg-light"><i class="bi bi-people text-secondary"></i></div>
+        <div>
+          <div class="stat-lbl">Total</div>
+          <div class="stat-num">{{ stats.total }}</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-icon-sm bg-success-subtle"><i class="bi bi-check-circle text-success"></i></div>
+        <div>
+          <div class="stat-lbl">Activos</div>
+          <div class="stat-num text-success">{{ stats.active }}</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-icon-sm bg-secondary-subtle"><i class="bi bi-pause-circle text-secondary"></i></div>
+        <div>
+          <div class="stat-lbl">Inactivos</div>
+          <div class="stat-num">{{ stats.inactive }}</div>
+        </div>
+      </div>
+    </div>
+
+    {# Buscador + botón Nuevo unidos como input-group #}
+    <div class="input-group input-group-sm search-create-group" style="max-width:420px;">
+      <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+      <input type="text" id="admin-search" class="form-control"
+             placeholder="Filtrar usuario o email…" autocomplete="off">
+      <button type="button"
+              class="btn btn-success"
+              data-bs-toggle="modal"
+              data-bs-target="#createAdminModal">
+        <i class="bi bi-person-plus me-1"></i>Nuevo administrador
+      </button>
+    </div>
+  </div>
+
+  {# ── Layout principal: lista (col-xl-8) + aside (col-xl-4) ─────────── #}
+  <div class="row g-3">
+
+    {# ─── Columna izquierda: lista de admins ─── #}
+    <div class="col-12 col-xl-8">
+      <div id="admins-list" class="d-flex flex-column gap-2">
+        {% for a in admins %}
+          {% set is_self = a.id == current_user.id %}
+          <div class="admin-card card border-0 shadow-sm {% if is_self %}admin-row-self{% endif %}"
+               data-search="{{ (a.username ~ ' ' ~ a.email)|lower }}">
+            <div class="card-body py-3 px-3">
+              <div class="d-flex align-items-center gap-3 flex-wrap admin-row">
+
+                {# Avatar #}
+                <div class="admin-mini-avatar flex-shrink-0">
+                  {{ a.username[:1]|upper }}
+                </div>
+
+                {# Datos #}
+                <div class="flex-grow-1 min-w-0">
+                  <div class="d-flex align-items-center flex-wrap gap-2">
+                    <span class="fw-semibold">{{ a.username }}</span>
+                    <span class="text-muted small">#{{ a.id }}</span>
+
+                    {% if is_self %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle"
+                            style="font-size:.65rem;">Tú</span>
+                    {% endif %}
+
+                    {% if a.is_active %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle">
+                        <i class="bi bi-check-circle me-1"></i>Activa
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary border">
+                        <i class="bi bi-pause-circle me-1"></i>Inactiva
+                      </span>
+                    {% endif %}
+
+                    {% if a.is_protected and not is_self %}
+                      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning"
+                            title="Único administrador activo: no se puede desactivar."
+                            data-bs-toggle="tooltip">
+                        <i class="bi bi-shield-lock me-1"></i>Cuenta protegida
+                      </span>
+                    {% endif %}
+                  </div>
+
+                  <div class="text-muted small text-truncate">{{ a.email }}</div>
+
+                  {# Línea de meta: SIEMPRE 4 elementos (con "—" si vacío)
+                     para que todas las cards tengan la misma altura. #}
+                  <div class="d-flex flex-wrap gap-3 mt-1 admin-meta">
+                    <span title="Último acceso">
+                      <i class="bi bi-clock me-1"></i>
+                      {% if a.last_login_at %}
+                        {{ a.last_login_at.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        <span class="text-muted">Sin acceso</span>
+                      {% endif %}
+                    </span>
+                    <span title="Fecha de creación">
+                      <i class="bi bi-calendar-plus me-1"></i>
+                      {{ a.created_at.strftime('%d/%m/%Y') if a.created_at else '—' }}
+                    </span>
+                    <span title="Último cambio de contraseña">
+                      <i class="bi bi-key me-1"></i>
+                      {% if a.last_password_change_at %}
+                        {{ a.last_password_change_at.strftime('%d/%m/%Y') }}
+                      {% else %}
+                        <span class="text-muted">Sin cambios</span>
+                      {% endif %}
+                    </span>
+                    <a href="{{ url_for('audit.logs') }}"
+                       class="text-decoration-none text-muted"
+                       title="Ver en auditoría">
+                      <i class="bi bi-activity me-1"></i>{{ a.audit_count }} acciones
+                    </a>
+                  </div>
+                </div>
+
+                {# Acciones #}
+                <div class="d-flex gap-1 flex-shrink-0 admin-actions">
+                  {% if is_self %}
+                    <a href="{{ url_for('account.index') }}"
+                       class="btn btn-sm btn-outline-secondary"
+                       title="Edita tu propia cuenta">
+                      <i class="bi bi-person-gear me-1"></i>Mi cuenta
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary disabled"
+                            tabindex="-1" aria-disabled="true"
+                            title="No puedes desactivar tu propia cuenta"
+                            data-bs-toggle="tooltip">
+                      <i class="bi bi-pause-circle me-1"></i>Desactivar
+                    </button>
+                  {% else %}
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#resetPwModal"
+                            data-admin-id="{{ a.id }}"
+                            data-admin-username="{{ a.username }}">
+                      <i class="bi bi-key me-1"></i>Resetear contraseña
+                    </button>
+
+                    {% if a.is_protected %}
+                      <button type="button"
+                              class="btn btn-sm btn-outline-secondary disabled"
+                              tabindex="-1" aria-disabled="true"
+                              title="Único administrador activo: no se puede desactivar."
+                              data-bs-toggle="tooltip">
+                        <i class="bi bi-shield-lock me-1"></i>Protegido
+                      </button>
+                    {% elif a.is_active %}
+                      <button type="button"
+                              class="btn btn-sm btn-outline-warning"
+                              data-bs-toggle="modal"
+                              data-bs-target="#toggleStateModal"
+                              data-admin-id="{{ a.id }}"
+                              data-admin-username="{{ a.username }}"
+                              data-target-state="off">
+                        <i class="bi bi-pause-circle me-1"></i>Desactivar
+                      </button>
+                    {% else %}
+                      <button type="button"
+                              class="btn btn-sm btn-outline-success"
+                              data-bs-toggle="modal"
+                              data-bs-target="#toggleStateModal"
+                              data-admin-id="{{ a.id }}"
+                              data-admin-username="{{ a.username }}"
+                              data-target-state="on">
+                        <i class="bi bi-play-circle me-1"></i>Activar
+                      </button>
+                    {% endif %}
+                  {% endif %}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="card border-0 shadow-sm">
+            <div class="card-body text-center text-muted py-5">
+              <i class="bi bi-inbox d-block fs-3 mb-1 opacity-50"></i>
+              No hay administradores registrados.
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {# Empty state para búsquedas sin resultados #}
+      <div id="empty-search-state" class="card border-0 shadow-sm d-none mt-2">
+        <div class="card-body text-center text-muted py-5">
+          <i class="bi bi-search d-block fs-3 mb-1 opacity-50"></i>
+          <div class="fw-semibold">No se encontraron administradores</div>
+          <small>Prueba con otra búsqueda.</small>
+        </div>
+      </div>
+    </div>
+
+    {# ─── Columna derecha: aside de actividad de admins ─── #}
+    <div class="col-12 col-xl-4">
+      <div class="card border-0 shadow-sm admins-aside">
+        <div class="card-header bg-white border-bottom py-2 d-flex align-items-center justify-content-between">
+          <span class="fw-semibold">
+            <i class="bi bi-journal-text me-2 text-muted"></i>Actividad de administradores
+          </span>
+          <a href="{{ url_for('audit.logs') }}"
+             class="small text-decoration-none" title="Ver historial completo">
+            Ver todo <i class="bi bi-arrow-up-right-square ms-1"></i>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          {% if activity %}
+            <ul class="audit-list list-unstyled mb-0">
+              {% for ev in activity %}
+                <li class="audit-item">
+                  <span class="audit-dot level-{{ ev.level }}"></span>
+                  <div class="audit-body">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                      <span class="fw-semibold small">{{ ev.action_label }}</span>
+                      <small class="text-muted text-nowrap" style="font-size:.7rem;">
+                        {{ ev.created_at.strftime('%d/%m %H:%M') if ev.created_at else '' }}
+                      </small>
+                    </div>
+                    <div class="text-muted small">
+                      por <span class="text-body">{{ ev.actor }}</span>
+                    </div>
+                    {% if ev.detail %}
+                      <div class="text-muted small text-truncate" title="{{ ev.detail }}">
+                        {{ ev.detail }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-center text-muted py-4 px-3">
+              <i class="bi bi-inbox d-block fs-4 mb-2 opacity-50"></i>
+              <small>Sin actividad registrada de administradores.</small>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{# ── Modal: crear admin ──────────────────────────────────────────────── #}
+<div class="modal fade" id="createAdminModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="{{ url_for('admins.create') }}" autocomplete="off" id="create-admin-form">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-1">
+          <h6 class="modal-title fw-semibold">
+            <i class="bi bi-person-plus me-2 text-success"></i>Nuevo administrador
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-2">
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="ca-username">Usuario</label>
+              <input type="text" class="form-control form-control-sm"
+                     id="ca-username" name="username" required minlength="2" maxlength="64">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="ca-email">Email</label>
+              <input type="email" class="form-control form-control-sm"
+                     id="ca-email" name="email" required maxlength="255">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="ca-password">Contraseña inicial</label>
+              <input type="password" class="form-control form-control-sm"
+                     id="ca-password" name="password" required minlength="8">
+              <div class="form-text small">Mínimo 8 caracteres.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="ca-confirm">Repetir contraseña</label>
+              <input type="password" class="form-control form-control-sm"
+                     id="ca-confirm" name="confirm_password" required minlength="8">
+              <div id="ca-match-hint" class="form-text small"></div>
+            </div>
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="ca-active" name="is_active" checked>
+                <label class="form-check-label small" for="ca-active">Activo desde el inicio</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-success">
+            <i class="bi bi-check2-circle me-1"></i>Crear administrador
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Modal: reset password ───────────────────────────────────────────── #}
+<div class="modal fade" id="resetPwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="" autocomplete="off" id="reset-pw-form">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-1">
+          <h6 class="modal-title fw-semibold">
+            <i class="bi bi-key me-2 text-warning-emphasis"></i>
+            Resetear contraseña de <span id="rp-username" class="text-success"></span>
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-2">
+          <p class="small text-muted mb-2">
+            Define una contraseña nueva para este administrador. Comunícasela por un canal seguro.
+          </p>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="rp-new">Nueva contraseña</label>
+              <input type="password" class="form-control form-control-sm"
+                     id="rp-new" name="new_password" required minlength="8">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm small fw-semibold mb-1" for="rp-confirm">Repetir</label>
+              <input type="password" class="form-control form-control-sm"
+                     id="rp-confirm" name="confirm_password" required minlength="8">
+              <div id="rp-match-hint" class="form-text small"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-success">
+            <i class="bi bi-check2-circle me-1"></i>Actualizar contraseña
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Modal: confirmar activar/desactivar ─────────────────────────────── #}
+<div class="modal fade" id="toggleStateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="" id="toggle-state-form">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-1">
+          <h6 class="modal-title fw-semibold">
+            <i id="ts-icon" class="bi bi-question-circle me-2"></i>
+            <span id="ts-title">Confirmar acción</span>
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-2">
+          <p class="small mb-0" id="ts-message"></p>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm" id="ts-confirm-btn"></button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.ADMINS_URLS = {
+    deactivate: "{{ url_for('admins.deactivate',     admin_id=0) }}",
+    activate:   "{{ url_for('admins.activate',       admin_id=0) }}",
+    reset:      "{{ url_for('admins.reset_password', admin_id=0) }}",
+  };
+</script>
+<script src="{{ url_for('static', filename='js/admins.js') }}"></script>
+{% endblock %}

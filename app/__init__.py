@@ -22,6 +22,19 @@ def create_app(config_name: str | None = None) -> Flask:
     cfg = config_map.get(config_name, config_map["default"])
     app.config.from_object(cfg)
 
+    # Reverse proxy (despliegue institucional detrás de un proxy con HTTPS):
+    # confía en X-Forwarded-Proto/For/Host para que url_for(_external=True)
+    # genere https y request.remote_addr sea la IP real del cliente.
+    # Se activa con BEHIND_PROXY=true; en local queda desactivado.
+    if app.config.get("BEHIND_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1,
+        )
+        logging.getLogger(__name__).info(
+            "ProxyFix activado: confiando en cabeceras X-Forwarded-* del proxy."
+        )
+
     # Configure logging
     logging.basicConfig(
         level=logging.DEBUG if app.config["DEBUG"] else logging.INFO,
@@ -36,7 +49,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # Import all models so Alembic can detect them
     from app.model.entities import (  # noqa: F401
         overleaf_user, overleaf_project, project_member,
-        sync_run, audit_log, project_sync_log,
+        sync_run, sync_schedule, audit_log, project_sync_log,
         role, role_change_log, report_export_log,
         system_alert, app_setting, admin_notification_pref,
     )
@@ -54,11 +67,13 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.rest.controllers.users_controller import users_bp
     from app.rest.controllers.projects_controller import projects_bp
     from app.rest.controllers.sync_controller import sync_bp
-    from app.rest.controllers.admin_controller import audit_bp, dev_bp
+    from app.rest.controllers.admin_controller import audit_bp
     from app.rest.controllers.reports_controller import reports_bp
     from app.rest.controllers.roles_controller import roles_bp
     from app.rest.controllers.alerts_controller import alerts_bp
     from app.rest.controllers.metrics_controller import metrics_bp
+    from app.rest.controllers.account_controller import account_bp
+    from app.rest.controllers.admins_controller import admins_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -66,11 +81,12 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(projects_bp)
     app.register_blueprint(sync_bp)
     app.register_blueprint(audit_bp)
-    app.register_blueprint(dev_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(roles_bp)
     app.register_blueprint(alerts_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(account_bp)
+    app.register_blueprint(admins_bp)
 
     # Seed default roles and alert thresholds if DB is ready (idempotent)
     with app.app_context():
@@ -84,6 +100,27 @@ def create_app(config_name: str | None = None) -> Flask:
             seed_defaults()
         except Exception:
             pass  # DB might not be migrated yet
+
+    # ─── Filtros de Jinja ─────────────────────────────────────────────────
+    # `localtime` convierte un datetime aware (almacenado en UTC) a la zona
+    # horaria del sistema (configurada con la variable de entorno `TZ`).
+    # Si el datetime viene "naive" lo asume UTC.
+    @app.template_filter("localtime")
+    def _localtime(dt):
+        if dt is None:
+            return None
+        from datetime import timezone as _tz
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_tz.utc)
+        return dt.astimezone()  # zona del sistema (TZ del contenedor)
+
+    # `localdt` formatea un datetime aware ya en zona local con strftime.
+    # Uso: {{ dt | localdt('%d/%m %H:%M') }}
+    @app.template_filter("localdt")
+    def _localdt(dt, fmt="%d/%m/%Y %H:%M"):
+        if dt is None:
+            return ""
+        return _localtime(dt).strftime(fmt)
 
     # Context processor: inject ACTIVE alert count for sidebar badge.
     # Active = is_resolved == False. This is shown on every page so the badge
@@ -102,6 +139,18 @@ def create_app(config_name: str | None = None) -> Flask:
 
     # Register error handlers
     _register_error_handlers(app)
+
+    # Arranca APScheduler para las programaciones (SyncSchedule). No-op si
+    # SCHEDULER_ENABLED=False, en el watcher del autoreloader, o si APScheduler
+    # no está instalado.
+    try:
+        from app.etl.scheduler import init_scheduler
+        init_scheduler(app)
+    except Exception as exc:
+        # No queremos que un fallo del scheduler tumbe la app entera.
+        logging.getLogger(__name__).warning(
+            "init_scheduler falló: %s", exc, exc_info=True,
+        )
 
     return app
 

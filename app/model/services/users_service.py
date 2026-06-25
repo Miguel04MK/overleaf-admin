@@ -13,6 +13,7 @@ from app.config.extensions import db
 from app.model.entities.overleaf_user import OverleafUser
 from app.model.entities.overleaf_project import OverleafProject
 from app.model.entities.project_member import ProjectMember
+from app.model.entities.role import Role
 
 
 # ── Subqueries used for sorting / filtering without N+1 ──────────────────────
@@ -121,6 +122,16 @@ def search_users_paginated(
                     elif fop == "lte":
                         query = query.having(quota_pct <= v)
 
+            elif ftype == "role":
+                if fval == "none":
+                    query = query.filter(OverleafUser.role_id.is_(None))
+                else:
+                    try:
+                        rid = int(fval)
+                        query = query.filter(OverleafUser.role_id == rid)
+                    except (TypeError, ValueError):
+                        pass
+
             elif ftype == "access":
                 if fval == "never":
                     query = query.filter(OverleafUser.last_login_at.is_(None))
@@ -141,6 +152,16 @@ def search_users_paginated(
     query = query.group_by(OverleafUser.id)
 
     # ── Sorting ───────────────────────────────────────────────────────────────
+    # Subquery escalar para que el ORDER BY de "roles" use el NOMBRE del rol
+    # (alfabético) en lugar de `is_admin` (booleano), que es el orden que el
+    # usuario espera al pulsar la cabecera de la columna.
+    from sqlalchemy import select as sa_select
+    role_name_for_user = (
+        sa_select(Role.name)
+        .where(Role.id == OverleafUser.role_id)
+        .correlate(OverleafUser)
+        .scalar_subquery()
+    )
     sort_map = {
         "email":     OverleafUser.email,
         "nombre":    func.concat(
@@ -148,7 +169,7 @@ def search_users_paginated(
                          ' ',
                          func.coalesce(OverleafUser.last_name, ''),
                      ),
-        "roles":     OverleafUser.is_admin,
+        "roles":     role_name_for_user,
         "proyectos": projects_count,
         "cuota":     quota_pct,
         "registro":  OverleafUser.signup_date,
@@ -167,9 +188,17 @@ def search_users_paginated(
 
     rows = query.offset((page - 1) * per_page).limit(per_page).all()
 
+    # Batch-load roles para evitar N+1
+    role_ids = {u.role_id for u, *_ in rows if u.role_id}
+    roles_map: dict[int, Role] = (
+        {r.id: r for r in Role.query.filter(Role.id.in_(role_ids)).all()}
+        if role_ids else {}
+    )
+
     users = []
     for user, proj_count, q_used, q_pct in rows:
-        users.append(_serialize_row(user, proj_count, q_used, q_pct))
+        users.append(_serialize_row(user, proj_count, q_used, q_pct,
+                                    roles_map.get(user.role_id)))
 
     return {
         "total": total,
@@ -191,7 +220,7 @@ def _fmt_bytes(n) -> str:
     return f"{n:.1f} PB"
 
 
-def _serialize_row(u, projects_count, quota_used, quota_pct) -> dict:
+def _serialize_row(u, projects_count, quota_used, quota_pct, role: "Role | None" = None) -> dict:
     """Serialize a user row without N+1 queries — all aggregates pre-computed."""
     from flask import url_for
 
@@ -216,6 +245,9 @@ def _serialize_row(u, projects_count, quota_used, quota_pct) -> dict:
         "email": u.email or "",
         "display_name": u.display_name if u.display_name != u.email else "",
         "is_admin": u.is_admin,
+        "role_id":    role.id    if role else None,
+        "role_name":  role.name  if role else None,
+        "role_color": role.color if role else None,
         "projects_count": projects_count,
         "quota_percent": pct,
         "quota_status": q_status,
@@ -364,7 +396,12 @@ def get_user_detail_data(user_id: int, projects_page: int = 1, per_page: int = 1
     }
 
 
-def set_user_quota(user_id: int, max_bytes) -> tuple:
+def set_user_quota(
+    user_id: int,
+    max_bytes,
+    *,
+    actor: str = "system",
+) -> tuple:
     user = OverleafUser.query.get(user_id)
     if not user:
         return False, "Usuario no encontrado."
@@ -372,8 +409,33 @@ def set_user_quota(user_id: int, max_bytes) -> tuple:
     if max_bytes is not None and max_bytes < 0:
         return False, "La cuota no puede ser negativa."
 
+    old_bytes = user.max_quota_bytes
     user.max_quota_bytes = max_bytes
     db.session.commit()
+
+    # AuditLog para que aparezca en /auditoria/ bajo la categoría "Cuotas".
+    try:
+        from app.model.services.admin import admin_service as audit_service
+        def _fmt(b):
+            if b is None:
+                return "Ilimitada"
+            for unit in ("B", "KB", "MB", "GB", "TB"):
+                if abs(b) < 1024:
+                    return f"{b:.0f} {unit}"
+                b /= 1024
+            return f"{b:.1f} PB"
+        detail = (
+            f"Cuota del usuario «{user.email or user.id}» "
+            f"actualizada: {_fmt(old_bytes)} → {_fmt(max_bytes)}"
+        )
+        audit_service.log_action(
+            action="quota_change",
+            actor=actor,
+            detail=detail,
+            level="info",
+        )
+    except Exception as exc:
+        logger.warning("AuditLog of quota_change failed for user %s: %s", user_id, exc)
 
     try:
         from app.model.services import alerts_service

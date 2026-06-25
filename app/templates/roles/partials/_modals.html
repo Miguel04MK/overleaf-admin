@@ -128,14 +128,96 @@
         </div>
       </div>
 
-      <div class="modal-footer border-0 pt-1">
-        <button type="button" class="btn btn-sm btn-outline-secondary"
-                data-bs-dismiss="modal">Cerrar</button>
+      <div class="modal-footer border-0 pt-1 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span id="manage-pending-counter" class="small text-muted">
+          Sin cambios pendientes.
+        </span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+                  id="manage-discard-btn" disabled>
+            <i class="bi bi-x-lg me-1"></i>Descartar
+          </button>
+          <button type="button" class="btn btn-sm btn-ol"
+                  id="manage-apply-btn" disabled>
+            <i class="bi bi-check2-circle me-1"></i>Aplicar
+            <span id="manage-apply-count"></span>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+                  data-bs-dismiss="modal">Cerrar</button>
+        </div>
       </div>
 
     </div>
   </div>
 </div>
+
+{# ══ Modal: Confirmar borrado de rol ═══════════════════════════════════════ #}
+<div class="modal fade" id="confirmDeleteRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-exclamation-triangle me-2 text-danger"></i>
+          Eliminar rol «{{ role.name }}»
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body py-2">
+        <p class="small mb-2">
+          Vas a <strong>eliminar permanentemente</strong> el rol
+          <strong>«{{ role.name }}»</strong> de la plataforma. Esta acción
+          no se puede deshacer.
+        </p>
+
+        {% set n_users = users_stats | length %}
+        {% if role.is_default %}
+          <div class="alert alert-warning small mb-0 py-2 px-3">
+            <i class="bi bi-shield-lock me-1"></i>
+            Este es el <strong>rol por defecto</strong>. No se puede eliminar
+            mientras lo sea. Marca otro rol como por defecto antes de borrarlo.
+          </div>
+        {% elif n_users > 0 %}
+          <div class="alert alert-warning small mb-0 py-2 px-3">
+            <i class="bi bi-people me-1"></i>
+            Este rol tiene <strong>{{ n_users }}</strong> usuario{{ 's' if n_users != 1 else '' }}
+            asignado{{ 's' if n_users != 1 else '' }}.
+            {% if default_role %}
+              Al eliminarlo se reasignará{{ 'n' if n_users != 1 else '' }}
+              automáticamente al rol por defecto
+              <strong>«{{ default_role.name }}»</strong>.
+            {% else %}
+              No hay rol por defecto configurado; no se podrá completar el borrado.
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            El historial de auditoría se conservará referenciando el nombre del rol.
+          </p>
+        {% endif %}
+      </div>
+
+      <div class="modal-footer border-0 pt-1 gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x me-1"></i>Cancelar
+        </button>
+        <form method="POST"
+              action="{{ url_for('roles.delete_role', role_id=role.id) }}"
+              id="delete-role-form">
+          <button type="submit"
+                  class="btn btn-sm btn-danger"
+                  {% if role.is_default %}disabled{% endif %}>
+            <i class="bi bi-trash me-1"></i>Sí, eliminar rol
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 
 {# ══ Modal: Confirmar acción sobre usuario ═════════════════════════════════ #}
 <div class="modal fade" id="confirmRoleModal" tabindex="-1" aria-hidden="true">

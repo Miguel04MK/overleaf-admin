@@ -1,0 +1,213 @@
+/* login.css — pantalla de inicio de sesión con layout split.
+ *
+ * En escritorio: 45% oscuro (izquierda) + 55% claro (derecha).
+ * En móvil/tablet: una sola columna, primero el bloque oscuro reducido
+ * y luego el formulario.
+ *
+ * Colores acordes a la app:
+ *   - oscuro: similar al sidebar (Bootstrap bg-dark)
+ *   - acento: verde Overleaf (--ol-green) ya definido en custom.css
+ */
+
+.login-split {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 45% 55%;
+}
+
+@media (max-width: 767.98px) {
+  .login-split { grid-template-columns: 1fr; }
+}
+
+/* ── LADO IZQUIERDO ────────────────────────────────────────────────────── */
+.login-left {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(61, 139, 61, .18) 0%, transparent 45%),
+    linear-gradient(180deg, #1f2937 0%, #111827 100%);
+  color: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decoración sutil (textura de puntos en la esquina inferior derecha) */
+.login-left::after {
+  content: "";
+  position: absolute;
+  right: -80px; bottom: -80px;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(61, 139, 61, .15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-left-inner {
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.brand-icon {
+  font-size: 1.6rem;
+  color: var(--ol-green, #4ade80);
+}
+.brand-name {
+  font-weight: 600;
+  letter-spacing: .02em;
+  font-size: 1.05rem;
+}
+
+.login-title {
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+.login-lead {
+  font-size: .95rem;
+  line-height: 1.55;
+  color: #cbd5e1;
+  margin-bottom: 1.75rem;
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2.5rem 0;
+}
+.feature-list li {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .35rem 0;
+  font-size: .88rem;
+  color: #cbd5e1;
+}
+.feature-list li i {
+  color: var(--ol-green, #4ade80);
+  width: 1.1rem;
+  text-align: center;
+}
+
+.login-footer {
+  position: absolute;
+  bottom: 2rem;
+  left: 2.5rem;
+  right: 2.5rem;
+  font-size: .72rem;
+  color: #94a3b8;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  padding-top: .85rem;
+}
+.login-tfg { font-size: .68rem; color: #6b7280; }
+
+/* En móvil, el bloque oscuro se compacta y el footer se inyecta dentro */
+@media (max-width: 767.98px) {
+  .login-left {
+    padding: 1.75rem 1.5rem 1.25rem;
+    min-height: auto;
+  }
+  .login-title  { font-size: 1.3rem; margin-bottom: .5rem; }
+  .login-lead   { font-size: .85rem; margin-bottom: 0; }
+  .feature-list { display: none; }
+  .login-footer { display: none; }
+  .login-left::after { display: none; }
+}
+
+/* ── LADO DERECHO ──────────────────────────────────────────────────────── */
+.login-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 2rem;
+  background: #f8fafc;
+}
+.login-form-wrap {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-heading {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: .25rem;
+}
+.login-sub {
+  font-size: .85rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Inputs: misma forma que el resto de la app (Bootstrap default + acento verde) */
+.login-form-wrap .input-group .input-group-text {
+  border-right: 0;
+  background: #fff;
+}
+.login-form-wrap .form-control,
+.login-form-wrap .input-group .form-control {
+  border-left: 0;
+  padding-left: .25rem;
+}
+.login-form-wrap .form-control:focus {
+  border-color: var(--ol-input-focus, #7fba7f);
+  box-shadow: 0 0 0 .2rem var(--ol-focus-ring, rgba(61, 139, 61, .18));
+}
+/* Cuando el input está enfocado, el texto del input-group-text debe igualar el borde */
+.login-form-wrap .form-control:focus + .toggle-pw,
+.login-form-wrap .input-group:focus-within .input-group-text {
+  border-color: var(--ol-input-focus, #7fba7f);
+}
+
+.toggle-pw {
+  border-color: var(--bs-border-color);
+  background: #fff;
+}
+.toggle-pw:hover {
+  background: #f1f5f9;
+}
+
+/* Botón principal: verde Overleaf clásico, ya definido (btn-success) */
+.login-form-wrap .btn-success {
+  background-color: var(--ol-green, #3d8b3d);
+  border-color: var(--ol-green, #3d8b3d);
+  font-weight: 600;
+}
+.login-form-wrap .btn-success:hover,
+.login-form-wrap .btn-success:focus {
+  background-color: var(--ol-green-dark, #2d6a2d);
+  border-color: var(--ol-green-dark, #2d6a2d);
+}
+
+/* Móvil: padding lateral más ajustado */
+@media (max-width: 575.98px) {
+  .login-right { padding: 1.5rem 1rem; }
+}
+
+/* ── Flash alert ──────────────────────────────────────────────────────── */
+/* Forzamos position relative y padding-right para que la X de cerrar quede
+   bien encajada dentro del bloque verde, incluso si Bootstrap no aplica sus
+   reglas por algún motivo. */
+.login-form-wrap .alert {
+  position: relative;
+}
+.login-form-wrap .alert.alert-dismissible {
+  padding-right: 2.75rem;
+}
+.login-form-wrap .alert.alert-dismissible .btn-close {
+  position: absolute;
+  top: 50%;
+  right: .5rem;
+  transform: translateY(-50%);
+  padding: .35rem;
+  margin: 0;
+}

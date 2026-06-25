@@ -148,6 +148,22 @@
   /* ── 6. Auditoría e incidencias ───────────────────────────────────────────── */
   loadSection(SECTION_AUDITORIA_URL, 'auditoria-content', d => {
     let html = '';
+
+    // Desglose por categoría (auth/admin/cuotas/sync/rol)
+    if (d.by_category && d.by_category.length) {
+      html += '<div class="card border-0 shadow-sm p-3 mb-3">';
+      html += '<h6 class="small fw-semibold mb-2"><i class="bi bi-pie-chart me-1 text-muted"></i>Eventos por categoría</h6>';
+      html += '<div class="row g-2">';
+      d.by_category.forEach(c => {
+        html += `<div class="col-6 col-md-4 col-lg-2"><div class="border rounded p-2 text-center">`;
+        html += `<i class="bi ${esc(c.icon)} text-${esc(c.color)}" style="font-size:1rem;"></i>`;
+        html += `<div class="text-muted" style="font-size:.7rem;">${esc(c.label)}</div>`;
+        html += `<div class="fw-bold">${c.count}</div>`;
+        html += `</div></div>`;
+      });
+      html += '</div></div>';
+    }
+
     if (d.recent_errors && d.recent_errors.length) {
       html += '<div class="card border-0 shadow-sm p-3 mb-3">';
       html += '<h6 class="small fw-semibold mb-2">Errores y avisos recientes</h6>';
@@ -157,7 +173,9 @@
         const badge = e.level === 'error'
           ? '<span class="badge bg-danger">error</span>'
           : `<span class="badge bg-warning text-dark">${esc(e.level)}</span>`;
-        html += `<tr><td>${esc(e.created_at)}</td><td>${badge}</td><td>${esc(e.actor)}</td><td>${esc(e.action)}</td><td class="text-truncate" style="max-width:200px;">${esc(e.detail || '—')}</td></tr>`;
+        // Acción legible + código técnico debajo
+        const actionCell = `${esc(e.action_label || e.action)}<div class="text-muted" style="font-size:.65rem;"><code>${esc(e.action)}</code></div>`;
+        html += `<tr><td>${esc(e.created_at)}</td><td>${badge}</td><td>${esc(e.actor)}</td><td>${actionCell}</td><td class="text-truncate" style="max-width:200px;">${esc(e.detail || '—')}</td></tr>`;
       });
       html += '</tbody></table></div></div>';
     } else {
@@ -169,7 +187,7 @@
       html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0 small">';
       html += '<thead class="table-light"><tr><th>Fecha</th><th>Admin</th><th>Acción</th><th>Rol anterior</th><th>Rol nuevo</th></tr></thead><tbody>';
       d.recent_role_changes.forEach(rc => {
-        html += `<tr><td>${esc(rc.changed_at)}</td><td>${esc(rc.changed_by)}</td><td>${esc(rc.action)}</td><td>${esc(rc.role_from || '—')}</td><td>${esc(rc.role_to || '—')}</td></tr>`;
+        html += `<tr><td>${esc(rc.changed_at)}</td><td>${esc(rc.changed_by)}</td><td>${esc(rc.action_label || rc.action)}</td><td>${esc(rc.role_from || '—')}</td><td>${esc(rc.role_to || '—')}</td></tr>`;
       });
       html += '</tbody></table></div></div>';
     }

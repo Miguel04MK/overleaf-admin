@@ -39,6 +39,8 @@
 .kpi--storage  { --ic-bg: rgba(32,201,151,.12);  --ic-fg: #138a6c; }
 .kpi--alerts   { --ic-bg: rgba(220,53,69,.10);   --ic-fg: #dc3545; }
 .kpi--alerts.is-quiet { --ic-bg: rgba(108,117,125,.10); --ic-fg: #6c757d; }
+/* Sin alertas → escudo verde, look "todo OK". */
+.kpi--alerts.is-ok    { --ic-bg: rgba(25,135,84,.10);   --ic-fg: #198754; }
 .kpi--sync-ok  { --ic-bg: rgba(25,135,84,.10);   --ic-fg: #198754; }
 .kpi--sync-bad { --ic-bg: rgba(220,53,69,.10);   --ic-fg: #dc3545; }
 .kpi--sync-na  { --ic-bg: rgba(108,117,125,.10); --ic-fg: #6c757d; }
@@ -110,8 +112,15 @@
 .quota-list.fading { opacity: .3; }
 
 /* ── Role distribution chart ─────────────────────────────────────────────── */
-.chart-roles { position: relative; flex: 1 1 0; min-height: 0; }
-.card-body.roles-body { padding: .2rem .35rem .1rem !important; display: flex; flex-direction: column; }
+/* min-height igual al de la lista de cuotas para que las dos cards (junto a la
+   de historial) queden a la misma altura aunque el doughnut tenga pocos datos. */
+.chart-roles { position: relative; flex: 1 1 0; min-height: 200px; }
+.card-body.roles-body { padding: .2rem .35rem .1rem !important; display: flex; flex-direction: column; min-height: 220px; }
+
+/* Fuerza altura mínima consistente para todas las cards de la fila
+   "roles + cuota + historial" → evita que el dashboard tenga huecos cuando
+   alguna card tiene pocos datos. */
+.section-card.shadow-sm { min-height: 260px; }
 
 /* ── Sync history mini-table ─────────────────────────────────────────────── */
 .sync-mini th { font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; padding: .25rem .4rem !important; }

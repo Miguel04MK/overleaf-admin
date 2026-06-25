@@ -900,35 +900,21 @@ document.getElementById('confirm-threshold-btn').addEventListener('click', () =>
 });
 
 // ── Preferencias de notificación ──────────────────────────────────────────────
-const notifModal = new bootstrap.Modal(document.getElementById('notifModal'));
-
-document.getElementById('btn-notif-header').addEventListener('click', () => {
-  notifModal.show();
-  loadNotifPrefs();
-});
-
-const NOTIF_LABELS = {
-  notify_critical:               'Nivel: Crítico',
-  notify_danger:                 'Nivel: Peligro',
-  notify_warning:                'Nivel: Aviso',
-  notify_info:                   'Nivel: Info',
-  notify_service_down:           'Tipo: Servicio caído',
-  notify_sync_failed:            'Tipo: Fallo de sync',
-  notify_quota_exceeded:         'Tipo: Cuota excedida',
-  notify_quota_warning:          'Tipo: Cuota cercana',
-  notify_project_limit_exceeded: 'Tipo: Límite proyectos superado',
-  notify_project_limit_warning:  'Tipo: Proyectos cercano al límite',
-  notify_repeated_errors:        'Tipo: Errores repetidos',
-  notify_administrative_warning: 'Tipo: Aviso administrativo',
-};
-
+// La lógica del modal (abrir, cargar, renderizar, guardar) vive en
+// js/notif-modal.js y se activa con [data-notif-open]. Aquí sólo dejamos el
+// resumen específico de esta página, que se vuelve a calcular tras guardar
+// (ver window.NOTIF_ON_SAVE definido en alerts/list.html).
 function loadNotifSummary() {
   fetch(NOTIF_URL, { headers: { 'Accept': 'application/json' } })
     .then(r => r.json())
     .then(data => {
-      const prefs  = data.prefs || {};
-      const total  = Object.keys(prefs).length;
-      const active = Object.values(prefs).filter(Boolean).length;
+      const prefs = data.prefs || {};
+      // Contar cuántos tipos tienen al menos un modo activo (inmediato o periódico)
+      const imm   = prefs.immediate || {};
+      const dig   = prefs.digest    || {};
+      const keys  = Object.keys(Object.keys(imm).length ? imm : dig);
+      const total  = keys.length;
+      const active = keys.filter(k => imm[k] || dig[k]).length;
       const el     = document.getElementById('notif-summary-val');
       const color  = active === 0 ? 'text-muted' : active < 4 ? 'text-warning' : 'text-primary';
       el.innerHTML = `<span class="${color}">${active}</span><span class="text-muted fw-normal" style="font-size:.72rem;"> / ${total} activas</span>`;
@@ -938,81 +924,6 @@ function loadNotifSummary() {
       if (el) el.innerHTML = '<span class="text-muted small">—</span>';
     });
 }
-
-function loadNotifPrefs() {
-  document.getElementById('notif-body').innerHTML =
-    '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando…</div>';
-  fetch(NOTIF_URL, { headers: { 'Accept': 'application/json' } })
-    .then(r => r.json())
-    .then(data => renderNotifPrefs(data.prefs || {}))
-    .catch(() => {
-      document.getElementById('notif-body').innerHTML =
-        '<p class="text-danger small">Error al cargar preferencias.</p>';
-    });
-}
-
-function renderNotifPrefs(prefs) {
-  const levelFields = ['notify_critical','notify_danger','notify_warning','notify_info'];
-  const typeFields  = Object.keys(NOTIF_LABELS).filter(k => !levelFields.includes(k));
-
-  function checkHtml(key) {
-    const checked = prefs[key] ? 'checked' : '';
-    return `<div class="form-check form-switch mb-2">
-      <input class="form-check-input" type="checkbox" role="switch"
-             id="notif-${key}" name="${key}" ${checked}>
-      <label class="form-check-label small" for="notif-${key}">${NOTIF_LABELS[key] || key}</label>
-    </div>`;
-  }
-
-  document.getElementById('notif-body').innerHTML = `
-    <p class="text-muted small mb-3">
-      Recibirás un email cuando se cree una nueva alerta que cumpla
-      <strong>al menos uno</strong> de los criterios activados.
-    </p>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <p class="fw-semibold small mb-2"><i class="bi bi-layers me-1"></i>Por nivel de gravedad</p>
-        ${levelFields.map(checkHtml).join('')}
-      </div>
-      <div class="col-md-6">
-        <p class="fw-semibold small mb-2"><i class="bi bi-tag me-1"></i>Por tipo de alerta</p>
-        ${typeFields.map(checkHtml).join('')}
-      </div>
-    </div>`;
-}
-
-document.getElementById('notif-save-btn').addEventListener('click', () => {
-  const body = {};
-  document.querySelectorAll('#notif-body input[type=checkbox]').forEach(chk => {
-    body[chk.name] = chk.checked;
-  });
-  const btn = document.getElementById('notif-save-btn');
-  const msg = document.getElementById('notif-save-msg');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
-  fetch(NOTIF_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body:    JSON.stringify(body),
-  })
-    .then(r => r.json())
-    .then(data => {
-      msg.className   = 'small me-auto ' + (data.ok ? 'text-success' : 'text-danger');
-      msg.textContent = data.msg || (data.ok ? 'Guardado.' : 'Error.');
-      msg.classList.remove('d-none');
-      setTimeout(() => msg.classList.add('d-none'), 3000);
-      if (data.ok) loadNotifSummary();
-    })
-    .catch(() => {
-      msg.className   = 'small me-auto text-danger';
-      msg.textContent = 'Error de red.';
-      msg.classList.remove('d-none');
-    })
-    .finally(() => {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar preferencias';
-    });
-});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 doFetch();

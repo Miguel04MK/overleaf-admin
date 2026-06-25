@@ -88,36 +88,53 @@
           </div>
         </div>
 
-        {# Filtro: Indicadores #}
-        {% set IND = [
-          ('large',         'Grande',       'bi-hdd-fill',    'warning'),
-          ('inactive',      'Inactivo',     'bi-moon-fill',   'secondary'),
-          ('collaborative', 'Colaborativo', 'bi-people-fill', 'primary'),
-        ] %}
-        <div class="dropdown" id="dd-indicators">
+        {# Filtro: Tamaño #}
+        <div class="dropdown" id="dd-size">
           <button type="button"
-                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if indicators_filter }}"
-                  id="btn-f-indicators">
-            <i class="bi bi-flag{{ '-fill' if indicators_filter }} me-1"></i>Indicadores
-            {% if indicators_filter %}
-              <span class="badge bg-white text-success ms-1" style="font-size:.7rem;">
-                {{ indicators_filter|length }}
-              </span>
-            {% endif %}
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if size_op }}"
+                  id="btn-f-size">
+            <i class="bi bi-hdd me-1"></i>Tamaño
           </button>
-          <div class="dropdown-menu shadow-sm p-2" style="min-width:210px;">
-            <p class="small fw-semibold text-muted mb-2 px-1">Tipo de proyecto</p>
-            {% for key, label, icon, color in IND %}
-              <div class="ind-toggle {{ 'active' if key in indicators_filter }}"
-                   data-key="{{ key }}" data-label="{{ label }}">
-                <i class="bi {{ icon }} text-{{ color }}"></i>
-                <span>{{ label }}</span>
-                <i class="bi bi-check2 ind-check"></i>
-              </div>
-            {% endfor %}
-            <div class="border-top mt-2 pt-2 px-1">
-              <button type="button" class="btn btn-ol w-100"
-                      onclick="applyIndicators()">Aplicar</button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:280px;">
+            <p class="small fw-semibold text-muted mb-2">Tamaño del proyecto</p>
+            <div class="d-flex gap-2 align-items-center">
+              <select class="form-select form-select-sm" id="f-size-op" style="width:110px;">
+                <option value="gt" {% if size_op == 'gt' %}selected{% endif %}>Más de</option>
+                <option value="eq" {% if size_op == 'eq' %}selected{% endif %}>Igual a</option>
+                <option value="lt" {% if size_op == 'lt' %}selected{% endif %}>Menos de</option>
+              </select>
+              <input type="number" class="form-control form-control-sm" id="f-size-val"
+                     min="0" step="any" placeholder="MB" style="width:90px;"
+                     value="{{ size_mb if size_mb is not none }}">
+              <span class="text-muted small">MB</span>
+              <button type="button" class="btn btn-ol-icon ms-auto" id="f-size-add" title="Aplicar">
+                <i class="bi bi-check2-circle"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {# Filtro: Colaboradores #}
+        <div class="dropdown" id="dd-members">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary filter-btn dropdown-toggle {{ 'has-filter' if members_op }}"
+                  id="btn-f-members">
+            <i class="bi bi-people me-1"></i>Colaboradores
+          </button>
+          <div class="dropdown-menu shadow-sm p-3" style="min-width:280px;">
+            <p class="small fw-semibold text-muted mb-2">Nº de colaboradores</p>
+            <div class="d-flex gap-2 align-items-center">
+              <select class="form-select form-select-sm" id="f-members-op" style="width:110px;">
+                <option value="gt" {% if members_op == 'gt' %}selected{% endif %}>Más de</option>
+                <option value="eq" {% if members_op == 'eq' %}selected{% endif %}>Igual a</option>
+                <option value="lt" {% if members_op == 'lt' %}selected{% endif %}>Menos de</option>
+              </select>
+              <input type="number" class="form-control form-control-sm" id="f-members-val"
+                     min="0" max="9999" placeholder="nº" style="width:80px;"
+                     value="{{ members_val if members_val is not none }}">
+              <button type="button" class="btn btn-ol-icon ms-auto" id="f-members-add" title="Aplicar">
+                <i class="bi bi-check2-circle"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -131,7 +148,7 @@
       </div>{# /fila 1 #}
 
       {# Fila 2: chips de filtros activos #}
-      {% set has_filters = search or owner_id or date_from or date_to or indicators_filter %}
+      {% set has_filters = search or owner_id or date_from or date_to or size_op or members_op %}
       <div id="chips-row"
            class="{% if not has_filters %}d-none {% endif %}mt-2 pt-2 border-top d-flex flex-wrap align-items-center gap-2">
       </div>
@@ -177,25 +194,26 @@
                   <i class="sort-icon bi bi-chevron-expand"></i>
                 </div>
               </th>
-              <th>Indicadores</th>
             </tr>
           </thead>
           <tbody id="projects-tbody">
             {% for proj in pagination.items %}
             {% set cnt   = member_counts.get(proj.id, 0) %}
             {% set names = member_names.get(proj.id, []) %}
-            {% set flags = indicators.get(proj.id, []) %}
             {% set detail_url = url_for('projects.project_detail', project_id=proj.id) %}
-            <tr onclick="window.location='{{ detail_url }}'">
+            <tr class="row-clickable" onclick="window.location='{{ detail_url }}'">
               <td class="ps-3 fw-medium small">
                 <a href="{{ detail_url }}" class="text-decoration-none text-body"
                    onclick="event.stopPropagation()">{{ proj.name or "—" }}</a>
               </td>
               <td class="small">
                 {% if proj.owner %}
+                  {# Pill clickable que delimita el área "ir al usuario";
+                     el resto de la fila sigue llevando al detalle del proyecto. #}
                   <a href="{{ url_for('users.user_detail', user_id=proj.owner.id) }}"
-                     class="text-decoration-none text-muted d-flex align-items-center gap-1"
-                     onclick="event.stopPropagation()">
+                     class="owner-pill text-decoration-none"
+                     onclick="event.stopPropagation()"
+                     title="Ver perfil de {{ proj.owner.display_name }}">
                     <i class="bi bi-person-fill"></i>{{ proj.owner.display_name }}
                   </a>
                 {% else %}<span class="text-muted">—</span>{% endif %}
@@ -227,29 +245,10 @@
               <td class="small text-muted">
                 {{ proj.created_at.strftime('%d/%m/%Y') if proj.created_at else "—" }}
               </td>
-              <td>
-                <div class="d-flex flex-wrap gap-1">
-                  {% if 'large' in flags %}
-                    <span class="badge bg-warning text-dark" title="Ocupa más de 10 MB">
-                      <i class="bi bi-hdd-fill me-1"></i>Grande
-                    </span>
-                  {% endif %}
-                  {% if 'inactive' in flags %}
-                    <span class="badge bg-secondary" title="Sin actividad en más de 90 días">
-                      <i class="bi bi-moon-fill me-1"></i>Inactivo
-                    </span>
-                  {% endif %}
-                  {% if 'collaborative' in flags %}
-                    <span class="badge bg-primary bg-opacity-75" title="{{ cnt }} colaboradores">
-                      <i class="bi bi-people-fill me-1"></i>Colaborativo
-                    </span>
-                  {% endif %}
-                </div>
-              </td>
             </tr>
             {% endfor %}
             {% if not pagination.items %}
-            <tr><td colspan="7" class="text-center py-5 text-muted">
+            <tr><td colspan="6" class="text-center py-5 text-muted">
               <i class="bi bi-folder-x fs-1 d-block mb-3 opacity-50"></i>
               No hay proyectos que coincidan con los filtros aplicados.
             </td></tr>
@@ -280,14 +279,17 @@
 <script>
 const SEARCH_URL    = "{{ url_for('projects.search_projects') }}";
 const INITIAL_STATE = {
-  q:          {{ search     | tojson }},
-  owner_id:   {{ owner_id   | tojson }},
-  owner_name: {{ (selected_owner.display_name if selected_owner else '') | tojson }},
-  date_from:  {{ date_from  | tojson }},
-  date_to:    {{ date_to    | tojson }},
-  indicators: {{ indicators_filter | tojson }},
-  sort:       {{ sort_col   | tojson }},
-  order:      {{ sort_order | tojson }},
+  q:           {{ search     | tojson }},
+  owner_id:    {{ owner_id   | tojson }},
+  owner_name:  {{ (selected_owner.display_name if selected_owner else '') | tojson }},
+  date_from:   {{ date_from  | tojson }},
+  date_to:     {{ date_to    | tojson }},
+  size_op:     {{ size_op    | tojson }},
+  size_mb:     {{ size_mb    | tojson }},
+  members_op:  {{ members_op | tojson }},
+  members_val: {{ members_val | tojson }},
+  sort:        {{ sort_col   | tojson }},
+  order:       {{ sort_order | tojson }},
 };
 </script>
 <script src="{{ url_for('static', filename='js/projects-list.js') }}"></script>

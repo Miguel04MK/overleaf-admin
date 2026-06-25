@@ -234,9 +234,11 @@ class TestDashboardService:
         assert len(data["recent_audit"]) == 3
 
     def test_db_ok(self, app):
+        """`db_ok` se retiró del dashboard junto al panel de salud de servicios."""
         from app.model.services.dashboard_service import get_dashboard_data
         data = get_dashboard_data()
-        assert data["db_ok"] is True
+        assert isinstance(data, dict)
+        assert "db_ok" not in data
 
     def test_empty_db_returns_defaults(self, app):
         from app.model.services.dashboard_service import get_dashboard_data
@@ -442,13 +444,14 @@ class TestDashboardRendering:
         assert "kpi--users" in html
         assert "kpi--projects" in html
 
-    def test_get_root_has_status_line(self, client, login):
+    def test_get_root_renders_kpi_strip(self, client, login):
+        """La barra inferior 'status-line' se retiró; el dashboard ahora se
+        compone de la franja de KPIs + filas de cards. Verificamos que
+        renderiza la franja de KPIs."""
         resp = client.get("/")
         html = resp.data.decode()
-        assert "status-line" in html
-        assert ("Sistema correcto" in html or
-                "Con avisos" in html or
-                "Con incidencias" in html)
+        assert "kpi-strip" in html
+        assert "status-line" not in html
 
     def test_dashboard_renders_audit_translations(self, client, login, seed_audit_logs):
         resp = client.get("/")
@@ -521,21 +524,51 @@ class TestMetricsRoute:
     def test_metrics_shows_growth_charts(self, client, login, seed_users, seed_projects):
         resp = client.get("/metricas/")
         html = resp.data.decode()
-        assert "chartGrowthUsers" in html or "Crecimiento de usuarios" in html
+        # Tras la reorganización, las gráficas usuarios/proyectos se fusionan
+        # en una card "Crecimiento" con un switcher. Buscamos cualquier marcador.
+        assert (
+            "Crecimiento" in html
+            and ("growth-panel" in html or "chartGrowthUsers" in html)
+        )
 
     def test_metrics_shows_rankings(self, client, login, seed_projects):
         resp = client.get("/metricas/")
         html = resp.data.decode()
-        assert "chartTopOwners" in html or "Ranking" in html
+        # Ranking ahora vive en la tab "Usuarios y proyectos" con switcher
+        # entre "Más proyectos" y "Más almacenamiento".
+        assert "Ranking" in html and "ranking-panel" in html
 
     def test_metrics_shows_sync_history(self, client, login, seed_sync):
         resp = client.get("/metricas/")
         html = resp.data.decode()
-        assert "Historial de sincronizaciones" in html
+        # Tras la reorganización, el historial vive en la tab "Sincronización";
+        # buscamos cualquier marcador estable de esa sección.
+        assert (
+            "Historial" in html
+            and ("Sincronización" in html or "sync-tbl" in html)
+        )
 
     def test_metrics_empty_db_no_errors(self, client, login):
         resp = client.get("/metricas/")
         assert resp.status_code == 200
+
+    def test_metrics_renders_tab_structure(self, client, login):
+        """La pantalla de métricas se organiza en 4 tabs (se retiró 'salud')."""
+        resp = client.get("/metricas/")
+        html = resp.data.decode()
+        assert 'id="metricsTabs"' in html
+        for tid in ("tab-resumen", "tab-usuarios", "tab-storage", "tab-sync"):
+            assert f'data-bs-target="#{tid}"' in html, f"falta tab {tid}"
+        assert 'data-bs-target="#tab-salud"' not in html
+
+    def test_metrics_has_chart_switchers(self, client, login):
+        """Las gráficas hermanas (crecimiento / ranking) se fusionan con un
+        switcher dentro de la misma card."""
+        resp = client.get("/metricas/")
+        html = resp.data.decode()
+        assert 'class="chart-switch"' in html or "chart-switch" in html
+        assert "growth-panel" in html
+        assert "ranking-panel" in html
 
 
 # ── Metrics service tests ────────────────────────────────────────────────────

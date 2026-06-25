@@ -1,129 +1,449 @@
 {% extends "base.html" %}
 {% block title %}Sincronización{% endblock %}
-{% block page_title %}Estado de sincronización{% endblock %}
+{% block page_title %}Sincronización{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sync.css') }}">
+{% endblock %}
 
 {% block content %}
-<div class="pt-3">
+<div class="pt-2 sync-page">
 
-  <!-- Acción manual -->
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3">
-      <div>
-        <h6 class="fw-semibold mb-1">Sincronización manual</h6>
-        <p class="text-muted small mb-0">
-          Extrae usuarios y proyectos de Overleaf Community Edition y los carga en PostgreSQL.
-          El proceso se ejecuta en segundo plano; refresca la página para ver el resultado.
-        </p>
+  {# ── Fila superior: 3 cards (sin "Estado actual" suelto) ────────────── #}
+  <div class="row g-2 mb-3">
+    {# Última sincronización (con badge "En curso" integrado si aplica) #}
+    <div class="col-12 col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="stat-icon-sm bg-success-subtle">
+              <i class="bi bi-clock-history text-success"></i>
+            </div>
+            <div class="stat-lbl">Última sincronización</div>
+            {% if sync_status.running %}
+              <span class="badge bg-info text-white ms-auto live-badge" id="running-badge"
+                    title="Hay una sync en curso ahora mismo">
+                <i class="bi bi-arrow-repeat me-1"></i>En curso
+              </span>
+            {% endif %}
+          </div>
+          <div id="last-sync-summary">
+            {% set last = sync_status.last %}
+            {% if last %}
+              <div class="small fw-semibold">
+                {% if last.status == 'success' %}
+                  <span class="text-success"><i class="bi bi-check-circle me-1"></i>Éxito</span>
+                {% elif last.status == 'error' %}
+                  <span class="text-danger"><i class="bi bi-x-circle me-1"></i>Error</span>
+                {% else %}
+                  <span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i>{{ last.status }}</span>
+                {% endif %}
+                · {{ last.sync_type_label }}
+              </div>
+              <div class="text-muted" style="font-size:.72rem;">
+                {{ last.started_at[:16].replace('T',' ') if last.started_at else '—' }}
+                {% if last.duration_seconds %} · {{ "%.1f"|format(last.duration_seconds) }}s{% endif %}
+                · por {{ last.triggered_by_user or 'system' }}
+              </div>
+            {% else %}
+              <div class="text-muted small">Sin sincronizaciones aún.</div>
+            {% endif %}
+          </div>
+        </div>
       </div>
-      <form method="POST" action="{{ url_for('sync.trigger') }}">
-        <button type="submit" class="btn btn-success">
-          <i class="bi bi-arrow-repeat me-2"></i>Sincronizar ahora
-        </button>
-      </form>
+    </div>
+
+    {# Datos procesados (última sync) #}
+    <div class="col-12 col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="stat-icon-sm bg-primary-subtle">
+              <i class="bi bi-arrow-down-up text-primary"></i>
+            </div>
+            <div class="stat-lbl">Datos procesados</div>
+          </div>
+          <div id="last-sync-counts" class="small">
+            {% set last = sync_status.last %}
+            {% if last %}
+              <span class="me-3">
+                <i class="bi bi-people me-1"></i>
+                {% if last.users_after is not none %}{{ last.users_after }}{% else %}{{ last.users_synced or 0 }}{% endif %}
+                usuarios
+              </span>
+              <span>
+                <i class="bi bi-folder me-1"></i>
+                {% if last.projects_after is not none %}{{ last.projects_after }}{% else %}{{ last.projects_synced or 0 }}{% endif %}
+                proyectos
+              </span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Errores 24h #}
+    <div class="col-12 col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+          <div class="stat-icon-sm bg-danger-subtle">
+            <i class="bi bi-exclamation-octagon text-danger"></i>
+          </div>
+          <div>
+            <div class="stat-lbl">Errores (24h)</div>
+            <div class="stat-num {% if sync_status.totals_24h.error %}text-danger{% endif %}"
+                 id="errors-24h">{{ sync_status.totals_24h.error }}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Historial -->
-  <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom fw-semibold">
-      <i class="bi bi-clock-history me-2 text-muted"></i>Historial de sincronizaciones
-      <span class="badge bg-secondary ms-2">{{ runs|length }}</span>
+  {# ── Fila central: Programadas (izquierda) + Acciones (derecha) ────── #}
+  <div class="row g-3 mb-3">
+
+    {# ── Columna izquierda: programadas ───────────────────────────── #}
+    <div class="col-12 col-lg-8">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom py-2 px-3 fw-semibold small d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-calendar-event me-2 text-muted"></i>Sincronización periódica</span>
+          {% if sync_status.next_run_at %}
+            <small class="text-muted">Próxima: {{ sync_status.next_run_at[:16].replace('T',' ') }}</small>
+          {% endif %}
+        </div>
+        <div class="card-body py-3 px-3">
+
+          {# Listado de programaciones existentes #}
+          {% if schedules %}
+            <div class="schedule-list mb-3">
+              {% for sch in schedules %}
+                <div class="schedule-card d-flex align-items-center flex-wrap gap-2
+                            {% if not sch.enabled %}schedule-disabled{% endif %}">
+                  <div class="schedule-icon">
+                    <i class="bi {% if sch.sync_type == 'users' %}bi-people
+                                {% elif sch.sync_type == 'projects' %}bi-folder
+                                {% else %}bi-arrow-repeat{% endif %} text-muted"></i>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                      <span class="fw-semibold small">{{ sch.name }}</span>
+                      {% if sch.enabled %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle"
+                              style="font-size:.65rem;">Activa</span>
+                      {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary border"
+                              style="font-size:.65rem;">Pausada</span>
+                      {% endif %}
+                    </div>
+                    <div class="text-muted" style="font-size:.72rem;">
+                      <i class="bi bi-tag me-1"></i>{{ sch.sync_type_label }}
+                      <span class="mx-1">·</span>
+                      <i class="bi bi-clock me-1"></i>{{ sch.interval_label }}
+                      {% if sch.scheduled_hour_label %}
+                        <span class="mx-1">·</span>
+                        <i class="bi bi-alarm me-1"></i>{{ sch.scheduled_hour_label }}
+                      {% endif %}
+                      {% if sch.next_run_at %}
+                        <span class="mx-1">·</span>
+                        <i class="bi bi-arrow-right me-1"></i>{{ sch.next_run_at | localdt('%d/%m %H:%M') }}
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="d-flex gap-1 flex-shrink-0">
+                    <form method="POST"
+                          action="{{ url_for('sync.toggle_schedule', schedule_id=sch.id) }}"
+                          class="d-inline">
+                      <button type="submit"
+                              class="btn btn-sm btn-outline-{% if sch.enabled %}warning{% else %}success{% endif %} py-0 px-2"
+                              title="{% if sch.enabled %}Pausar{% else %}Activar{% endif %}">
+                        <i class="bi {% if sch.enabled %}bi-pause-fill{% else %}bi-play-fill{% endif %}"></i>
+                      </button>
+                    </form>
+                    <form method="POST"
+                          action="{{ url_for('sync.delete_schedule', schedule_id=sch.id) }}"
+                          class="d-inline"
+                          data-confirm="¿Eliminar la programación «{{ sch.name }}»?">
+                      <button type="submit"
+                              class="btn btn-sm btn-outline-danger py-0 px-2"
+                              title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted small mb-3 text-center py-2">
+              <i class="bi bi-inbox d-block fs-4 mb-1 opacity-50"></i>
+              Sin programaciones. Añade una para que se ejecute automáticamente.
+            </div>
+          {% endif %}
+
+          {# Formulario "añadir nueva" #}
+          <form method="POST" action="{{ url_for('sync.create_schedule') }}"
+                class="row g-2 align-items-end border-top pt-3">
+            <div class="col-12">
+              <div class="small fw-semibold mb-1">
+                <i class="bi bi-plus-circle me-1 text-success"></i>Añadir programación
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small fw-semibold mb-1" for="sch-name">Nombre</label>
+              <input type="text" class="form-control form-control-sm" id="sch-name"
+                     name="name" required maxlength="128"
+                     placeholder="p. ej. Diaria de usuarios">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small fw-semibold mb-1" for="sch-type">Tipo</label>
+              <select class="form-select form-select-sm" id="sch-type" name="sync_type">
+                <option value="full">Completa</option>
+                <option value="users">Solo usuarios</option>
+                <option value="projects">Solo proyectos</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label small fw-semibold mb-1" for="sch-interval">Frecuencia</label>
+              <select class="form-select form-select-sm" id="sch-interval" name="interval_minutes">
+                {% for value, label in interval_presets %}
+                  <option value="{{ value }}" {% if value == 1440 %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small fw-semibold mb-1" for="sch-hour">Hora</label>
+              <select class="form-select form-select-sm" id="sch-hour" name="scheduled_hour">
+                <option value="">Sin fijar</option>
+                {% for h in range(24) %}
+                  <option value="{{ h }}" {% if h == 8 %}selected{% endif %}>{{ '%02d'|format(h) }}:00</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6 col-md-1 d-flex">
+              <button type="submit" class="btn btn-sm btn-success w-100">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+              <input type="hidden" name="enabled" value="on">
+            </div>
+          </form>
+
+          <div class="form-text small mt-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Las programaciones activas se ejecutan automáticamente en segundo
+            plano. La hora fija indica a qué hora del día debe ejecutarse;
+            para intervalos de 12 h se ejecuta dos veces al día (hora + 12 h).
+          </div>
+        </div>
+      </div>
     </div>
+
+    {# ── Columna derecha: acciones manuales ─────────────────────── #}
+    <div class="col-12 col-lg-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom py-2 px-3 fw-semibold small">
+          <i class="bi bi-lightning-charge me-2 text-muted"></i>Acciones manuales
+        </div>
+        <div class="card-body py-3 px-3 d-flex flex-column gap-2">
+          {% set buttons = [
+            ('full',         'Completa',       'bi-arrow-repeat',    'outline-success', "Actualiza usuarios, proyectos y relaciones."),
+            ('users',        'Solo usuarios',  'bi-people',          'outline-primary', "Sincroniza únicamente cuentas de Overleaf."),
+            ('projects',     'Solo proyectos', 'bi-folder',          'outline-primary', "Sincroniza proyectos, miembros y tamaños."),
+            ('resync_total', 'Resync total',   'bi-arrow-clockwise', 'outline-danger',  "Revisión completa. Puede tardar varios minutos."),
+          ] %}
+          {% set url_map = {
+            'full': url_for('sync.trigger'),
+            'users': url_for('sync.trigger_users'),
+            'projects': url_for('sync.trigger_projects'),
+            'resync_total': url_for('sync.trigger_resync_total'),
+          } %}
+          {% for key, label, icon, color, desc in buttons %}
+            <form method="POST" action="{{ url_map[key] }}" class="sync-action-form"
+                  data-confirm-title="Confirmar sincronización"
+                  data-confirm-msg="¿Iniciar la sincronización «{{ label }}»? {{ desc }}">
+              <button type="button" class="btn btn-{{ color }} w-100 text-start sync-action-btn"
+                      {% if sync_status.running %}disabled{% endif %}>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi {{ icon }} sync-action-icon"></i>
+                  <div class="min-w-0 flex-grow-1">
+                    <div class="fw-semibold small">{{ label }}</div>
+                    <small class="opacity-75 d-block sync-action-desc">{{ desc }}</small>
+                  </div>
+                </div>
+              </button>
+            </form>
+          {% endfor %}
+
+          {% if sync_status.running %}
+            <div class="alert alert-info small mb-0 py-2 px-3 mt-1">
+              <i class="bi bi-info-circle me-1"></i>
+              Hay una sync en curso. Espera a que termine para lanzar otra.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Historial con filtros ─────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-2 px-3 fw-semibold small d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="bi bi-clock-history me-2 text-muted"></i>Historial de sincronizaciones</span>
+      <span class="text-muted small" id="hist-total">{{ pagination.total }} registros</span>
+    </div>
+
+    <div class="card-body py-2 px-3 border-bottom">
+      <form id="hist-filters" class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1" for="f-status">Estado</label>
+          <select class="form-select form-select-sm" id="f-status" name="status">
+            <option value="">Todos</option>
+            <option value="success">Éxito</option>
+            <option value="error">Error</option>
+            <option value="running">En curso</option>
+            <option value="partial">Parcial</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1" for="f-type">Tipo</label>
+          <select class="form-select form-select-sm" id="f-type" name="sync_type">
+            <option value="">Todos</option>
+            <option value="full">Completa</option>
+            <option value="users">Solo usuarios</option>
+            <option value="projects">Solo proyectos</option>
+            <option value="resync_total">Resync total</option>
+            <option value="scheduled">Programada</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1" for="f-by">Iniciado</label>
+          <select class="form-select form-select-sm" id="f-by" name="triggered_by">
+            <option value="">Todos</option>
+            <option value="manual">Manual</option>
+            <option value="scheduled">Programada</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1" for="f-user">Por usuario</label>
+          <select class="form-select form-select-sm" id="f-user" name="triggered_by_user">
+            <option value="">Todos</option>
+            {% for u in actors %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-1">
+          <label class="form-label small fw-semibold mb-1" for="f-from">Desde</label>
+          <input type="date" class="form-control form-control-sm" id="f-from" name="date_from">
+        </div>
+        <div class="col-6 col-md-1">
+          <label class="form-label small fw-semibold mb-1" for="f-to">Hasta</label>
+          <input type="date" class="form-control form-control-sm" id="f-to" name="date_to">
+        </div>
+        <div class="col-12 col-md-2 d-flex gap-1">
+          <button type="submit" class="btn btn-sm btn-success flex-grow-1">
+            <i class="bi bi-funnel-fill"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-clear-filters">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+
     <div class="card-body p-0">
-      {% if runs %}
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-sm table-hover align-middle mb-0 sync-table">
           <thead class="table-light">
             <tr>
               <th class="ps-3">#</th>
               <th>Inicio</th>
-              <th>Fin</th>
+              <th>Tipo</th>
               <th>Estado</th>
-              <th>Modo</th>
+              <th>Iniciado</th>
               <th>Usuarios</th>
               <th>Proyectos</th>
               <th>Duración</th>
-              <th>Mensaje</th>
+              <th>Errores</th>
+              <th class="text-end pe-3"></th>
             </tr>
           </thead>
-          <tbody>
-            {% for run in runs %}
-            <tr>
-              <td class="ps-3 text-muted small">{{ run.id }}</td>
-              <td class="small text-nowrap">
-                {{ run.started_at.strftime('%d/%m/%Y %H:%M:%S') if run.started_at else '—' }}
-              </td>
-              <td class="small text-nowrap text-muted">
-                {{ run.finished_at.strftime('%H:%M:%S') if run.finished_at else
-                   ('<span class="text-info small">en curso…</span>'|safe) }}
-              </td>
-              <td>
-                {% if run.status == 'success' %}
-                  <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Éxito</span>
-                {% elif run.status == 'error' %}
-                  <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Error</span>
-                {% elif run.status == 'running' %}
-                  <span class="badge bg-info"><i class="bi bi-arrow-repeat me-1"></i>En curso</span>
-                {% elif run.status == 'partial' %}
-                  <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle me-1"></i>Parcial</span>
-                {% else %}
-                  <span class="badge bg-secondary">{{ run.status }}</span>
-                {% endif %}
-              </td>
-              <td class="small text-muted">
-                {% if run.triggered_by == 'manual' %}
-                  <i class="bi bi-hand-index me-1"></i>Manual
-                {% else %}
-                  <i class="bi bi-clock me-1"></i>Programada
-                {% endif %}
-              </td>
-              <td class="small">
-                <span class="fw-medium">{{ run.users_found }}</span>
-                {% with delta = run.users_delta %}{% include 'partials/_delta_inline.html' %}{% endwith %}
-              </td>
-              <td class="small">
-                <span class="fw-medium">{{ run.projects_found }}</span>
-                {% with delta = run.projects_delta %}{% include 'partials/_delta_inline.html' %}{% endwith %}
-              </td>
-              <td class="small text-muted">
-                {% if run.duration_seconds is not none %}
-                  {{ "%.1f"|format(run.duration_seconds) }}s
-                {% else %}—{% endif %}
-              </td>
-              <td class="small text-muted" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-                  title="{{ run.message or '' }}">
-                {{ run.message or '—' }}
-              </td>
-            </tr>
-            {% endfor %}
+          <tbody id="hist-tbody">
+            {% include 'sync/_history_rows.html' %}
           </tbody>
         </table>
       </div>
-      {% else %}
-      <div class="text-center text-muted py-5">
-        <i class="bi bi-arrow-repeat fs-1 d-block mb-3 opacity-50"></i>
-        No hay sincronizaciones registradas todavía.<br>
-        Haz clic en <strong>Sincronizar ahora</strong> para comenzar.
+      <div id="hist-pagination" class="d-flex justify-content-center py-2">
+        {% include 'sync/_pagination.html' %}
       </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Info técnica -->
-  <div class="card border-0 shadow-sm mt-4 border-start border-4 border-info">
-    <div class="card-body">
-      <h6 class="fw-semibold text-info mb-2">
-        <i class="bi bi-info-circle me-2"></i>Información técnica
-      </h6>
-      <ul class="small text-muted mb-0">
-        <li>La sincronización se conecta al MongoDB de Overleaf CE (configurable en <code>.env</code> → <code>MONGO_URI</code>).</li>
-        <li>Si MongoDB no está disponible, el proceso fallará con estado <strong>Error</strong> y lo registrará en el log de auditoría.</li>
-        <li>Las sincronizaciones son <strong>idempotentes</strong>: se pueden ejecutar varias veces sin duplicar datos.</li>
-        <li>Para diagnosticar la conexión con Overleaf: <code>python scripts/diagnose_overleaf.py</code></li>
-        <li>Para poblar Overleaf con datos de prueba: <code>python scripts/seed_overleaf.py</code></li>
-      </ul>
     </div>
   </div>
 
 </div>
+
+{# ── Modal: confirmar acción de sync ──────────────────────────────────── #}
+<div class="modal fade" id="confirmSyncModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold" id="cs-title">
+          <i class="bi bi-question-circle me-2 text-warning-emphasis"></i>
+          Confirmar sincronización
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-2">
+        <p class="small mb-0" id="cs-message">¿Quieres lanzar la sincronización?</p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" id="cs-confirm-btn">
+          <i class="bi bi-check2-circle me-1"></i>Sí, lanzar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal de detalle de sync ──────────────────────────────────────────── #}
+{# `modal-dialog-scrollable` hace que SI el contenido excede el alto de la
+   ventana, sea el modal-body el que tenga su scroll interno (no la página).
+   El header (con strip de color) y el footer quedan siempre fijos. #}
+<div class="modal fade" id="syncDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content sd-content">
+      {# Cabecera con strip de color según estado (success / error / partial / running) #}
+      <div class="detail-header-strip sd-strip-loading" id="sd-header">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <div id="sd-header-content" class="flex-grow-1 min-w-0">
+            <div class="text-muted small">Cargando detalle…</div>
+          </div>
+          <button type="button" class="btn-close mt-1" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+      </div>
+      <div class="modal-body py-2 px-3" id="sd-body">
+        <div class="text-center text-muted py-4">
+          <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+        </div>
+      </div>
+      <div class="modal-footer border-0 py-2 px-3">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.SYNC_URLS = {
+    search: "{{ url_for('sync.search') }}",
+    state:  "{{ url_for('sync.state_json') }}",
+    detail: "{{ url_for('sync.sync_detail', sync_id=0) }}",
+  };
+</script>
+<script src="{{ url_for('static', filename='js/sync.js') }}"></script>
 {% endblock %}
