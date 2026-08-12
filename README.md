@@ -367,3 +367,24 @@ Los siguientes campos están documentados en `app/sync/extractor.py`:
 8. python scripts/sync_manual.py    # Primera sincronización
 9. # Navegar al dashboard para ver los datos sincronizados
 ```
+
+---
+
+## Licencia
+
+Copyright © 2026 Miguel Álvarez Fernández.
+
+Este proyecto se distribuye bajo **Creative Commons Reconocimiento-NoComercial 4.0
+Internacional (CC BY-NC 4.0)**. El texto completo está en [`LICENSE`](LICENSE) y en
+<https://creativecommons.org/licenses/by-nc/4.0/deed.es>.
+
+En resumen:
+
+| | |
+|---|---|
+| Puedes | Copiar, distribuir, modificar y crear obras derivadas |
+| Con la condición de | Citar la autoría original |
+| No puedes | Usarlo con fines comerciales |
+
+> GitHub muestra la licencia como "Other" porque CC BY-NC 4.0 no está en su base de
+> datos de detección automática. La licencia aplicable es la indicada aquí.
