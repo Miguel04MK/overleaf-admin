@@ -1,7 +1,8 @@
 # Overleaf Admin Platform
 
 Plataforma web de administración y gestión complementaria para **Overleaf Community Edition**.
-Desarrollada como Trabajo de Fin de Grado (TFG).
+Desarrollada como Trabajo de Fin de Grado (TFG) en la Universidade da Coruña,
+calificado con **9 sobre 10**.
 
 > **Importante:** Esta plataforma NO sustituye a Overleaf.
 > Se conecta externamente a Overleaf CE para extraer metadatos y ofrecerlos
